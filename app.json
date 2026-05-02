@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "DualCalendarApp",
+    "slug": "dual-calendar-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "dualcalendar",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.dualcalendar"
+    },
+    "android": {
+      "package": "app.dualcalendar",
+      "adaptiveIcon": {
+        "backgroundColor": "#F8F7F4"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "DualCalendarApp uses your location to calculate zmanim (halachic times)."
+        }
+      ],
+      "expo-notifications"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "73dcf406-9cd1-4bec-a83c-cde688268f4a"
+      }
+    }
+  }
+}
