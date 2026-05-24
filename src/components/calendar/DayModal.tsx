@@ -1,16 +1,14 @@
 // src/components/calendar/DayModal.tsx
 
-import React, { forwardRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { DayData, toHebrewNumeral } from '../../services/DateService';
+import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Linking, BackHandler } from 'react-native';
+import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop, type BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
+import { DayData, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ZmanimList } from '../zmanim/ZmanimList';
 import { useZmanim } from '../../hooks/useZmanim';
-import { useNotes } from '../../hooks/useNotes';
 import { NoteList } from '../notes/NoteList';
 import type { ZmanimResult } from '../../services/ZmanimService';
-import type { CalendarNote } from '../../hooks/useNotes';
 import type { ThemeColors } from '../../hooks/useThemeColors';
 
 interface DayModalProps {
@@ -21,7 +19,35 @@ interface DayModalProps {
 export const DayModal = forwardRef<BottomSheet, DayModalProps>(({ dayData, onClose }, ref) => {
   const colors = useThemeColors();
   const zmanim = useZmanim(dayData?.gregorianDate ?? new Date());
-  const { notes } = useNotes(dayData?.gregorianDate ?? null);
+
+  // Track the current snap index so we know whether the sheet is open.
+  // useRef avoids re-renders on every snap change; -1 = closed.
+  const snapIndex = useRef<number>(-1);
+
+  // Wire Android hardware back button: close the sheet if it is open,
+  // otherwise let the system handle it (return false).
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (snapIndex.current >= 0) {
+        (ref as React.RefObject<BottomSheet>)?.current?.close();
+        return true; // consumed — do not exit app
+      }
+      return false; // not consumed — system handles it
+    });
+    return () => subscription.remove(); // cleanup on unmount — no memory leak
+  }, [ref]);
+
+  const renderBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
 
   return (
     <BottomSheet
@@ -29,6 +55,8 @@ export const DayModal = forwardRef<BottomSheet, DayModalProps>(({ dayData, onClo
       index={-1}
       snapPoints={['50%', '85%']}
       enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      onChange={(index) => { snapIndex.current = index; }}
       onClose={onClose}
       backgroundStyle={{ backgroundColor: colors.surface }}
       handleIndicatorStyle={{ backgroundColor: colors.border }}
@@ -38,7 +66,6 @@ export const DayModal = forwardRef<BottomSheet, DayModalProps>(({ dayData, onClo
           dayData={dayData}
           colors={colors}
           zmanim={zmanim}
-          notes={notes}
         />
       ) : null}
     </BottomSheet>
@@ -49,12 +76,10 @@ function ModalScrollContent({
   dayData,
   colors,
   zmanim,
-  notes,
 }: {
   dayData: DayData;
   colors: ThemeColors;
   zmanim: ZmanimResult;
-  notes: CalendarNote[];
 }) {
   const { hebrewDate, holidays, parasha, omerDay, dafYomi, rambamChapter, gregorianDate } = dayData;
 
@@ -62,7 +87,7 @@ function ModalScrollContent({
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
-  const hebrewFormatted = `${toHebrewNumeral(hebrewDate.day)} ${hebrewDate.monthName} ${hebrewDate.year}`;
+  const hebrewFormatted = `${toHebrewNumeral(hebrewDate.day)} ${hebrewDate.monthName} ${toHebrewYear(hebrewDate.year)}`;
 
   return (
     <BottomSheetScrollView contentContainerStyle={styles.content}>
@@ -125,7 +150,7 @@ function ModalScrollContent({
 
       <ZmanimList zmanim={zmanim} />
 
-      <NoteList notes={notes} date={gregorianDate} />
+      <NoteList date={gregorianDate} hebrewDate={hebrewDate} />
     </BottomSheetScrollView>
   );
 }
