@@ -41,8 +41,8 @@ interface SettingsState {
   setFirstDayOfWeek: (d: FirstDayOfWeek) => void;
   setDefaultCalendarType: (t: DefaultCalendarType) => void;
   setDiaspora: (v: boolean) => void;
-  loadFromStorage: () => void;
-  save: (key: string, value: string) => void;
+  loadFromStorage: () => Promise<void>;
+  save: (key: string, value: string) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -60,28 +60,46 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   use24hTime: true,
   omerReminders: false,
 
-  toggleHebrew: () => { const v = !get().showHebrew; set({ showHebrew: v }); get().save('showHebrew', String(v)); },
-  toggleGregorian: () => { const v = !get().showGregorian; set({ showGregorian: v }); get().save('showGregorian', String(v)); },
-  toggleHebrewOnTop: () => { const v = !get().hebrewOnTop; set({ hebrewOnTop: v }); get().save('hebrewOnTop', String(v)); },
+  toggleHebrew:      () => { const v = !get().showHebrew;    set({ showHebrew: v });    get().save('showHebrew', String(v)); },
+  toggleGregorian:   () => { const v = !get().showGregorian; set({ showGregorian: v }); get().save('showGregorian', String(v)); },
+  toggleHebrewOnTop: () => { const v = !get().hebrewOnTop;   set({ hebrewOnTop: v });   get().save('hebrewOnTop', String(v)); },
   setDiagonalDirection: (d) => { set({ diagonalDirection: d }); get().save('diagonalDirection', d); },
-  setDarkMode: (m) => { set({ darkMode: m }); get().save('darkMode', m); },
-  setZmanimMethod: (m) => { set({ zmanimMethod: m }); get().save('zmanimMethod', m); },
-  setFirstDayOfWeek: (d) => { set({ firstDayOfWeek: d }); get().save('firstDayOfWeek', String(d)); },
+  setDarkMode:          (m) => { set({ darkMode: m });          get().save('darkMode', m); },
+  setZmanimMethod:      (m) => { set({ zmanimMethod: m });      get().save('zmanimMethod', m); },
+  setFirstDayOfWeek:    (d) => { set({ firstDayOfWeek: d });    get().save('firstDayOfWeek', String(d)); },
   setDefaultCalendarType: (t) => { set({ defaultCalendarType: t }); get().save('defaultCalendarType', t); },
-  setDiaspora: (v) => { set({ diaspora: v }); get().save('diaspora', String(v)); },
+  setDiaspora:          (v) => { set({ diaspora: v });           get().save('diaspora', String(v)); },
 
-  loadFromStorage: () => {
+  loadFromStorage: async () => {
+    const [
+      showHebrew, showGregorian, hebrewOnTop, diagonalDirection,
+      darkMode, firstDayOfWeek, defaultCalendarType, diaspora,
+      zmanimMethod, omerReminders, use24hTime,
+    ] = await Promise.all([
+      StorageService.getPref('showHebrew',          'true'),
+      StorageService.getPref('showGregorian',        'true'),
+      StorageService.getPref('hebrewOnTop',          'true'),
+      StorageService.getPref('diagonalDirection',    'tl-br'),
+      StorageService.getPref('darkMode',             'system'),
+      StorageService.getPref('firstDayOfWeek',       '0'),
+      StorageService.getPref('defaultCalendarType',  'hebrew'),
+      StorageService.getPref('diaspora',             'false'),
+      StorageService.getPref('zmanimMethod',         'GRA'),
+      StorageService.getPref('omerReminders',        'false'),
+      StorageService.getPref('use24hTime',           'true'),
+    ]);
     set({
-      showHebrew: StorageService.getPref('showHebrew', 'true') === 'true',
-      showGregorian: StorageService.getPref('showGregorian', 'true') === 'true',
-      hebrewOnTop: StorageService.getPref('hebrewOnTop', 'true') === 'true',
-      diagonalDirection: StorageService.getPref('diagonalDirection', 'tl-br') as DiagonalDirection,
-      darkMode: StorageService.getPref('darkMode', 'system') as any,
-      firstDayOfWeek: Number(StorageService.getPref('firstDayOfWeek', '0')) as FirstDayOfWeek,
-      defaultCalendarType: StorageService.getPref('defaultCalendarType', 'hebrew') as DefaultCalendarType,
-      diaspora: StorageService.getPref('diaspora', 'false') === 'true',
-      zmanimMethod: StorageService.getPref('zmanimMethod', 'GRA') as ZmanimMethod,
-      omerReminders: StorageService.getPref('omerReminders', 'false') === 'true',
+      showHebrew:          showHebrew === 'true',
+      showGregorian:       showGregorian === 'true',
+      hebrewOnTop:         hebrewOnTop === 'true',
+      diagonalDirection:   diagonalDirection as DiagonalDirection,
+      darkMode:            darkMode as 'system' | 'light' | 'dark',
+      firstDayOfWeek:      Number(firstDayOfWeek) as FirstDayOfWeek,
+      defaultCalendarType: defaultCalendarType as DefaultCalendarType,
+      diaspora:            diaspora === 'true',
+      zmanimMethod:        zmanimMethod as ZmanimMethod,
+      omerReminders:       omerReminders === 'true',
+      use24hTime:          use24hTime === 'true',
     });
   },
 
