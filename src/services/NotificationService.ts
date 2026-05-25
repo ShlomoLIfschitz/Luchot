@@ -3,18 +3,20 @@
 import * as Notifications from 'expo-notifications';
 import { getZmanim } from './ZmanimService';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
 export class NotificationService {
+  static init() {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }
+
   static async requestPermissions(): Promise<boolean> {
-    const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
+    const result = await Notifications.requestPermissionsAsync();
+    return result.granted;
   }
 
   /**

@@ -1,6 +1,6 @@
 // src/services/DateService.ts
 
-import { HDate, HebrewCalendar, Event as HebcalEvent, flags, parshiot } from '@hebcal/core';
+import { HDate, HebrewCalendar, Event as HebcalEvent, flags } from '@hebcal/core';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -64,6 +64,31 @@ export function toHebrewNumeral(n: number): string {
   return GEMATRIA[n] ?? n.toString();
 }
 
+// ── Hebrew Year Gematria ───────────────────────────────────
+
+const GEM_HUNDREDS = ['', 'ק', 'ר', 'ש', 'ת', 'תק', 'תר', 'תש', 'תת', 'תתק'];
+const GEM_TENS     = ['', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ'];
+const GEM_UNITS    = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'];
+
+/** Converts a Hebrew year number to gematria letters, e.g. 5785 → "תשפ״ה" */
+export function toHebrewYear(year: number): string {
+  const y = year % 1000;
+  const h = Math.floor(y / 100);
+  const rem = y % 100;
+  let t = Math.floor(rem / 10);
+  let u = rem % 10;
+
+  // Avoid writing God's name (yod-heh=15, yod-vav=16)
+  let tensStr  = GEM_TENS[t];
+  let unitsStr = GEM_UNITS[u];
+  if (t === 1 && u === 5) { tensStr = 'ט'; unitsStr = 'ו'; }
+  if (t === 1 && u === 6) { tensStr = 'ט'; unitsStr = 'ז'; }
+
+  const letters = GEM_HUNDREDS[h] + tensStr + unitsStr;
+  if (letters.length <= 1) return letters + '׳';
+  return letters.slice(0, -1) + '״' + letters.slice(-1);
+}
+
 // ── Core DateService ──────────────────────────────────────
 
 export class DateService {
@@ -90,8 +115,8 @@ export class DateService {
     const daysInMonth = new Date(year, month, 0).getDate();
 
     // Fetch all hebcal events for this month once
-    const startDate = new HDate(1, month, year);
-    const endDate = new HDate(daysInMonth, month, year);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month - 1, daysInMonth);
 
     const events = HebrewCalendar.calendar({
       start: startDate,

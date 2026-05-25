@@ -24,6 +24,23 @@ export interface ZmanimResult {
 
 const zmanimCache = new Map<string, ZmanimResult>();
 
+const NULL_ZMANIM: ZmanimResult = {
+  alotHashachar: null,
+  misheyakir: null,
+  netz: null,
+  sofZmanShmaMGA: null,
+  sofZmanShmaGRA: null,
+  sofZmanTfillaMGA: null,
+  sofZmanTfillaGRA: null,
+  chatzot: null,
+  minchaGedola: null,
+  minchaKetana: null,
+  plagHamincha: null,
+  shkia: null,
+  tzeitHakochavim: null,
+  tzeitRabbeinu: null,
+};
+
 /** kosher-zmanim returns Luxon DateTime; avoid importing luxon types (no @types/luxon needed). */
 function toJsDate(dt: { isValid: boolean; toJSDate: () => Date } | null | undefined): Date | null {
   if (!dt || !dt.isValid) return null;
@@ -40,34 +57,39 @@ export function getZmanim(
   const key = `${date.toDateString()}-${latitude.toFixed(4)}-${longitude.toFixed(4)}-${method}`;
   if (zmanimCache.has(key)) return zmanimCache.get(key)!;
 
-  const geoLocation = new GeoLocation('', latitude, longitude, elevation, 'Asia/Jerusalem');
-  const czc = new ComplexZmanimCalendar(geoLocation);
-  czc.setDate(date);
+  try {
+    const geoLocation = new GeoLocation('', latitude, longitude, elevation, 'Asia/Jerusalem');
+    const czc = new ComplexZmanimCalendar(geoLocation);
+    czc.setDate(date);
 
-  const plag =
-    method === 'MGA'
-      ? czc.getPlagHamincha(czc.getAlos72(), czc.getTzais72())
-      : czc.getPlagHamincha(czc.getSunrise(), czc.getSunset());
+    const plag =
+      method === 'MGA'
+        ? czc.getPlagHamincha(czc.getAlos72(), czc.getTzais72())
+        : czc.getPlagHamincha(czc.getSunrise(), czc.getSunset());
 
-  const result: ZmanimResult = {
-    alotHashachar: toJsDate(czc.getAlos72()),
-    misheyakir: toJsDate(czc.getMisheyakir10Point2Degrees()),
-    netz: toJsDate(czc.getSunrise()),
-    sofZmanShmaMGA: toJsDate(czc.getSofZmanShmaMGA()),
-    sofZmanShmaGRA: toJsDate(czc.getSofZmanShmaGRA()),
-    sofZmanTfillaMGA: toJsDate(czc.getSofZmanTfilaMGA()),
-    sofZmanTfillaGRA: toJsDate(czc.getSofZmanTfilaGRA()),
-    chatzot: toJsDate(czc.getChatzos()),
-    minchaGedola: toJsDate(czc.getMinchaGedola(czc.getSunrise(), czc.getSunset())),
-    minchaKetana: toJsDate(czc.getMinchaKetana(czc.getSunrise(), czc.getSunset())),
-    plagHamincha: toJsDate(plag),
-    shkia: toJsDate(czc.getSunset()),
-    tzeitHakochavim: toJsDate(czc.getTzaisGeonim8Point5Degrees()),
-    tzeitRabbeinu: toJsDate(czc.getTzais72()),
-  };
+    const result: ZmanimResult = {
+      alotHashachar: toJsDate(czc.getAlos72()),
+      misheyakir: toJsDate(czc.getMisheyakir10Point2Degrees()),
+      netz: toJsDate(czc.getSunrise()),
+      sofZmanShmaMGA: toJsDate(czc.getSofZmanShmaMGA()),
+      sofZmanShmaGRA: toJsDate(czc.getSofZmanShmaGRA()),
+      sofZmanTfillaMGA: toJsDate(czc.getSofZmanTfilaMGA()),
+      sofZmanTfillaGRA: toJsDate(czc.getSofZmanTfilaGRA()),
+      chatzot: toJsDate(czc.getChatzos()),
+      minchaGedola: toJsDate(czc.getMinchaGedola(czc.getSunrise(), czc.getSunset())),
+      minchaKetana: toJsDate(czc.getMinchaKetana(czc.getSunrise(), czc.getSunset())),
+      plagHamincha: toJsDate(plag),
+      shkia: toJsDate(czc.getSunset()),
+      tzeitHakochavim: toJsDate(czc.getTzaisGeonim8Point5Degrees()),
+      tzeitRabbeinu: toJsDate(czc.getTzais72()),
+    };
 
-  zmanimCache.set(key, result);
-  return result;
+    zmanimCache.set(key, result);
+    return result;
+  } catch {
+    zmanimCache.set(key, NULL_ZMANIM);
+    return NULL_ZMANIM;
+  }
 }
 
 export function isAfterSunset(zmanim: ZmanimResult): boolean {
