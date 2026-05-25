@@ -1,17 +1,16 @@
 // src/components/calendar/MonthGrid.tsx
-// Phase 3.3 — full rewrite. Consumes new DayCell API, implements v2
-// interaction model. @ts-nocheck pragma removed.
+// Phase 3.4 — mode made required; useRouter wired; second-tap and viewDay
+// quick action now navigate to the Day tab.
 //
 // Known limitations (intentional, deferred to later phases):
 //   1. User notes do not appear as tags — buildDayTags receives empty
 //      userNotes array. Batching strategy for per-cell notes deferred
 //      to Phase 4.
-//   2. Second-tap navigation is a no-op — Day tab doesn't exist until
-//      Phase 3.4.
-//   3. Quick action handlers are no-ops — targets become available in
-//      Phase 3.4–3.5.
+//   2. addNote / addRecurring quick action handlers are no-ops — NoteEditor
+//      integration deferred to Phase 3.5.
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -30,8 +29,8 @@ export type MonthGridMode = 'hebrew' | 'gregorian';
 
 interface MonthGridProps {
   /** Determines primary/secondary date label assignment.
-   *  Defaults to 'hebrew' — the primary tab per SCREENS.md. */
-  mode?: MonthGridMode;
+   *  Pass 'hebrew' for the עברי tab, 'gregorian' for the לועזי tab. */
+  mode: MonthGridMode;
 }
 
 // ── Day name headers ───────────────────────────────────────────────────────────
@@ -41,8 +40,9 @@ const DAYS_HE_MON_FIRST = ['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 'א׳
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MonthGrid({ mode = 'hebrew' }: MonthGridProps) {
+export function MonthGrid({ mode }: MonthGridProps) {
   const colors = useThemeColors();
+  const router = useRouter();
   const {
     monthData,
     selectedDate,
@@ -95,8 +95,7 @@ export function MonthGrid({ mode = 'hebrew' }: MonthGridProps) {
   const handleDayPress = useCallback(
     (dayData: DayData) => {
       if (isSameDay(dayData.gregorianDate, selectedDate)) {
-        // TODO Phase 3.4: router.push('/(tabs)/day') once Day tab exists.
-        // Currently a no-op — the day is already visually selected.
+        router.push('/(tabs)/day');
       } else {
         setSelectedDate(dayData.gregorianDate);
       }
@@ -125,7 +124,7 @@ export function MonthGrid({ mode = 'hebrew' }: MonthGridProps) {
           // TODO Phase 3.4+: open NoteEditor with recurring=true, date=actionSheetDate
           break;
         case 'viewDay':
-          // TODO Phase 3.4: router.push('/(tabs)/day')
+          router.push('/(tabs)/day');
           break;
       }
     },
