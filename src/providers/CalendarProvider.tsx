@@ -17,6 +17,7 @@ interface CalendarState {
   setViewMode: (mode: ViewMode) => void;
   setSelectedDate: (date: Date) => void;
   navigateMonth: (direction: 1 | -1) => void;
+  navigateToMonth: (year: number, month: number) => void;
   setDiaspora: (value: boolean) => void;
   refreshMonth: () => void;
 }
@@ -42,6 +43,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     if (newMonth < 1)  { newMonth = 12; newYear--; }
     const monthData = dateService.getMonthData(newYear, newMonth);
     set({ currentMonth: newMonth, currentYear: newYear, monthData });
+  },
+
+  navigateToMonth: (year, month) => {
+    const monthData = dateService.getMonthData(year, month);
+    set({ currentYear: year, currentMonth: month, monthData });
   },
 
   setDiaspora: (value) => {

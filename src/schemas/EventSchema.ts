@@ -2,7 +2,7 @@
 
 export type CalendarType = 'hebrew' | 'gregorian';
 export type RecurrenceType = 'none' | 'yearly_hebrew' | 'yearly_gregorian' | 'weekly' | 'monthly_hebrew' | 'monthly_gregorian';
-export type NoteCategory = 'work' | 'personal' | 'holiday' | 'torah' | 'medical' | 'other';
+export type NoteCategory = 'work' | 'personal' | 'holiday' | 'torah' | 'medical' | 'other' | 'birthday' | 'yahrzeit' | 'anniversary';
 
 /**
  * 1:1 compatible with Google Calendar API Event object
