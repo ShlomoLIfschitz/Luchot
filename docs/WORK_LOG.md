@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-05-26 — Session: Phase 3.6 (Zmanim screen full implementation)
+
+**Phase:** Phase 3.6
+**Commits:** `77fa5c9` (ZmanimService feat), `da4e237` (ZmanimFullList feat), + zmanim.tsx + docs (this commit)
+**Duration:** ~45min
+
+### What got done
+- Extended `src/services/ZmanimService.ts` — added `candleLighting` and `havdalah` to `ZmanimResult` interface (at end, as required). Updated `NULL_ZMANIM` sentinel with both new `null` fields. In `getZmanim`, extracted `shkia` and `tzeitHakochavim` as local `const` variables (like `plag`) before the result object, then computed candle/havdalah from them inside the successful try-path only. `candleLighting` = 18 min before `shkia` on Fridays (JS day 5); `havdalah` = `tzeitHakochavim` on Saturdays (JS day 6). Change is purely additive — `ZmanimList` and all other consumers unaffected.
+- Created `src/components/zmanim/ZmanimFullList.tsx` — full zmanim display component for the Zmanim screen. Sections: זמני בוקר / סוף זמני ק"ש ותפילה / זמני יום / זמני ערב. Shita-dependent rows (`sofZmanShma`, `sofZmanTfilla`) show both GRA and MGA side-by-side; preferred method is full opacity, other is dimmed. Candle lighting and havdalah render as coloured banners (using `colors.candle + '20'` tint) when present. Kept intentionally separate from `ZmanimList` (compact 7-row Day screen component).
+- Rewrote `app/(tabs)/zmanim.tsx` — full Zmanim screen:
+  - Header: Hebrew + Gregorian dates.
+  - Location indicator: display-only `Pressable` (disabled) showing `'ישראל'` hardcoded (see adaptation note below). No `useLocationStore` import.
+  - Shita segmented control (גר״א / מג״א / רבנות): each tap calls `setZmanimMethod` which persists to `SettingsProvider` + SQLite. `ZmanimFullList` re-highlights preferred method accordingly.
+  - `ZmanimFullList` with all 14 times + candle/havdalah banners.
+  - Swipe day navigation (consistent with Day screen).
+- Typecheck clean at every step (after ZmanimService alone, and again after all three files).
+
+### Decisions made / discoveries
+- **LocationProvider has no city-name field.** Pre-flight found `useLocationStore` exposes only `latitude`, `longitude`, `setLocation`. Spec's `s.locationName ?? 'ישראל'` would not compile. Adaptation: `useLocationStore` import removed entirely; location row displays `'ישראל'` as a static fallback with a `TODO Phase 4` comment. Documented in `zmanim.tsx` file header.
+- **`ZmanimMethod` is exported from both `ZmanimService.ts` and `SettingsProvider.tsx`** with identical definitions (`'GRA' | 'MGA' | 'RABBANUT'`). Imported from `ZmanimService` in the Zmanim screen (as spec intended). TypeScript accepts both since they are structurally identical.
+- **`as ZmanimMethod` cast removed** — `zmanimMethod` from `useSettingsStore` is already typed as `ZmanimMethod` (from `SettingsProvider`). Cast was overdefensive.
+- **Two ZmanimList components are intentional and permanent.** `ZmanimList` = compact 7-row, Day screen. `ZmanimFullList` = 14+2 rows with sections + shita comparison, Zmanim screen. Do NOT merge them.
+
+### Open items / blockers
+1. **Location indicator is a static placeholder (`'ישראל'`).** LocationProvider needs a `locationName`/`cityName` field + reverse-geocoding or city picker. Deferred to Phase 4.
+2. **Candle lighting is hardcoded at 18 minutes.** Per-city customization (Jerusalem 40 min, Petah Tikva 20 min, etc.) deferred to Phase 4.
+3. **RABBANUT shita not meaningfully differentiated.** `getZmanim` currently uses GRA-path for RABBANUT (plagHamincha from sunrise/sunset). Full Rabbanut ruleset requires additional research and kosher-zmanim API work — deferred.
+4. **All Phase 3.5 open items remain** (per-hour note bucketing, header date-tap, QuickActionSheet addNote/addRecurring wiring, user notes as calendar tags).
+
+### Next steps
+- Phase 3.7 — Hamburger drawer. This is the final Phase 3 task: Settings moves out of tabs, Week view reintroduced via drawer, addNote/addRecurring quick actions can be wired, dead SettingsProvider fields cleaned up.
+
+---
+
 ## 2026-05-26 — Session: Phase 3.5 (Day screen full implementation)
 
 **Phase:** Phase 3.5

@@ -1,6 +1,6 @@
 # Luchot — Roadmap
 
-> **Status snapshot:** On `main`, remote on GitHub. Phase 3.5 complete. Phases 3.1–3.5 done; 3.6–3.7 next.
+> **Status snapshot:** On `main`, remote on GitHub. Phase 3.6 complete. Phases 3.1–3.6 done; 3.7 is the final Phase 3 task.
 
 This document is the dependency map and ordering plan for Luchot. Each phase lists what owns it, what it depends on, and what it unblocks. Full implementation detail lives in the per-task prompts written when the work is actually picked up — not here.
 
@@ -90,13 +90,9 @@ Rewrote `_layout.tsx` (4 tabs: עברי/לועזי/יום/זמנים, lucide ico
 
 Full Day screen implemented: header (Hebrew + Gregorian dates), holiday banner, Torah details (Parasha/Omer/Daf/Rambam with Sefaria links), ZmanimList reuse, all-day notes, 24-hour schedule scaffold, FAB → NoteEditor, swipe day navigation. `DayModal.tsx` removed. NoteEditor confirmed as Modal-based (not BottomSheet) — documented in WORK_LOG.
 
-### 3.6 — Zmanim screen
+### 3.6 — Zmanim screen ✅ (commits `77fa5c9`, `da4e237`, + zmanim.tsx in docs commit)
 
-Goal: build the Zmanim tab. Show the 14 halachic times for the selected date, candle lighting and Havdalah prominently on Fridays, current location indicator, shita selector visible. Consumes `useZmanim` (already exists in the hooks layer).
-
-- **Owns:** `app/(tabs)/zmanim.tsx`
-- **Depends on:** 3.4
-- **Unblocks:** nothing
+Extended `ZmanimService` with `candleLighting`/`havdalah` (additive). Created `ZmanimFullList` (14+2 zmanim, sectioned, GRA/MGA side-by-side). Full Zmanim screen: header, location placeholder (`'ישראל'` — Phase 4), shita segmented control (persisted), `ZmanimFullList`. Location picker and per-city candle times deferred to Phase 4.
 
 ### 3.7 — Hamburger drawer
 
