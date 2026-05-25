@@ -5,6 +5,8 @@ import {
   Modal, View, Text, TextInput, Pressable, StyleSheet,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { radius } from '../../constants/radius';
+import { overlay } from '../../constants/overlay';
 import type { ThemeColors } from '../../hooks/useThemeColors';
 import type { NoteType, CalendarNote } from '../../hooks/useNotes';
 import type { HebrewDateInfo } from '../../services/DateService';
@@ -149,8 +151,8 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 },
+  overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title: { fontSize: 17, fontWeight: '700', textAlign: 'right', marginBottom: 14 },
   input: {

@@ -5,6 +5,8 @@ import {
   Modal, View, Text, Pressable, StyleSheet,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { radius } from '../../constants/radius';
+import { overlay } from '../../constants/overlay';
 import type { ThemeColors } from '../../hooks/useThemeColors';
 import { toHebrewYear } from '../../services/DateService';
 
@@ -85,8 +87,8 @@ export function MonthYearPicker({ visible, currentYear, currentMonth, colors, on
 }
 
 const pickerStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
-  sheet: { width: 320, borderRadius: 20, padding: 20, elevation: 10 },
+  overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'center', alignItems: 'center' },
+  sheet: { width: 320, borderRadius: radius.xl, padding: 20, elevation: 10 },
   yearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   yearArrow: { padding: 8 },
   arrowText: { fontSize: 30, fontWeight: '300' },
