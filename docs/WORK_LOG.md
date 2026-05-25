@@ -6,6 +6,44 @@
 
 ---
 
+## 2026-05-26 — Session: Phase 3.5 (Day screen full implementation)
+
+**Phase:** Phase 3.5
+**Commits:** `17b39b0` (Day screen feat), `5f9def8` (DayModal chore)
+**Duration:** ~45min
+
+### What got done
+- Rewrote `app/(tabs)/day.tsx` — full Day screen replacing the Phase 3.4 placeholder. Single scrollable view with:
+  - **Header:** Hebrew date (`toHebrewNumeral` + `toHebrewYear`) and Gregorian date (`he-IL` locale), centered.
+  - **Holiday Banner:** appears when `isYomTov` or any holiday is present; uses `tagHolidayBg`/`tagHoliday` tokens.
+  - **Torah Details section:** Parasha (Shabbat only), Omer count, Daf Yomi (with Sefaria link), Rambam chapter (with Sefaria link). Each rendered via `DetailRow` sub-component.
+  - **Zmanim:** reuses `ZmanimList` as-is (7-zman curated list with `use24hTime` already wired).
+  - **All-day notes:** notes with no time anchor rendered above the hourly grid in `surfaceElevated` chips.
+  - **Hourly schedule:** 00:00–23:00 visual structure with a vertical divider; hour cells currently always empty (see open items).
+  - **FAB:** `Plus` lucide icon, `colors.accent` background, opens NoteEditor. RTL-aware via `I18nManager.isRTL` inline style (`left: 24` in RTL, `right: 24` in LTR).
+  - **Swipe gesture:** `GestureDetector` + `Gesture.Pan()` navigates days on velocityX > 400; RTL-aware (left = next, right = prev).
+- Deleted `src/components/calendar/DayModal.tsx` — unused since Phase 3.3, now formally removed.
+- Typecheck clean (0 errors).
+
+### Decisions made / discoveries
+- **NoteEditor is Modal-based, NOT BottomSheet.** The Phase 3.5 spec assumed `NoteEditor` was a `forwardRef`/BottomSheet component controlled by a ref. The actual implementation is a React Native `Modal` with `visible: boolean` prop. Adaptation: replaced `useRef<BottomSheet>` + `expand()`/`close()` with `useState<boolean>` + `setEditorVisible`. This is documented in the file-level comment in `day.tsx`.
+- **Two-pattern Notes UI is intentional going forward.** `NoteEditor` = React Native `Modal` (keyboard-aware, full-screen overlay). `QuickActionSheet` = `@gorhom/bottom-sheet` (gesture-driven, snap-points). They serve different UX roles. Future phases should NOT standardize these to a single sheet pattern without explicit Architect decision.
+- **`colors: ThemeColors` must be passed into `NoteEditor`** — the component does not call `useThemeColors` internally. Any future screen that embeds `NoteEditor` must pass `colors` down.
+- **`saveNote` (async → `Promise<void>`) is assignable to `onSave` (→ `void`)** — TypeScript allows this because `void` in callback position means "caller does not use the return value." No adapter needed. `NoteList.tsx` uses the identical pattern.
+- Day screen does NOT update `currentMonth`/`currentYear` in `CalendarProvider` when swiping across month boundaries. These fields are MonthGrid's concern. `dateService.getDayData` handles month transitions transparently via the cached `getMonthData`.
+
+### Open items / blockers
+1. **Per-hour note bucketing not implemented.** `CalendarNote` carries no hour field. All notes render in the "all-day" row above the grid. The hourly grid renders 24 empty rows as visual scaffolding. Batching notes to hour slots requires a schema change to `CalendarEvent` — deferred to Phase 4.
+2. **Date picker on Day screen header tap.** Header shows dates but is not tappable. A header-level date jump (to MonthYearPicker or similar) was not in scope for Phase 3.5 — deferred to Phase 4.
+3. **addNote / addRecurring quick actions in MonthGrid's QuickActionSheet still no-ops.** These open NoteEditor from the calendar grid — a separate wiring task from the Day screen's FAB (which IS wired). Deferred to Phase 3.7 or standalone fix.
+4. **User notes as tags on the calendar grid still deferred to Phase 4.** `buildDayTags(item, [])` still passes empty notes.
+
+### Next steps
+- Phase 3.6 — Zmanim screen. Replaces `zmanim.tsx` placeholder. Show all 14 halachic times for selected date, candle lighting / Havdalah prominent on Fri/Sat, shita selector.
+- Phase 3.7 — Hamburger drawer. Settings moves out of tabs; Week view reintroduced via drawer; addNote / addRecurring quick actions can be wired at that point.
+
+---
+
 ## 2026-05-26 — Session: Phase 3.4 (Tab layout restructure)
 
 **Phase:** Phase 3.4

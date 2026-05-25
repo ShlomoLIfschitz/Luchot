@@ -1,6 +1,6 @@
 # Luchot — Roadmap
 
-> **Status snapshot:** On `main`, remote on GitHub. Phase 3.4 complete. Phases 3.1–3.4 done; 3.5–3.7 next.
+> **Status snapshot:** On `main`, remote on GitHub. Phase 3.5 complete. Phases 3.1–3.5 done; 3.6–3.7 next.
 
 This document is the dependency map and ordering plan for Luchot. Each phase lists what owns it, what it depends on, and what it unblocks. Full implementation detail lives in the per-task prompts written when the work is actually picked up — not here.
 
@@ -86,13 +86,9 @@ Goal: add `mode: 'hebrew' | 'gregorian'` to MonthGrid. Fix the interaction model
 
 Rewrote `_layout.tsx` (4 tabs: עברי/לועזי/יום/זמנים, lucide icons, theme colors). Deleted `week.tsx`. Created `gregorian.tsx` and `zmanim.tsx` (placeholders). Rewrote `index.tsx` and `day.tsx`. MonthGrid `mode` prop made required; `router.push('/(tabs)/day')` wired for second-tap and viewDay quick action.
 
-### 3.5 — Day screen
+### 3.5 — Day screen ✅ (commits `17b39b0`, `5f9def8`)
 
-Goal: build the full Day screen that replaces the current `day.tsx` stub + `DayModal` combo. Per SCREENS.md: header with both dates, holidays/Parasha/Daf/Rambam/Omer summary, hourly schedule with events and zmanim inline, notes list for that day. No more modal — Day is a full tab.
-
-- **Owns:** `app/(tabs)/day.tsx`, possibly removes `src/components/calendar/DayModal.tsx`
-- **Depends on:** 3.4
-- **Unblocks:** nothing critical (3.6 and 3.7 are independent)
+Full Day screen implemented: header (Hebrew + Gregorian dates), holiday banner, Torah details (Parasha/Omer/Daf/Rambam with Sefaria links), ZmanimList reuse, all-day notes, 24-hour schedule scaffold, FAB → NoteEditor, swipe day navigation. `DayModal.tsx` removed. NoteEditor confirmed as Modal-based (not BottomSheet) — documented in WORK_LOG.
 
 ### 3.6 — Zmanim screen
 
