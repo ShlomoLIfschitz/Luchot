@@ -1,144 +1,232 @@
 // src/components/calendar/DayCell.tsx
+// Presentational v2 component — per docs/SCREENS.md and docs/DESIGN.md.
+// Does NOT manage tap state, selection logic, or know about Hebrew/Gregorian mode.
+// All interaction logic lives in the parent (MonthGrid).
 
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { DayData, toHebrewNumeral } from '../../services/DateService';
-import { useSettingsStore } from '../../providers/SettingsProvider';
+import { Flame } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { radius } from '../../constants/radius';
 
-interface DayCellProps {
-  dayData: DayData;
-  isToday: boolean;
-  isSelected: boolean;
-  isAfterSunset: boolean;      // Global sunset state
-  onPress: (dayData: DayData) => void;
+// ── Cell height — per docs/DESIGN.md ──────────────────────────────────────────
+const CELL_HEIGHT = 110; // px, locked per DESIGN.md spec
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+/** Must match the 5 token categories in colors.ts */
+export type TagCategory = 'holiday' | 'shabbat' | 'special' | 'event' | 'personal';
+
+export interface DayCellTag {
+  category: TagCategory;
+  label: string; // displayed text, max ~12 chars practical
 }
 
-export const DayCell = memo(({ dayData, isToday, isSelected, isAfterSunset, onPress }: DayCellProps) => {
+export interface DayCellProps {
+  // Date display
+  primaryLabel: string;   // e.g. "כ״ז" or "14" — large, top, writing-direction start
+  secondaryLabel: string; // e.g. "14" or "כ״ז" — small, opposite corner
+
+  // State
+  isToday: boolean;    // 2px today border + todayBg tint
+  isSelected: boolean; // 2px selected border + selectedBg tint
+  isShabbat: boolean;  // subtle purple bg tint
+  isHoliday: boolean;  // subtle green bg tint
+  isFriday: boolean;   // show candle icon opposite primary label
+  isEmpty?: boolean;   // padding day from prev/next month — render transparent placeholder
+
+  // Content
+  tags: DayCellTag[]; // 0 or more; component slices to 2 visible + +N overflow
+
+  // Interaction — parent owns all logic; parent should useCallback these
+  onPress: () => void;
+  onLongPress: () => void;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+function DayCellInner({
+  primaryLabel,
+  secondaryLabel,
+  isToday,
+  isSelected,
+  isShabbat,
+  isHoliday,
+  isFriday,
+  isEmpty,
+  tags,
+  onPress,
+  onLongPress,
+}: DayCellProps) {
   const colors = useThemeColors();
-  const { showHebrew, showGregorian, hebrewOnTop, diagonalDirection } = useSettingsStore();
 
-  const { gregorianDate, hebrewDate, holidays, isYomTov, omerDay } = dayData;
-  const gregDay = gregorianDate.getDate();
-  const hebrewDay = toHebrewNumeral(hebrewDate.day);
-  const isShabbat = hebrewDate.isShabbat;
-  const isRoshChodesh = hebrewDate.isRoshChodesh;
+  // Empty cell — transparent placeholder occupying grid space, no interaction
+  if (isEmpty) {
+    return <View style={styles.emptyCell} />;
+  }
 
-  // Color logic
-  let accentColor = colors.textPrimary;
-  if (isToday) accentColor = colors.today;
-  else if (isYomTov || holidays.length > 0) accentColor = colors.tagHoliday;
-  else if (isShabbat) accentColor = colors.tagShabbat;
+  // ── Border resolution (priority: selected > today > default) ───────────────
+  const borderColor = isSelected
+    ? colors.selected
+    : isToday
+    ? colors.today
+    : colors.borderSubtle;
+  const borderWidth = isSelected || isToday ? 2 : 0.5;
 
-  // Diagonal: top-left = Greg, bottom-right = Hebrew (or flipped)
-  // diagonalDirection: 'tl-br' | 'tr-bl'
-  const isRTL = diagonalDirection === 'tr-bl';
+  // ── Background resolution (priority: selected > today > holiday > shabbat > default) ─
+  const backgroundColor = isSelected
+    ? colors.selectedBg
+    : isToday
+    ? colors.todayBg
+    : isHoliday
+    ? colors.tagHolidayBg
+    : isShabbat
+    ? colors.tagShabbatBg
+    : colors.surface;
 
-  const primaryText = hebrewOnTop ? hebrewDay : gregDay.toString();
-  const secondaryText = hebrewOnTop ? gregDay.toString() : hebrewDay;
+  // ── Tag color map — type-safe, avoids template literal string indexing ─────
+  const TAG_COLORS: Record<TagCategory, { bg: string; fg: string }> = {
+    holiday:  { bg: colors.tagHolidayBg,  fg: colors.tagHoliday  },
+    shabbat:  { bg: colors.tagShabbatBg,  fg: colors.tagShabbat  },
+    special:  { bg: colors.tagSpecialBg,  fg: colors.tagSpecial  },
+    event:    { bg: colors.tagEventBg,    fg: colors.tagEvent    },
+    personal: { bg: colors.tagPersonalBg, fg: colors.tagPersonal },
+  };
 
-  // Is this today after sunset? Show sunset indicator
-  const showSunsetIndicator = isToday && isAfterSunset;
+  // ── Tags slicing ───────────────────────────────────────────────────────────
+  const visibleTags = tags.slice(0, 2);
+  const overflowCount = Math.max(0, tags.length - 2);
 
   return (
     <Pressable
-      onPress={() => onPress(dayData)}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350} // RN sweet spot for distinguishing tap vs long-press
       style={[
         styles.cell,
-        isSelected && { backgroundColor: colors.accentLight },
-        isToday && { backgroundColor: colors.todayBg },
+        { backgroundColor, borderColor, borderWidth },
       ]}
     >
-      {/* Holiday dot */}
-      {(holidays.length > 0 || isYomTov) && (
-        <View style={[styles.holidayDot, { backgroundColor: accentColor }]} />
-      )}
+      {/* ── Date area ───────────────────────────────────────────────────────── */}
+      {/* Row: primary label (writing-direction start) + candle (end, Fridays only) */}
+      <View style={styles.dateRow}>
+        <Text style={[styles.primaryLabel, { color: colors.textPrimary }]}>
+          {primaryLabel}
+        </Text>
+        {isFriday && (
+          <Flame size={12} color={colors.candle} />
+        )}
+      </View>
 
-      {/* Primary date — top position */}
-      <Text style={[
-        styles.primaryDate,
-        { color: accentColor },
-        isRTL ? styles.alignRight : styles.alignLeft,
-      ]}>
-        {primaryText}
-      </Text>
+      {/* Secondary label — opposite corner from primary (writing-direction end) */}
+      {/* writingDirection: 'ltr' ensures Gregorian digit renders LTR in RTL container */}
+      <View style={styles.secondaryRow}>
+        <Text
+          style={[styles.secondaryLabel, { color: colors.textTertiary, writingDirection: 'ltr' }]}
+        >
+          {secondaryLabel}
+        </Text>
+      </View>
 
-      {/* Sunset indicator badge */}
-      {showSunsetIndicator && (
-        <Text style={styles.sunsetBadge}>✶</Text>
-      )}
-
-      {/* Secondary date — bottom, diagonal, smaller + faded */}
-      <Text style={[
-        styles.secondaryDate,
-        { color: colors.textTertiary },
-        isRTL ? styles.alignLeft : styles.alignRight,
-      ]}>
-        {secondaryText}
-      </Text>
-
-      {/* Rosh Chodesh indicator */}
-      {isRoshChodesh && (
-        <View style={[styles.roshChodeshBar, { backgroundColor: colors.accent }]} />
-      )}
+      {/* ── Tags area (2px gap below date area — see comment in styles) ─────── */}
+      <View style={styles.tagsArea}>
+        {visibleTags.map((tag, i) => {
+          const { bg, fg } = TAG_COLORS[tag.category];
+          return (
+            <View key={i} style={[styles.tagChip, { backgroundColor: bg }]}>
+              <Text
+                style={[styles.tagText, { color: fg }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {tag.label}
+              </Text>
+            </View>
+          );
+        })}
+        {overflowCount > 0 && (
+          <View style={[styles.tagChip, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.tagText, { color: colors.textSecondary }]}>
+              +{overflowCount}
+            </Text>
+          </View>
+        )}
+      </View>
     </Pressable>
   );
-}, (prev, next) => {
-  // Custom comparison for memo — only re-render if meaningful change
+}
+
+// ── Memoization ───────────────────────────────────────────────────────────────
+// Custom comparator avoids re-renders when parent re-renders with same values.
+// onPress/onLongPress are intentionally NOT compared — parent should useCallback
+// them; stable references should not cause cell re-renders.
+
+export const DayCell = memo(DayCellInner, (prev, next) => {
   return (
-    prev.isToday === next.isToday &&
-    prev.isSelected === next.isSelected &&
-    prev.isAfterSunset === next.isAfterSunset &&
-    prev.dayData.gregorianDate.getTime() === next.dayData.gregorianDate.getTime()
+    prev.primaryLabel   === next.primaryLabel   &&
+    prev.secondaryLabel === next.secondaryLabel &&
+    prev.isToday        === next.isToday        &&
+    prev.isSelected     === next.isSelected     &&
+    prev.isShabbat      === next.isShabbat      &&
+    prev.isHoliday      === next.isHoliday      &&
+    prev.isFriday       === next.isFriday       &&
+    prev.isEmpty        === next.isEmpty        &&
+    prev.tags.length    === next.tags.length    &&
+    prev.tags.every(
+      (t, i) =>
+        t.category === next.tags[i].category &&
+        t.label    === next.tags[i].label
+    )
   );
 });
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  emptyCell: {
+    flex: 1,
+    height: CELL_HEIGHT, // still occupies grid space
+  },
   cell: {
     flex: 1,
-    aspectRatio: 0.85,
-    margin: 1,
-    borderRadius: 8,
+    height: CELL_HEIGHT,   // per docs/DESIGN.md — 110px locked
+    borderRadius: radius.sm, // = 6, per DESIGN.md "Day cells"
     padding: 4,
-    justifyContent: 'space-between',
     overflow: 'hidden',
   },
-  primaryDate: {
-    fontSize: 15,
-    fontWeight: '600',
-    fontFamily: 'System',
-    letterSpacing: -0.3,
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  secondaryDate: {
-    fontSize: 9,           // ~60% of primary
+  primaryLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    // textAlign defaults to 'auto' — respects I18nManager.isRTL
+  },
+  secondaryRow: {
+    // 2px gap below the date row before the secondary label
+    marginTop: 2,
+    alignItems: 'flex-end', // opposite corner from primary (which is at flex-start in RTL)
+  },
+  secondaryLabel: {
+    fontSize: 11,
     fontWeight: '400',
-    opacity: 0.55,
-    fontFamily: 'System',
   },
-  sunsetBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    fontSize: 7,
-    color: '#C4A882',
+  tagsArea: {
+    // 2px gap below the date area before tags
+    marginTop: 2,
+    gap: 2,
+    flex: 1,
   },
-  holidayDot: {
-    position: 'absolute',
-    bottom: 5,
-    alignSelf: 'center',
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+  tagChip: {
+    alignSelf: 'stretch',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: radius.xs, // = 4, per DESIGN.md "Tags, small badges"
   },
-  roshChodeshBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    borderRadius: 1,
-    opacity: 0.6,
+  tagText: {
+    fontSize: 10,
+    fontWeight: '500',
   },
-  alignLeft: { textAlign: 'left' },
-  alignRight: { textAlign: 'right' },
 });
