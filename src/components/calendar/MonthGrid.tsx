@@ -1,132 +1,245 @@
-// @ts-nocheck — pending DayCell API migration in Phase 3.3
 // src/components/calendar/MonthGrid.tsx
+// Phase 3.3 — full rewrite. Consumes new DayCell API, implements v2
+// interaction model. @ts-nocheck pragma removed.
+//
+// Known limitations (intentional, deferred to later phases):
+//   1. User notes do not appear as tags — buildDayTags receives empty
+//      userNotes array. Batching strategy for per-cell notes deferred
+//      to Phase 4.
+//   2. Second-tap navigation is a no-op — Day tab doesn't exist until
+//      Phase 3.4.
+//   3. Quick action handlers are no-ops — targets become available in
+//      Phase 3.4–3.5.
 
-import React, { useCallback, useMemo, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Platform } from 'react-native';
-import { useCalendarStore } from '../../providers/CalendarProvider';
-import { DayCell } from './DayCell';
-import { DayModal } from './DayModal';
-import { DayData, toHebrewYear } from '../../services/DateService';
-import { MonthYearPicker } from './MonthYearPicker';
-import { useThemeColors } from '../../hooks/useThemeColors';
-import { useZmanim } from '../../hooks/useZmanim';
-import { isAfterSunset } from '../../services/ZmanimService';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import BottomSheet from '@gorhom/bottom-sheet';
+import { useCalendarStore } from '../../providers/CalendarProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { DayCell } from './DayCell';
+import { MonthYearPicker } from './MonthYearPicker';
+import { QuickActionSheet, QuickAction } from './QuickActionSheet';
+import { DayData, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
+import { buildDayTags } from '../../utils/tagMapper';
 
-const DAYS_HE = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type MonthGridMode = 'hebrew' | 'gregorian';
+
+interface MonthGridProps {
+  /** Determines primary/secondary date label assignment.
+   *  Defaults to 'hebrew' — the primary tab per SCREENS.md. */
+  mode?: MonthGridMode;
+}
+
+// ── Day name headers ───────────────────────────────────────────────────────────
+
 const DAYS_HE_SUN_FIRST = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
 const DAYS_HE_MON_FIRST = ['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 'א׳'];
 
-export function MonthGrid() {
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function MonthGrid({ mode = 'hebrew' }: MonthGridProps) {
   const colors = useThemeColors();
-  const { monthData, selectedDate, today, navigateMonth, navigateToMonth, setSelectedDate, currentMonth, currentYear } = useCalendarStore();
-  const zmanim = useZmanim(today);
-  const afterSunset = zmanim ? isAfterSunset(zmanim) : false;
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const [modalDay, setModalDay] = React.useState<DayData | null>(null);
-  const [pickerVisible, setPickerVisible] = React.useState(false);
+  const {
+    monthData,
+    selectedDate,
+    today,
+    navigateMonth,
+    navigateToMonth,
+    setSelectedDate,
+    currentMonth,
+    currentYear,
+  } = useCalendarStore();
   const firstDayOfWeek = useSettingsStore((s) => s.firstDayOfWeek);
 
-  // Build grid with leading empty cells
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [actionSheetDate, setActionSheetDate] = useState<Date | null>(null);
+  const actionSheetRef = useRef<BottomSheet>(null);
+
+  // ── Grid construction ──────────────────────────────────────────────────────
+  // Prepend empty cells to align the first day of the month correctly.
   const gridData = useMemo(() => {
     if (!monthData.length) return [];
     const firstDay = monthData[0].gregorianDate.getDay();
-    const offset = firstDayOfWeek === 1
-      ? (firstDay + 6) % 7
-      : firstDay;
+    const offset = firstDayOfWeek === 1 ? (firstDay + 6) % 7 : firstDay;
     const empties = Array(offset).fill(null);
     return [...empties, ...monthData];
   }, [monthData, firstDayOfWeek]);
 
-  const handleDayPress = useCallback((dayData: DayData) => {
-    setSelectedDate(dayData.gregorianDate);
-    setModalDay(dayData);
-    bottomSheetRef.current?.expand();
+  // ── Date helpers ───────────────────────────────────────────────────────────
+  const isSameDay = useCallback((a: Date, b: Date) => {
+    return a.toDateString() === b.toDateString();
   }, []);
 
-  // Swipe gesture for month navigation
-  const swipeGesture = Gesture.Pan()
-    .onEnd((e) => {
-      if (Math.abs(e.velocityX) > 400) {
-        navigateMonth(e.velocityX < 0 ? 1 : -1);
+  // ── Label computation ──────────────────────────────────────────────────────
+  // Determines which date (Hebrew or Gregorian) is primary vs secondary
+  // based on the mode prop passed by the tab screen.
+  const getLabels = useCallback(
+    (d: DayData): { primary: string; secondary: string } => {
+      const greg   = d.gregorianDate.getDate().toString();
+      const hebrew = toHebrewNumeral(d.hebrewDate.day);
+      return mode === 'hebrew'
+        ? { primary: hebrew, secondary: greg }
+        : { primary: greg,   secondary: hebrew };
+    },
+    [mode],
+  );
+
+  // ── Interaction handlers ───────────────────────────────────────────────────
+
+  // First tap → select day. Second tap on already-selected day → navigate.
+  // Navigation is a TODO until the Day tab exists (Phase 3.4).
+  const handleDayPress = useCallback(
+    (dayData: DayData) => {
+      if (isSameDay(dayData.gregorianDate, selectedDate)) {
+        // TODO Phase 3.4: router.push('/(tabs)/day') once Day tab exists.
+        // Currently a no-op — the day is already visually selected.
+      } else {
+        setSelectedDate(dayData.gregorianDate);
       }
-    });
+    },
+    [selectedDate, isSameDay, setSelectedDate],
+  );
 
-  const renderItem = useCallback(({ item, index }: { item: DayData | null; index: number }) => {
-    if (!item) return <View style={styles.emptyCell} />;
-    const isToday = item.gregorianDate.toDateString() === today.toDateString();
-    const isSelected = item.gregorianDate.toDateString() === selectedDate.toDateString();
-    return (
-      <DayCell
-        dayData={item}
-        isToday={isToday}
-        isSelected={isSelected}
-        isAfterSunset={isToday && afterSunset}
-        onPress={handleDayPress}
-      />
-    );
-  }, [today, selectedDate, afterSunset, handleDayPress]);
+  // Long-press → select day + open quick action sheet.
+  const handleDayLongPress = useCallback(
+    (dayData: DayData) => {
+      setSelectedDate(dayData.gregorianDate);
+      setActionSheetDate(dayData.gregorianDate);
+      actionSheetRef.current?.expand();
+    },
+    [setSelectedDate],
+  );
 
-  const monthName = useMemo(() => {
+  // Quick action dispatch — no-ops until Phase 3.4–3.5 wires the targets.
+  const handleQuickAction = useCallback(
+    (action: QuickAction) => {
+      switch (action) {
+        case 'addNote':
+          // TODO Phase 3.4+: open NoteEditor with date=actionSheetDate
+          break;
+        case 'addRecurring':
+          // TODO Phase 3.4+: open NoteEditor with recurring=true, date=actionSheetDate
+          break;
+        case 'viewDay':
+          // TODO Phase 3.4: router.push('/(tabs)/day')
+          break;
+      }
+    },
+    [],
+  );
+
+  // ── Swipe gesture ──────────────────────────────────────────────────────────
+  const swipeGesture = Gesture.Pan().onEnd((e) => {
+    if (Math.abs(e.velocityX) > 400) {
+      navigateMonth(e.velocityX < 0 ? 1 : -1);
+    }
+  });
+
+  // ── Cell renderer ──────────────────────────────────────────────────────────
+  // User notes are passed as [] — see file-level "Known limitations" comment.
+  const renderItem = useCallback(
+    ({ item, index }: { item: DayData | null; index: number }) => {
+      if (!item) {
+        return <View style={styles.emptyCell} />;
+      }
+
+      const { primary, secondary } = getLabels(item);
+      const isToday    = isSameDay(item.gregorianDate, today);
+      const isSelected = isSameDay(item.gregorianDate, selectedDate);
+      const isFriday   = item.gregorianDate.getDay() === 5;
+      const tags       = buildDayTags(item, []); // userNotes deferred to Phase 4
+
+      return (
+        <View style={styles.cellWrapper}>
+          <DayCell
+            primaryLabel={primary}
+            secondaryLabel={secondary}
+            isToday={isToday}
+            isSelected={isSelected}
+            isShabbat={item.hebrewDate.isShabbat}
+            isHoliday={item.isYomTov || item.holidays.length > 0}
+            isFriday={isFriday}
+            tags={tags}
+            onPress={() => handleDayPress(item)}
+            onLongPress={() => handleDayLongPress(item)}
+          />
+        </View>
+      );
+    },
+    [today, selectedDate, getLabels, isSameDay, handleDayPress, handleDayLongPress],
+  );
+
+  // ── Month title computation ────────────────────────────────────────────────
+  const gregMonthName = useMemo(() => {
     const d = new Date(currentYear, currentMonth - 1, 1);
     return d.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
   }, [currentMonth, currentYear]);
 
-  // Hebrew month title: use the 15th day of the Gregorian month as anchor
   const hebrewMonthTitle = useMemo(() => {
     if (!monthData.length) return '';
     const anchor = monthData[Math.min(14, monthData.length - 1)];
     return `${anchor.hebrewDate.monthName} ${toHebrewYear(anchor.hebrewDate.year)}`;
   }, [monthData]);
 
+  // Header titles respect mode — primary (large) matches mode priority.
+  const primaryTitle   = mode === 'hebrew' ? hebrewMonthTitle : gregMonthName;
+  const secondaryTitle = mode === 'hebrew' ? gregMonthName    : hebrewMonthTitle;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+
         {/* Month Header */}
         <View style={styles.header}>
           <Pressable onPress={() => navigateMonth(-1)} hitSlop={12}>
             <Text style={[styles.navArrow, { color: colors.accent }]}>‹</Text>
           </Pressable>
+
+          {/* Tap (not long-press) now opens the month/year picker — per SCREENS.md */}
           <Pressable
-            onLongPress={() => setPickerVisible(true)}
-            delayLongPress={400}
+            onPress={() => setPickerVisible(true)}
             style={styles.headerCenter}
           >
-            <Text style={[styles.monthTitle, { color: colors.textPrimary }]}>{hebrewMonthTitle}</Text>
-            <Text style={[styles.monthSubtitle, { color: colors.textSecondary }]}>{monthName}</Text>
+            <Text style={[styles.monthTitle, { color: colors.textPrimary }]}>
+              {primaryTitle}
+            </Text>
+            <Text style={[styles.monthSubtitle, { color: colors.textSecondary }]}>
+              {secondaryTitle}
+            </Text>
           </Pressable>
+
           <Pressable onPress={() => navigateMonth(1)} hitSlop={12}>
             <Text style={[styles.navArrow, { color: colors.accent }]}>›</Text>
           </Pressable>
         </View>
 
-        {/* Day Names */}
+        {/* Day Name Headers */}
         <View style={styles.dayNames}>
           {(firstDayOfWeek === 1 ? DAYS_HE_MON_FIRST : DAYS_HE_SUN_FIRST).map((d, i) => (
-            <Text key={i} style={[styles.dayName, { color: colors.textTertiary }]}>{d}</Text>
+            <Text key={i} style={[styles.dayName, { color: colors.textTertiary }]}>
+              {d}
+            </Text>
           ))}
         </View>
 
-        {/* Grid */}
+        {/* Calendar Grid */}
         <FlatList
           data={gridData}
           renderItem={renderItem}
-          keyExtractor={(item, index) => item ? item.gregorianDate.toISOString() : `empty-${index}`}
+          keyExtractor={(item, index) =>
+            item ? item.gregorianDate.toISOString() : `empty-${index}`
+          }
           numColumns={7}
           scrollEnabled={false}
           initialNumToRender={42}
           maxToRenderPerBatch={42}
           windowSize={1}
           removeClippedSubviews={false}
-        />
-
-        {/* Day Modal */}
-        <DayModal
-          ref={bottomSheetRef}
-          dayData={modalDay}
-          onClose={() => bottomSheetRef.current?.close()}
         />
 
         {/* Month/Year Picker */}
@@ -138,13 +251,24 @@ export function MonthGrid() {
           onSelect={navigateToMonth}
           onClose={() => setPickerVisible(false)}
         />
+
+        {/* Quick Action Sheet — opened on day long-press */}
+        <QuickActionSheet
+          ref={actionSheetRef}
+          date={actionSheetDate}
+          onAction={handleQuickAction}
+          onClose={() => actionSheetRef.current?.close()}
+        />
+
       </View>
     </GestureDetector>
   );
 }
 
+// ── Styles ─────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 8 },
+  container:   { flex: 1, paddingHorizontal: 8 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -152,14 +276,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 8,
   },
-  headerCenter: { alignItems: 'center' },
-  monthTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  monthSubtitle: { fontSize: 12, marginTop: 1 },
-  navArrow: { fontSize: 28, fontWeight: '300' },
-  dayNames: {
-    flexDirection: 'row',
-    paddingBottom: 8,
-  },
+  headerCenter:   { alignItems: 'center' },
+  monthTitle:     { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
+  monthSubtitle:  { fontSize: 12, marginTop: 1 },
+  navArrow:       { fontSize: 28, fontWeight: '300' },
+  dayNames:       { flexDirection: 'row', paddingBottom: 8 },
   dayName: {
     flex: 1,
     textAlign: 'center',
@@ -167,5 +288,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.3,
   },
-  emptyCell: { flex: 1, aspectRatio: 0.85, margin: 1 },
+  cellWrapper: { flex: 1 },
+  emptyCell:   { flex: 1, height: 110 }, // matches CELL_HEIGHT in DayCell
 });
