@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-05-25 — Session: Phase 3.1 + H4 (radius & overlay tokens)
+
+**Phase:** Phase 3.1 / Housekeeping H4
+**Commits:** `11bcb0f` (feat), plus WORK_LOG update
+**Duration:** ~30min
+
+### What got done
+- Created `src/constants/radius.ts` — full frozen scale: none(0) / sm(4) / md(8) / lg(12) / xl(16) / xxl(20) / full(9999)
+- Created `src/constants/overlay.ts` — minimal: modal `'rgba(0, 0, 0, 0.45)'`
+- Updated `src/components/notes/NoteEditor.tsx`: imported radius + overlay, replaced `borderTopLeftRadius: 20` / `borderTopRightRadius: 20` → `radius.xl` (16), replaced `'rgba(0,0,0,0.45)'` → `overlay.modal`
+- Updated `src/components/calendar/MonthYearPicker.tsx`: same imports, replaced `borderRadius: 20` → `radius.xl` (16), replaced `'rgba(0,0,0,0.45)'` → `overlay.modal`
+- All 6 reserved Phase 3 files left untouched, unstaged
+- `tsc --noEmit` passed clean
+
+### Decisions made
+- `borderRadius: 20` in both components maps to `radius.xl` (16), not `radius.xxl` (20) — intentional 4px reduction to align with DESIGN.md which specifies `xl: 16` for modals/sheets
+- overlay.ts is minimal (modal only) rather than full shape (modal/scrim/veil) — add values as needed in Phase 3
+- Radius scale includes `none: 0` and `xxl: 20` as generic tokens even though they're not currently consumed — they complete the scale for Phase 3 use
+
+### Open items / blockers
+- None from this task. H4 is closed.
+- Phase 3.2 (DayCell.tsx full rewrite) is next
+
+### Next steps
+- Begin Phase 3.2 — DayCell.tsx rewrite per SCREENS.md + DESIGN.md (awaiting Architect's execution prompt)
+
+---
+
 ## 2026-05-25 — Session: Housekeeping (H1, H2, H3 — docs + GitHub remote)
 
 **Phase:** Between Phase 2 and Phase 3 — housekeeping items H1, H2, H3
@@ -131,6 +159,34 @@
 > יומן רישום סשני של מה הושלם, מה הוחלט, ומה נשאר פתוח. מתעדכן ע"י Claude Code בסוף כל סשן לפי מפרט `CLAUDE.md`.
 >
 > רשומות חדשות מופיעות ראשונות. רשומות "backfilled" מתעדות עבודה שקדמה ליומן הזה.
+
+---
+
+## 2026-05-25 — סשן: Phase 3.1 + H4 (tokens של radius ו-overlay)
+
+**שלב:** Phase 3.1 / תחזוקה H4
+**Commits:** `11bcb0f` (feat), ועדכון WORK_LOG
+**משך:** ~30 דקות
+
+### מה הושלם
+- נוצר `src/constants/radius.ts` — סולם מלא ו-frozen: none(0) / sm(4) / md(8) / lg(12) / xl(16) / xxl(20) / full(9999)
+- נוצר `src/constants/overlay.ts` — מינימלי: modal `'rgba(0, 0, 0, 0.45)'`
+- עודכן `src/components/notes/NoteEditor.tsx`: ייבוא radius + overlay, הוחלפו `borderTopLeftRadius: 20` / `borderTopRightRadius: 20` → `radius.xl` (16), הוחלף `'rgba(0,0,0,0.45)'` → `overlay.modal`
+- עודכן `src/components/calendar/MonthYearPicker.tsx`: אותם ייבואים, הוחלף `borderRadius: 20` → `radius.xl` (16), הוחלף `'rgba(0,0,0,0.45)'` → `overlay.modal`
+- 6 הקבצים השמורים ל-Phase 3 לא נגעו, נשארו unstaged
+- `tsc --noEmit` עבר ללא שגיאות
+
+### החלטות שהתקבלו
+- `borderRadius: 20` בשני הקומפוננטות ממופה ל-`radius.xl` (16), לא `radius.xxl` (20) — הפחתה מכוונת של 4px כדי להתיישר עם DESIGN.md שמציין `xl: 16` ל-modals/sheets
+- overlay.ts מינימלי (modal בלבד) ולא צורה מלאה (modal/scrim/veil) — ערכים יתווספו לפי הצורך ב-Phase 3
+- סולם הרדיוס כולל `none: 0` ו-`xxl: 20` כ-tokens גנריים גם אם לא נצרכים עדיין — הם משלימים את הסולם לשימוש ב-Phase 3
+
+### פתוח / חוסם
+- אין. H4 סגור.
+- Phase 3.2 (שכתוב מלא של DayCell.tsx) הוא הבא
+
+### בסשן הבא
+- להתחיל Phase 3.2 — שכתוב DayCell.tsx לפי SCREENS.md + DESIGN.md (ממתין ל-prompt ביצוע מה-Architect)
 
 ---
 
