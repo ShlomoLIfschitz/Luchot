@@ -1,21 +1,23 @@
 {
   "expo": {
-    "name": "DualCalendarApp",
+    "name": "Luchot",
     "slug": "dual-calendar-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "dualcalendar",
+    "scheme": "luchot",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.dualcalendar"
+      "bundleIdentifier": "app.luchot"
     },
     "android": {
-      "package": "app.dualcalendar",
+      "package": "app.luchot",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F8F7F4"
       },
       "permissions": [
@@ -28,10 +30,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "DualCalendarApp uses your location to calculate zmanim (halachic times)."
+          "locationWhenInUsePermission": "Luchot uses your location to calculate zmanim (halachic times)."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font"
     ],
     "extra": {
       "router": {
@@ -40,6 +43,7 @@
       "eas": {
         "projectId": "73dcf406-9cd1-4bec-a83c-cde688268f4a"
       }
-    }
+    },
+    "owner": "shlomolif"
   }
 }
