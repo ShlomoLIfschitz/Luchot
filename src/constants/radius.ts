@@ -1,11 +1,10 @@
 export const radius = {
-  none: 0,
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  xxl: 20,
-  full: 9999,
+  xs:   4,    // Tags, small badges
+  sm:   6,    // Day cells
+  md:   8,    // Buttons, input fields
+  lg:   12,   // Cards, sheets
+  xl:   16,   // Modals
+  full: 9999, // Pills, circular buttons
 } as const;
 
 export type Radius = typeof radius;
