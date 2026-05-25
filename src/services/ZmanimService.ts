@@ -20,6 +20,10 @@ export interface ZmanimResult {
   shkia: Date | null;
   tzeitHakochavim: Date | null;
   tzeitRabbeinu: Date | null;
+
+  // NEW in Phase 3.6
+  candleLighting: Date | null;  // 18 min before sunset on Friday only
+  havdalah: Date | null;        // tzeitHakochavim on Saturday only
 }
 
 const zmanimCache = new Map<string, ZmanimResult>();
@@ -39,6 +43,8 @@ const NULL_ZMANIM: ZmanimResult = {
   shkia: null,
   tzeitHakochavim: null,
   tzeitRabbeinu: null,
+  candleLighting: null,
+  havdalah: null,
 };
 
 /** kosher-zmanim returns Luxon DateTime; avoid importing luxon types (no @types/luxon needed). */
@@ -67,6 +73,24 @@ export function getZmanim(
         ? czc.getPlagHamincha(czc.getAlos72(), czc.getTzais72())
         : czc.getPlagHamincha(czc.getSunrise(), czc.getSunset());
 
+    // Extract as locals so candle/havdalah computation can reference them
+    const shkia           = toJsDate(czc.getSunset());
+    const tzeitHakochavim = toJsDate(czc.getTzaisGeonim8Point5Degrees());
+
+    // Candle lighting — Friday only (JS day 5), 18 min before sunset.
+    // 18 min is the Diaspora/Israel-outside-Jerusalem standard.
+    // Per-city customization (Jerusalem 40 min, etc.) is Phase 4 work.
+    let candleLighting: Date | null = null;
+    if (date.getDay() === 5 && shkia) {
+      candleLighting = new Date(shkia.getTime() - 18 * 60 * 1000);
+    }
+
+    // Havdalah — Saturday only (JS day 6), equals tzeitHakochavim.
+    let havdalah: Date | null = null;
+    if (date.getDay() === 6 && tzeitHakochavim) {
+      havdalah = tzeitHakochavim;
+    }
+
     const result: ZmanimResult = {
       alotHashachar: toJsDate(czc.getAlos72()),
       misheyakir: toJsDate(czc.getMisheyakir10Point2Degrees()),
@@ -79,9 +103,11 @@ export function getZmanim(
       minchaGedola: toJsDate(czc.getMinchaGedola(czc.getSunrise(), czc.getSunset())),
       minchaKetana: toJsDate(czc.getMinchaKetana(czc.getSunrise(), czc.getSunset())),
       plagHamincha: toJsDate(plag),
-      shkia: toJsDate(czc.getSunset()),
-      tzeitHakochavim: toJsDate(czc.getTzaisGeonim8Point5Degrees()),
+      shkia,
+      tzeitHakochavim,
       tzeitRabbeinu: toJsDate(czc.getTzais72()),
+      candleLighting,
+      havdalah,
     };
 
     zmanimCache.set(key, result);
