@@ -27,8 +27,8 @@ export const DayCell = memo(({ dayData, isToday, isSelected, isAfterSunset, onPr
   // Color logic
   let accentColor = colors.textPrimary;
   if (isToday) accentColor = colors.today;
-  else if (isYomTov || holidays.length > 0) accentColor = colors.holiday;
-  else if (isShabbat) accentColor = colors.shabbat;
+  else if (isYomTov || holidays.length > 0) accentColor = colors.tagHoliday;
+  else if (isShabbat) accentColor = colors.tagShabbat;
 
   // Diagonal: top-left = Greg, bottom-right = Hebrew (or flipped)
   // diagonalDirection: 'tl-br' | 'tr-bl'
@@ -46,7 +46,7 @@ export const DayCell = memo(({ dayData, isToday, isSelected, isAfterSunset, onPr
       style={[
         styles.cell,
         isSelected && { backgroundColor: colors.accentLight },
-        isToday && { backgroundColor: colors.todayLight },
+        isToday && { backgroundColor: colors.todayBg },
       ]}
     >
       {/* Holiday dot */}
@@ -60,10 +60,6 @@ export const DayCell = memo(({ dayData, isToday, isSelected, isAfterSunset, onPr
         { color: accentColor },
         isRTL ? styles.alignRight : styles.alignLeft,
       ]}>
-        {showHebrew && hebrewOnTop ? hebrewDay : ''}
-        {showGregorian && !hebrewOnTop ? gregDay.toString() : ''}
-        {!showHebrew && !showGregorian ? '' : !hebrewOnTop && !showGregorian ? '' : ''}
-        {/* Simplified: show primary based on settings */}
         {primaryText}
       </Text>
 

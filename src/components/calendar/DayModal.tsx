@@ -98,7 +98,7 @@ function ModalScrollContent({
 
       {holidays.map((h, i) => (
         <View key={i} style={[styles.badge, { backgroundColor: colors.accentLight }]}>
-          <Text style={[styles.badgeText, { color: colors.holiday }]}>{h}</Text>
+          <Text style={[styles.badgeText, { color: colors.tagHoliday }]}>{h}</Text>
         </View>
       ))}
 
