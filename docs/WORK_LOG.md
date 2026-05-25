@@ -6,15 +6,18 @@
 
 ---
 
-## 2026-05-25 — Session: Housekeeping (ROADMAP + WORK_LOG)
+## 2026-05-25 — Session: Housekeeping (H1, H2, H3 — docs + GitHub remote)
 
-**Phase:** Between Phase 2 and Phase 3 — housekeeping items H1 and H2
-**Commits:** `a72df3c`
-**Duration:** ~1h
+**Phase:** Between Phase 2 and Phase 3 — housekeeping items H1, H2, H3
+**Commits:** `366995c` (docs), plus H3 remote setup (no commit — git plumbing only)
+**Duration:** ~2h
 
 ### What got done
 - Wrote `docs/ROADMAP.md` — bilingual (English then Hebrew), medium-detail phase plan, dependency map, MVP definition
 - Wrote `docs/WORK_LOG.md` — this file. Format established, backfilled entries for Phases 1, 2A, 2B, 2C
+- Renamed local branch from `master` to `main`
+- Created private GitHub repo at `https://github.com/ShlomoLIfschitz/Luchot.git` with full project description
+- Added `origin` remote and pushed all 12 commits with upstream tracking (`main` → `origin/main`)
 
 ### Decisions made
 - ROADMAP phase detail level: medium (one paragraph + dependencies per task, no acceptance criteria — those live in execution-time prompts)
@@ -23,13 +26,14 @@
 - H3 (GitHub remote) and H4 (radius/overlay token files) deferred — see ROADMAP
 
 ### Open items / blockers
-- GitHub remote still not configured (planned as H3)
-- Decision pending on H4: introduce `radius.ts` + `overlay.ts` before Phase 3.1 starts, or fold into 3.1 itself
+- Decision pending on H4 token files (radius.ts, overlay.ts) — Architect proposes folding into Phase 3.1 in the next session
+- Three design decisions for Phase 3.1 still pending: radius scale structure, what to do with the existing `borderRadius: 20` (xl=16 or xxl=20), and overlay.ts shape (minimal vs full)
 - 6 files in working tree still flagged for Phase 3 rewrite — untouched, as expected
 
 ### Next session
-- H3: GitHub remote setup + `master` → `main` rename + initial push
-- Then begin Phase 3.1
+- Both Architect and Claude Code start fresh sessions with updated INIT prompts
+- First task: resolve the three pending Phase 3.1 design decisions
+- Then execute Phase 3.1 — radius.ts + overlay.ts + final palette adjustments, plus replacing the two known magic numbers in NoteEditor and MonthYearPicker
 
 ---
 
@@ -130,15 +134,18 @@
 
 ---
 
-## 2026-05-25 — סשן: תחזוקה (ROADMAP + WORK_LOG)
+## 2026-05-25 — סשן: תחזוקה (H1, H2, H3 — תיעוד + GitHub remote)
 
-**שלב:** בין Phase 2 ל-Phase 3 — פריטי תחזוקה H1 ו-H2
-**Commits:** `a72df3c`
-**משך:** ~שעה
+**שלב:** בין Phase 2 ל-Phase 3 — פריטי תחזוקה H1, H2, H3
+**Commits:** `366995c` (תיעוד), ועוד ביצוע H3 remote (ללא commit — git plumbing בלבד)
+**משך:** ~שעתיים
 
 ### מה הושלם
 - כתיבת `docs/ROADMAP.md` — דו-לשוני (אנגלית ואז עברית), פירוט בינוני לכל שלב, מפת תלויות, הגדרת MVP
 - כתיבת `docs/WORK_LOG.md` — הקובץ הזה. נקבע הפורמט, רשומות רטרואקטיביות ל-Phases 1, 2A, 2B, 2C
+- שינוי שם branch מקומי מ-`master` ל-`main`
+- יצירת repo פרטי ב-GitHub בכתובת `https://github.com/ShlomoLIfschitz/Luchot.git` עם תיאור מלא של הפרויקט
+- הוספת `origin` remote ו-push של כל 12 ה-commits עם upstream tracking (`main` → `origin/main`)
 
 ### החלטות שהתקבלו
 - רמת פירוט ב-ROADMAP: בינונית (פסקה + תלויות לכל משימה, בלי קריטריוני קבלה — אלה חיים ב-prompts של זמן ביצוע)
@@ -147,13 +154,14 @@
 - H3 (GitHub remote) ו-H4 (קבצי tokens ל-radius/overlay) נדחים — ראה ROADMAP
 
 ### פתוח / חוסם
-- Remote של GitHub עדיין לא מוגדר (מתוכנן כ-H3)
-- החלטה ממתינה על H4: להציג `radius.ts` + `overlay.ts` לפני שמתחילים את Phase 3.1, או לצרף לתוך 3.1 עצמו
+- החלטה ממתינה על קבצי tokens של H4 (radius.ts, overlay.ts) — ה-Architect מציע לצרף ל-Phase 3.1 בסשן הבא
+- שלוש החלטות עיצוב ל-Phase 3.1 עדיין ממתינות: מבנה סולם ה-radius, מה לעשות עם `borderRadius: 20` הקיים (xl=16 או xxl=20), וצורת overlay.ts (מינימלי או מלא)
 - 6 קבצים ב-working tree עדיין מסומנים לשכתוב ב-Phase 3 — לא נגעו בהם, כמצופה
 
 ### בסשן הבא
-- H3: הגדרת remote של GitHub + שינוי שם `master` → `main` + push ראשוני
-- אחר כך להתחיל את Phase 3.1
+- גם Architect וגם Claude Code פותחים סשן חדש עם INIT prompts מעודכנים
+- משימה ראשונה: לפתור את שלוש החלטות העיצוב הממתינות ל-Phase 3.1
+- אחר כך לבצע Phase 3.1 — radius.ts + overlay.ts + התאמות פלטה סופיות, ועוד החלפת שני magic numbers הידועים ב-NoteEditor וב-MonthYearPicker
 
 ---
 
