@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-05-26 — Session: Phase 3.3 (MonthGrid mode prop + interaction model)
+
+**Phase:** Phase 3.3
+**Commits:** `a3ea24a` (tagMapper), `7bb11e1` (QuickActionSheet), `f139fcf` (MonthGrid rewrite), plus WORK_LOG update
+**Duration:** ~1h
+
+### What got done
+- Created `src/utils/tagMapper.ts` — pure `buildDayTags(dayData, userNotes)` function. Maps DayData holidays + Rosh Chodesh + Omer count + CalendarNotes into an ordered `DayCellTag[]`. No React, no side effects.
+- Created `src/components/calendar/QuickActionSheet.tsx` — `@gorhom/bottom-sheet`-based long-press action sheet with three actions (addNote / addRecurring / viewDay). Uses lucide icons (Pencil, Gift, FileText). `forwardRef` pattern consistent with BottomSheet usage elsewhere.
+- Rewrote `src/components/calendar/MonthGrid.tsx` — full rewrite consuming new DayCell API. Removed `@ts-nocheck` pragma (Phase 3.2 bridge). Key changes:
+  - Added `mode?: 'hebrew' | 'gregorian'` prop (default `'hebrew'`). Made optional so reserved tab files using `<MonthGrid />` without props continue to typecheck without modification.
+  - `getLabels()` computes `primaryLabel`/`secondaryLabel` from `DayData` based on mode.
+  - Interaction model: first tap = select, second tap on selected = navigate (TODO 3.4), long-press = QuickActionSheet.
+  - Month/year picker moved from `onLongPress` to `onPress` on the header (per SCREENS.md).
+  - Removed: `DayModal`, `useZmanim`, `isAfterSunset`, `afterSunset`, `modalDay` state, old `bottomSheetRef`.
+  - `buildDayTags(item, [])` called per cell with empty userNotes (see open items).
+- Typecheck clean. One fix needed during development: `mode` made optional (`mode?`) with default `'hebrew'` to avoid touching reserved `index.tsx` which renders `<MonthGrid />` without props.
+
+### Decisions made
+- `mode` defaulted to `'hebrew'` rather than required — avoids modifying reserved tab files prematurely; Phase 3.4 will pass explicit `mode` when it creates the Gregorian tab
+- Per-cell user notes wiring deferred: calling `useNotes` per cell inside `FlatList.renderItem` violates Rules of Hooks. Batching strategy (load all month's notes once at MonthGrid level, slice per cell) is the right fix but belongs in Phase 4 polish
+- QuickActionSheet actions are structural no-ops — full wiring happens as Phase 3.4 (navigation targets) and Phase 3.5 (NoteEditor integration) land
+
+### Open items / blockers
+1. **User notes not visible as tags.** `buildDayTags(item, [])` — batching strategy deferred to Phase 4
+2. **Second-tap Day navigation is no-op.** `TODO Phase 3.4` comment in MonthGrid. Activates once Day tab exists
+3. **Quick action handlers are no-ops.** Same dependency on Phase 3.4–3.5
+4. **5 reserved files still untouched:** `_layout.tsx`, `day.tsx`, `index.tsx`, `settings.tsx`, `week.tsx`
+
+### Next steps
+- Phase 3.4 — Tab layout restructure: rewrite `app/(tabs)/_layout.tsx` from 4 tabs (חודש/שבוע/יום/הגדרות) to (עברי/לועזי/יום/זמנים). Create `gregorian.tsx`, `zmanim.tsx` placeholder. Refactor `index.tsx` to pass `mode="hebrew"` explicitly. Remove `week.tsx` from tabs.
+
+---
+
 ## 2026-05-26 — Session: Phase 3.2 (DayCell v2 rewrite)
 
 **Phase:** Phase 3.2 (+ radius.ts hotfix from Phase 3.1)
@@ -190,6 +224,40 @@
 > יומן רישום סשני של מה הושלם, מה הוחלט, ומה נשאר פתוח. מתעדכן ע"י Claude Code בסוף כל סשן לפי מפרט `CLAUDE.md`.
 >
 > רשומות חדשות מופיעות ראשונות. רשומות "backfilled" מתעדות עבודה שקדמה ליומן הזה.
+
+---
+
+## 2026-05-26 — סשן: Phase 3.3 (mode prop ב-MonthGrid + מודל אינטראקציה)
+
+**שלב:** Phase 3.3
+**Commits:** `a3ea24a` (tagMapper), `7bb11e1` (QuickActionSheet), `f139fcf` (שכתוב MonthGrid), ועדכון WORK_LOG
+**משך:** ~שעה
+
+### מה הושלם
+- נוצר `src/utils/tagMapper.ts` — פונקציה טהורה `buildDayTags(dayData, userNotes)`. ממפה חגי DayData + ראש חודש + ספירת העומר + CalendarNotes ל-`DayCellTag[]` מסודר. ללא React, ללא תופעות לוואי.
+- נוצר `src/components/calendar/QuickActionSheet.tsx` — תפריט long-press מבוסס `@gorhom/bottom-sheet` עם שלוש פעולות (addNote / addRecurring / viewDay). משתמש באייקוני lucide (Pencil, Gift, FileText). דפוס `forwardRef` עקבי עם שימוש ב-BottomSheet בשאר האפליקציה.
+- שוכתב `src/components/calendar/MonthGrid.tsx` — שכתוב מלא הצורך ב-API של DayCell החדש. הוסר pragma `@ts-nocheck` (גשר Phase 3.2). שינויים מרכזיים:
+  - נוסף prop מסוג `mode?: 'hebrew' | 'gregorian'` (ברירת מחדל `'hebrew'`). הפך לאופציונלי כדי שקבצי הטאב השמורים המשתמשים ב-`<MonthGrid />` ללא props ימשיכו לעמוד בבדיקת הטיפוסים ללא שינוי.
+  - `getLabels()` מחשבת `primaryLabel`/`secondaryLabel` מ-`DayData` לפי mode.
+  - מודל אינטראקציה: לחיצה ראשונה = בחירה, לחיצה שנייה על הנבחר = ניווט (TODO 3.4), long-press = QuickActionSheet.
+  - בורר חודש/שנה הועבר מ-`onLongPress` ל-`onPress` בכותרת (לפי SCREENS.md).
+  - הוסרו: `DayModal`, `useZmanim`, `isAfterSunset`, `afterSunset`, `modalDay` state, `bottomSheetRef` הישן.
+  - `buildDayTags(item, [])` נקרא לכל תא עם userNotes ריק (ראה פתוח/חסום).
+- Typecheck ירוק. תיקון אחד נדרש: `mode` הפך לאופציונלי (`mode?`) עם ברירת מחדל `'hebrew'` כדי לא לגעת ב-`index.tsx` השמור שמרנדר `<MonthGrid />` ללא props.
+
+### החלטות שהתקבלו
+- `mode` כברירת מחדל `'hebrew'` ולא שדה חובה — מונע שינוי קבצי טאב שמורים בטרם עת; Phase 3.4 יעביר `mode` מפורש בעת יצירת הטאב הלועזי
+- חיבור notes למשתמש נדחה: קריאה ל-`useNotes` לכל תא בתוך `FlatList.renderItem` מפרה את Rules of Hooks. אסטרטגיית batch (טעינת notes לחודש פעם אחת ברמת MonthGrid) היא הפתרון הנכון אבל שייך ל-Phase 4
+- פעולות QuickActionSheet הן no-ops מבניים — חיבור מלא קורה ב-Phase 3.4 (יעדי ניווט) ו-Phase 3.5 (אינטגרציית NoteEditor)
+
+### פתוח / חוסם
+1. **Notes משתמש לא נראות כ-tags.** `buildDayTags(item, [])` — אסטרטגיית batch נדחית ל-Phase 4
+2. **ניווט לחיצה שנייה הוא no-op.** הערת `TODO Phase 3.4` ב-MonthGrid. יופעל ברגע שהטאב "יום" קיים
+3. **מטפלי פעולות מהירות הם no-ops.** אותה תלות ב-Phase 3.4–3.5
+4. **5 קבצים שמורים עדיין לא נגעו:** `_layout.tsx`, `day.tsx`, `index.tsx`, `settings.tsx`, `week.tsx`
+
+### בסשן הבא
+- Phase 3.4 — שינוי מבנה הטאבים: שכתוב `app/(tabs)/_layout.tsx` מ-4 טאבים (חודש/שבוע/יום/הגדרות) ל-(עברי/לועזי/יום/זמנים). יצירת `gregorian.tsx`, placeholder ל-`zmanim.tsx`. refactor של `index.tsx` להעביר `mode="hebrew"` במפורש. הסרת `week.tsx` מהטאבים.
 
 ---
 
