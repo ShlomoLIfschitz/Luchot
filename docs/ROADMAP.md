@@ -1,8 +1,6 @@
 # Luchot — Roadmap
 
-> **Status snapshot:** 11 commits on local `master`, all typecheck-green. Phase 2 (notes UI layer) complete. Phase 3 (calendar UI rewrite) is next.
->
-> **No remote yet.** GitHub setup scheduled between Phase 2 and Phase 3.
+> **Status snapshot:** On `main`, remote on GitHub. Phase 3.4 complete. Phases 3.1–3.4 done; 3.5–3.7 next.
 
 This document is the dependency map and ordering plan for Luchot. Each phase lists what owns it, what it depends on, and what it unblocks. Full implementation detail lives in the per-task prompts written when the work is actually picked up — not here.
 
@@ -84,13 +82,9 @@ Goal: add `mode: 'hebrew' | 'gregorian'` to MonthGrid. Fix the interaction model
 - **Depends on:** 3.2
 - **Unblocks:** 3.4 (tab layout needs MonthGrid rendering correctly in both modes)
 
-### 3.4 — Tab layout restructure
+### 3.4 — Tab layout restructure ✅ (commits `6f25a6c`, `4c48d29`, `67aab14`)
 
-Goal: rewrite `app/(tabs)/_layout.tsx` from 4 tabs (חודש/שבוע/יום/הגדרות) to the new spec (עברי/לועזי/יום/זמנים). Default landing on עברי. Create `app/(tabs)/gregorian.tsx` (Gregorian MonthGrid), `app/(tabs)/zmanim.tsx` (Zmanim screen placeholder for 3.6). Delete `app/(tabs)/week.tsx` (Week view moves to the hamburger drawer in 3.7). Refactor `app/(tabs)/index.tsx` to be the Hebrew MonthGrid tab.
-
-- **Owns:** all files under `app/(tabs)/`
-- **Depends on:** 3.3
-- **Unblocks:** 3.5, 3.6, 3.7
+Rewrote `_layout.tsx` (4 tabs: עברי/לועזי/יום/זמנים, lucide icons, theme colors). Deleted `week.tsx`. Created `gregorian.tsx` and `zmanim.tsx` (placeholders). Rewrote `index.tsx` and `day.tsx`. MonthGrid `mode` prop made required; `router.push('/(tabs)/day')` wired for second-tap and viewDay quick action.
 
 ### 3.5 — Day screen
 

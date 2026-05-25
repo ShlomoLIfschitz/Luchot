@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-05-26 — Session: Phase 3.4 (Tab layout restructure)
+
+**Phase:** Phase 3.4
+**Commits:** `6f25a6c` (rm week), `4c48d29` (tab restructure), `67aab14` (MonthGrid tighten)
+**Duration:** ~30min
+
+### What got done
+- Deleted `app/(tabs)/week.tsx` via `git rm -f` (had local modifications but imports broken WeekRow; deletion confirmed by architect).
+- Rewrote `app/(tabs)/_layout.tsx` — 4 new tabs (עברי/לועזי/יום/זמנים) with lucide icons (BookOpenText/Calendar/Sun/Clock). Settings hidden via `href: null`. Tab bar consumes `colors.accent`, `colors.textTertiary`, `colors.surface` from theme (replaces hardcoded `#8B6F4E`). `headerShown: false`.
+- Rewrote `app/(tabs)/index.tsx` — Hebrew calendar tab. Passes `mode="hebrew"` explicitly. Kept `refreshMonth()` init effect (store initialises with `monthData: []`).
+- Created `app/(tabs)/gregorian.tsx` — Gregorian calendar tab. Passes `mode="gregorian"`.
+- Rewrote `app/(tabs)/day.tsx` — placeholder showing selected date in `he-IL` locale. Full Day screen deferred to Phase 3.5.
+- Created `app/(tabs)/zmanim.tsx` — placeholder. Full Zmanim screen deferred to Phase 3.6.
+- Updated `src/components/calendar/MonthGrid.tsx`:
+  - `mode` prop made required (removed `= 'hebrew'` default).
+  - Added `useRouter` from `expo-router`.
+  - Wired `router.push('/(tabs)/day')` for second-tap on selected day and for the `viewDay` quick action.
+  - Updated file-level comment to reflect P3.4 completion.
+- Typecheck clean (0 errors) after all changes.
+
+### Decisions made
+- Kept `refreshMonth()` init useEffect in `index.tsx` — `CalendarProvider` initialises `monthData: []` so the call is required; dropped it from `gregorian.tsx` since the Hebrew tab always loads first in normal navigation.
+- `gregorian.tsx` does NOT call `refreshMonth()` — by the time the user navigates to it, the Hebrew tab will have already populated month data.
+
+### Open items / blockers
+1. **User notes not visible as tags.** `buildDayTags(item, [])` — batching strategy deferred to Phase 4.
+2. **addNote / addRecurring quick actions are no-ops.** NoteEditor integration deferred to Phase 3.5.
+
+### Next steps
+- Phase 3.5 — Full Day screen. Replaces `day.tsx` placeholder; implements the content described in SCREENS.md (header, holidays, parasha, learning items, zmanim inline, notes list).
+- Phase 3.6 — Full Zmanim screen. Replaces `zmanim.tsx` placeholder.
+
+---
+
 ## 2026-05-26 — Session: Phase 3.3 (MonthGrid mode prop + interaction model)
 
 **Phase:** Phase 3.3
