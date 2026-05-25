@@ -3,11 +3,19 @@
 import * as SQLite from 'expo-sqlite';
 import { CalendarEvent } from '../schemas/EventSchema';
 
-const db = SQLite.openDatabaseSync('calendar.db');
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) {
+    dbPromise = SQLite.openDatabaseAsync('calendar.db');
+  }
+  return dbPromise;
+}
 
 export class StorageService {
-  static init() {
-    db.execSync(`
+  static async init(): Promise<void> {
+    const db = await getDb();
+    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY,
         summary TEXT NOT NULL,
@@ -31,7 +39,6 @@ export class StorageService {
         updated TEXT,
         notification_scheduled INTEGER DEFAULT 0
       );
-
       CREATE TABLE IF NOT EXISTS preferences (
         key TEXT PRIMARY KEY,
         value TEXT
@@ -41,9 +48,10 @@ export class StorageService {
 
   // ── Events ────────────────────────────────────────────────
 
-  static saveEvent(event: CalendarEvent): void {
+  static async saveEvent(event: CalendarEvent): Promise<void> {
+    const db = await getDb();
     const ext = event.hebrewExtensions;
-    db.runSync(
+    await db.runAsync(
       `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         event.id, event.summary, event.description ?? null,
@@ -62,41 +70,47 @@ export class StorageService {
     );
   }
 
-  static getEventsForGregorianDate(date: Date): CalendarEvent[] {
+  static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {
+    const db = await getDb();
     const dateStr = date.toISOString().split('T')[0];
-    const rows = db.getAllSync<any>(
+    const rows = await db.getAllAsync<any>(
       `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled'`,
       [dateStr]
     );
     return rows.map(StorageService.rowToEvent);
   }
 
-  static getEventsForHebrewDate(hebrewDay: number, hebrewMonth: number): CalendarEvent[] {
-    const rows = db.getAllSync<any>(
-      `SELECT * FROM events WHERE hebrew_day = ? AND hebrew_month = ? 
+  static async getEventsForHebrewDate(hebrewDay: number, hebrewMonth: number): Promise<CalendarEvent[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>(
+      `SELECT * FROM events WHERE hebrew_day = ? AND hebrew_month = ?
        AND calendar_type = 'hebrew' AND status != 'cancelled'`,
       [hebrewDay, hebrewMonth]
     );
     return rows.map(StorageService.rowToEvent);
   }
 
-  static deleteEvent(id: string): void {
-    db.runSync(`UPDATE events SET status = 'cancelled', updated = ? WHERE id = ?`, [
-      new Date().toISOString(), id
-    ]);
+  static async deleteEvent(id: string): Promise<void> {
+    const db = await getDb();
+    await db.runAsync(
+      `UPDATE events SET status = 'cancelled', updated = ? WHERE id = ?`,
+      [new Date().toISOString(), id]
+    );
   }
 
   // ── Preferences ───────────────────────────────────────────
 
-  static getPref(key: string, defaultValue: string): string {
-    const row = db.getFirstSync<{ value: string }>(
+  static async getPref(key: string, defaultValue: string): Promise<string> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ value: string }>(
       `SELECT value FROM preferences WHERE key = ?`, [key]
     );
     return row?.value ?? defaultValue;
   }
 
-  static setPref(key: string, value: string): void {
-    db.runSync(
+  static async setPref(key: string, value: string): Promise<void> {
+    const db = await getDb();
+    await db.runAsync(
       `INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)`,
       [key, value]
     );
@@ -105,6 +119,13 @@ export class StorageService {
   // ── Row Mapper ────────────────────────────────────────────
 
   private static rowToEvent(row: any): CalendarEvent {
+    let recurrence: string[] | undefined;
+    try {
+      const parsed = JSON.parse(row.recurrence || '[]');
+      recurrence = Array.isArray(parsed) ? (parsed as string[]) : [];
+    } catch {
+      recurrence = [];
+    }
     return {
       id: row.id,
       summary: row.summary,
@@ -114,7 +135,7 @@ export class StorageService {
       updated: row.updated,
       start: { date: row.start_date, dateTime: row.start_datetime },
       end: { date: row.end_date, dateTime: row.end_datetime },
-      recurrence: JSON.parse(row.recurrence || '[]'),
+      recurrence,
       colorId: row.color_id,
       hebrewExtensions: {
         calendarType: row.calendar_type,
