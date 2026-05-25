@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-05-26 — Session: Phase 3.2 (DayCell v2 rewrite)
+
+**Phase:** Phase 3.2 (+ radius.ts hotfix from Phase 3.1)
+**Commits:** `08f886b` (radius fix), `8adda9c` (lucide install), `ca43010` (DayCell rewrite + MonthGrid bridge), plus WORK_LOG update
+**Duration:** ~1h
+
+### What got done
+- **Pre-flight caught radius.ts divergence:** Phase 3.1 shipped `sm=4` (no `xs`) and added `none=0`/`xxl=20` — not in DESIGN.md. No existing consumers of `radius.none` or `radius.xxl` found. Fixed immediately as a separate commit before any DayCell work.
+- **radius.ts aligned with DESIGN.md:** `xs=4` (tags/badges), `sm=6` (day cells), `md=8`, `lg=12`, `xl=16`, `full=9999`. `none` and `xxl` removed.
+- **Installed `lucide-react-native`** — required for `Flame` icon used as the Friday candle indicator in DayCell. No emoji fallback.
+- **Rewrote `src/components/calendar/DayCell.tsx`** — full hard-replace of old diagonal-layout architecture. New component is purely presentational: receives `primaryLabel`, `secondaryLabel`, state booleans, `tags[]`, and `onPress`/`onLongPress`. Removed: `DayData` import, `toHebrewNumeral` call, `useSettingsStore` call, `holidayDot`, `roshChodeshBar`, `sunsetBadge`, `isAfterSunset` prop, `#C4A882` hex, `aspectRatio: 0.85`, `diagonalDirection` logic.
+- **Added `@ts-nocheck` bridge to `MonthGrid.tsx`** — the one reserved-file edit allowed. Suppresses type errors from the old DayCell API until Phase 3.3 rewrites MonthGrid. Document comment included.
+- Typecheck green after each step.
+
+### Decisions made
+- `radius.xs` (=4) for tag chip corners; `radius.sm` (=6) for cell corners — exact DESIGN.md mapping
+- Lucide `Flame` icon for candle (no emoji); size 12, color `colors.candle`
+- State accumulation confirmed: border family (today/selected) and background family (holiday/shabbat tints) are independent
+- `secondaryLabel` wrapped with `writingDirection: 'ltr'` for correct LTR digit rendering in RTL container
+- `onPress`/`onLongPress` deliberately excluded from memo comparator — parent is expected to `useCallback` them
+- `delayLongPress={350}` — RN sweet spot for tap vs long-press distinction
+
+### Open items / blockers
+- `@ts-nocheck` in MonthGrid.tsx is intentional technical debt — removed in Phase 3.3
+- 5 reserved files still untouched: `_layout.tsx`, `day.tsx`, `index.tsx`, `settings.tsx`, `week.tsx`
+
+### Next steps
+- Phase 3.3 — MonthGrid rewrite: add `mode: 'hebrew' | 'gregorian'` prop, implement the new two-tap interaction model, wire the new DayCell API, move month/year picker trigger from long-press to header tap, implement quick-action menu on long-press
+
+---
+
 ## 2026-05-25 — Session: Phase 3.1 + H4 (radius & overlay tokens)
 
 **Phase:** Phase 3.1 / Housekeeping H4
@@ -159,6 +190,37 @@
 > יומן רישום סשני של מה הושלם, מה הוחלט, ומה נשאר פתוח. מתעדכן ע"י Claude Code בסוף כל סשן לפי מפרט `CLAUDE.md`.
 >
 > רשומות חדשות מופיעות ראשונות. רשומות "backfilled" מתעדות עבודה שקדמה ליומן הזה.
+
+---
+
+## 2026-05-26 — סשן: Phase 3.2 (שכתוב DayCell לגרסה v2)
+
+**שלב:** Phase 3.2 (+ תיקון חם של radius.ts מ-Phase 3.1)
+**Commits:** `08f886b` (תיקון radius), `8adda9c` (התקנת lucide), `ca43010` (שכתוב DayCell + גשר MonthGrid), ועדכון WORK_LOG
+**משך:** ~שעה
+
+### מה הושלם
+- **Pre-flight זיהה סטייה ב-radius.ts:** Phase 3.1 שלח `sm=4` (ללא `xs`) והוסיף `none=0`/`xxl=20` — לא לפי DESIGN.md. לא נמצאו צרכנים של `radius.none` או `radius.xxl`. תוקן מיידית כ-commit נפרד לפני כל עבודה על DayCell.
+- **radius.ts הותאם ל-DESIGN.md:** `xs=4` (tags/badges), `sm=6` (תאי יום), `md=8`, `lg=12`, `xl=16`, `full=9999`. הוסרו `none` ו-`xxl`.
+- **הותקן `lucide-react-native`** — נדרש לאייקון `Flame` המשמש כאינדיקטור נר שישי ב-DayCell. ללא fallback emoji.
+- **שוכתב `src/components/calendar/DayCell.tsx`** — החלפה מלאה של ארכיטקטורת הפריסה האלכסונית הישנה. הקומפוננטה החדשה היא presentational בלבד: מקבלת `primaryLabel`, `secondaryLabel`, boolean-ים של מצב, `tags[]`, ו-`onPress`/`onLongPress`. הוסרו: import של `DayData`, קריאה ל-`toHebrewNumeral`, קריאה ל-`useSettingsStore`, `holidayDot`, `roshChodeshBar`, `sunsetBadge`, prop `isAfterSunset`, hex `#C4A882`, `aspectRatio: 0.85`, לוגיקת `diagonalDirection`.
+- **נוסף גשר `@ts-nocheck` ל-`MonthGrid.tsx`** — העריכה היחידה המותרת לקובץ שמור. מדכא שגיאות טיפוס מ-API הישן של DayCell עד ש-Phase 3.3 יכתוב מחדש את MonthGrid. כולל הערת תיעוד.
+- Typecheck ירוק אחרי כל שלב.
+
+### החלטות שהתקבלו
+- `radius.xs` (=4) לפינות chip של tag; `radius.sm` (=6) לפינות תא — מיפוי מדויק לפי DESIGN.md
+- אייקון `Flame` מ-Lucide לנר (ללא emoji); גודל 12, צבע `colors.candle`
+- אקומולציה של מצבים מאושרת: משפחת border (today/selected) ומשפחת רקע (גוני holiday/shabbat) בלתי תלויים
+- `secondaryLabel` עם `writingDirection: 'ltr'` לרינדור נכון של ספרה לועזית בתוך container RTL
+- `onPress`/`onLongPress` מוחרגים בכוונה מ-comparator של memo — ה-parent אמור להשתמש ב-`useCallback`
+- `delayLongPress={350}` — sweet spot של RN להבדלת tap מ-long-press
+
+### פתוח / חוסם
+- `@ts-nocheck` ב-MonthGrid.tsx הוא חוב טכני מכוון — יוסר ב-Phase 3.3
+- 5 קבצים שמורים עדיין לא נגעו: `_layout.tsx`, `day.tsx`, `index.tsx`, `settings.tsx`, `week.tsx`
+
+### בסשן הבא
+- Phase 3.3 — שכתוב MonthGrid: הוספת prop מסוג `mode: 'hebrew' | 'gregorian'`, מימוש מודל האינטראקציה של לחיצה כפולה, חיבור API של DayCell החדש, העברת טריגר הבוחר חודש/שנה מ-long-press ללחיצה על כותרת, מימוש תפריט פעולות מהיר ב-long-press
 
 ---
 
