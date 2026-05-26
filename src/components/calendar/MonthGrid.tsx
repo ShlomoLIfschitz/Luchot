@@ -1,13 +1,16 @@
 // src/components/calendar/MonthGrid.tsx
 // Phase 3.4 — mode made required; useRouter wired; second-tap and viewDay
 // quick action now navigate to the Day tab.
+// Phase 3.7a-2 — addNote and addRecurring quick actions wired to NoteEditor.
 //
 // Known limitations (intentional, deferred to later phases):
 //   1. User notes do not appear as tags — buildDayTags receives empty
 //      userNotes array. Batching strategy for per-cell notes deferred
 //      to Phase 4.
-//   2. addNote / addRecurring quick action handlers are no-ops — NoteEditor
-//      integration deferred to Phase 3.5.
+//   2. addNote and addRecurring both open NoteEditor with default state
+//      (noteType: 'note'). The user selects the specific type via the
+//      editor's type chips. A direct preset would require a defaultNoteType
+//      prop on NoteEditor; deferred to Phase 4 polish.
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -22,6 +25,9 @@ import { MonthYearPicker } from './MonthYearPicker';
 import { QuickActionSheet, QuickAction } from './QuickActionSheet';
 import { DayData, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { buildDayTags } from '../../utils/tagMapper';
+import { NoteEditor } from '../notes/NoteEditor';
+import { useNotes } from '../../hooks/useNotes';
+import { dateService } from '../../services/DateService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,6 +64,20 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [actionSheetDate, setActionSheetDate] = useState<Date | null>(null);
   const actionSheetRef = useRef<BottomSheet>(null);
+
+  // NoteEditor state — opened by addNote / addRecurring quick actions.
+  // Both actions currently open the editor with default state; the user
+  // selects the specific type via the editor's type chips (see limitation #2).
+  const [noteEditorVisible, setNoteEditorVisible] = useState(false);
+
+  // Use actionSheetDate when set (the long-pressed day); fall back to
+  // selectedDate so useNotes always receives a valid Date.
+  const editorDate = actionSheetDate ?? selectedDate;
+  const editorHebrewDate = useMemo(
+    () => dateService.getDayData(editorDate).hebrewDate,
+    [editorDate],
+  );
+  const { saveNote } = useNotes(editorDate);
 
   // ── Grid construction ──────────────────────────────────────────────────────
   // Prepend empty cells to align the first day of the month correctly.
@@ -118,10 +138,10 @@ export function MonthGrid({ mode }: MonthGridProps) {
     (action: QuickAction) => {
       switch (action) {
         case 'addNote':
-          // TODO Phase 3.4+: open NoteEditor with date=actionSheetDate
+          setNoteEditorVisible(true);
           break;
         case 'addRecurring':
-          // TODO Phase 3.4+: open NoteEditor with recurring=true, date=actionSheetDate
+          setNoteEditorVisible(true);
           break;
         case 'viewDay':
           router.push('/(tabs)/day');
@@ -249,6 +269,19 @@ export function MonthGrid({ mode }: MonthGridProps) {
           colors={colors}
           onSelect={navigateToMonth}
           onClose={() => setPickerVisible(false)}
+        />
+
+        {/* NoteEditor — opened by addNote / addRecurring quick actions.
+            Modal-based (not BottomSheet); controlled via visible prop.
+            colors injected because NoteEditor does not call useThemeColors
+            internally. */}
+        <NoteEditor
+          visible={noteEditorVisible}
+          date={editorDate}
+          hebrewDate={editorHebrewDate}
+          colors={colors}
+          onClose={() => setNoteEditorVisible(false)}
+          onSave={saveNote}
         />
 
         {/* Quick Action Sheet — opened on day long-press */}
