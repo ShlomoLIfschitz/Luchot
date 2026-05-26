@@ -155,20 +155,20 @@ export default function DayScreen() {
             {dayData.dafYomi && (
               <DetailRow
                 label="דף יומי"
-                value={dayData.dafYomi}
+                value={dayData.dafYomi.display}
                 colors={colors}
                 actionLabel="→ ספריא"
-                onAction={() => Linking.openURL('https://www.sefaria.org.il')}
+                onAction={() => Linking.openURL(dayData.dafYomi!.url)}
               />
             )}
 
             {dayData.rambamOneChapter && (
               <DetailRow
                 label='רמב״ם יומי'
-                value={dayData.rambamOneChapter}
+                value={dayData.rambamOneChapter.display}
                 colors={colors}
                 actionLabel="→ ספריא"
-                onAction={() => Linking.openURL('https://www.sefaria.org.il/Mishneh_Torah')}
+                onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
               />
             )}
           </View>
