@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 3.7b-2 (Details screen + LearningItem refactor)
+
+**Phase:** Phase 3.7b-2
+**Commits:** `bd8ec1c` (DateService LearningItem refactor), `4c9a530` (Day screen update), `afb6de5` (Details screen), `ee0a430` (Drawer wiring)
+**Duration:** ~1 session
+
+### What got done
+- **`LearningItem` interface added to `src/services/DateService.ts`** — exported; contains `display: string` (Hebrew rendered text) and `url: string` (Sefaria URL with `?lang=bi`).
+- **`DayData` interface updated** — all 7 learning fields changed from `string | undefined` to `LearningItem | undefined`: `dafYomi`, `rambamOneChapter`, `mishnaYomi`, `nachYomi`, `tanakhYomi`, `chofetzChaim`, `psalms`.
+- **`renderLearning` helper rewritten** — now returns `LearningItem | undefined` instead of `string | undefined`. Captures `event.render('he')` as `display` and `(event as any).url()` as `url`. Defensive `typeof` guard ensures future schedules without URLs are handled gracefully (return `undefined` rather than partial object).
+- **`app/(tabs)/day.tsx` updated** — the two Sefaria link buttons (Daf Yomi, Rambam) now read `dayData.dafYomi.display` / `dayData.rambamOneChapter.display` for the label, and pass the event's specific Sefaria URL to `Linking.openURL`. The previously hardcoded generic Sefaria URLs (`sefaria.org.il`, `sefaria.org.il/Mishneh_Torah`) are gone.
+- **`app/details.tsx` created** — standalone screen at `/details`. Structure mirrors Zmanim screen (GestureDetector + ScreenHeader + ScrollView + swipe navigation). Four themed sections: תלמוד (Daf Yomi + Mishna Yomi), רמב"ם (Rambam 1 chapter), תנ"ך (Nach Yomi + Tanakh Yomi), מוסר ותהילים (Chofetz Chaim + Psalms). Each row shows Hebrew display text + "ספריא" button with `ExternalLink` icon opening the exact Sefaria page. Undefined items pruned per-section; empty sections dropped entirely. Empty-state message if no items at all for a date.
+- **`src/components/drawer/Drawer.tsx`** — added `Library` icon import; added "פרטי לימוד" DrawerItem between "זמנים" and the divider before "הגדרות".
+- Typecheck green at every commit boundary.
+
+### Discoveries / notes
+- Pre-flight confirmed all required lucide icons exist: `BookOpen`, `BookMarked`, `BookText`, `Sparkles`, `ExternalLink`, `Library`, `ListChecks`. Used `Library` for drawer item per spec.
+- The Day screen UX improvement (exact Sefaria page vs. generic homepage) came for free with the LearningItem refactor — no extra work needed.
+- `@hebcal/learning` investigation from pre-flight: all 7 active schedules expose `.url()` returning Sefaria `?lang=bi` URLs. The defensive `typeof (event as any).url === 'function'` guard in `renderLearning` is cheap insurance for future schedule additions.
+
+### Open items / blockers
+1. **Phase 3.7b-3 (Week view)** — next task. Week view moved out of tabs to drawer in 3.7a; component needs to be built.
+2. **About + Tour + final polish (Phase 3.7c)** — last Phase 3 tasks.
+3. **3 deferred learning schedules** (rambamThreeChapters, seferHaMitzvot, arukhHaShulchan) — documented in ROADMAP Phase 4-A. When revisited, they should follow the `LearningItem` shape already established here.
+4. **All prior open items from Phase 3.7a-2 remain** (hebrewOnTop toggle has no visible effect until Phase 3.7c universal header; defaultCalendarType usage TBD; location placeholder; candle lighting hardcoded 18min).
+
+### Next steps
+- Phase 3.7b-3 — Week view component (drawer navigation, not a tab).
+
+---
+
 ## 2026-05-27 — Session: Phase 3.7b-1 (@hebcal/learning integration — data layer)
 
 **Phase:** Phase 3.7b-1
