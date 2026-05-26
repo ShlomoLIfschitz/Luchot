@@ -188,7 +188,7 @@ export function Drawer() {
             <DrawerItem
               Icon={SettingsIcon}
               label="הגדרות"
-              onPress={() => navigateTo('/(tabs)/settings')}
+              onPress={() => navigateTo('/settings')}
             />
           </View>
         </Animated.View>
