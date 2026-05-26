@@ -1,6 +1,7 @@
 // src/services/DateService.ts
 
-import { HDate, HebrewCalendar, Event as HebcalEvent, flags } from '@hebcal/core';
+import { HDate, HebrewCalendar, Event as HebcalEvent, flags, DailyLearning } from '@hebcal/core';
+import '@hebcal/learning'; // side-effect: registers daily learning schedules into DailyLearning registry
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -24,8 +25,18 @@ export interface DayData {
   isYomTov: boolean;
   isCholHamoed: boolean;
   omerDay?: number;           // 1-49 during Sefirat HaOmer
-  dafYomi?: string;           // e.g. "ברכות דף ב"
-  rambamChapter?: string;
+  dafYomi?: string;           // Bavli Daf Yomi via @hebcal/learning ('dafYomi')
+  rambamOneChapter?: string;  // Rambam 1-chapter cycle via @hebcal/learning ('rambam1')
+  // ── Phase 3.7b-1: additional learning schedules ─────────────────────────
+  mishnaYomi?: string;        // Mishnah Yomi (2 mishnayot/day)
+  nachYomi?: string;          // Nach Yomi (1 chapter/day)
+  tanakhYomi?: string;        // Tanakh Yomi (Israeli program)
+  chofetzChaim?: string;      // Chofetz Chaim — daily halacha
+  psalms?: string;            // Tehillim (monthly cycle)
+  // ── Phase 4 deferred ─────────────────────────────────────────────────────
+  // rambamThreeChapters — not in @hebcal/learning v5.1.2
+  // seferHaMitzvot        — not in @hebcal/learning v5.1.2
+  // arukhHaShulchan       — not in @hebcal/learning v5.1.2
 }
 
 // ── Cache ─────────────────────────────────────────────────
@@ -87,6 +98,18 @@ export function toHebrewYear(year: number): string {
   const letters = GEM_HUNDREDS[h] + tensStr + unitsStr;
   if (letters.length <= 1) return letters + '׳';
   return letters.slice(0, -1) + '״' + letters.slice(-1);
+}
+
+// ── Daily Learning Helper ─────────────────────────────────
+// Looks up a named learning schedule for a given Hebrew date and returns
+// a Hebrew string (fallback: English, fallback: undefined).
+// The @hebcal/learning side-effect import above populates the registry.
+
+/** il = true for Israel, false for Diaspora (mirrors HebrewCalendar `il` flag) */
+function renderLearning(scheduleName: string, hd: HDate, il: boolean): string | undefined {
+  const event = DailyLearning.lookup(scheduleName, hd, il);
+  if (!event) return undefined;
+  return event.render('he') || event.render('en') || undefined;
 }
 
 // ── Core DateService ──────────────────────────────────────
@@ -189,8 +212,13 @@ export class DateService {
         isYomTov,
         isCholHamoed,
         omerDay,
-        dafYomi: this.getDafYomi(date),
-        rambamChapter: this.getRambamChapter(date),
+        dafYomi:          renderLearning('dafYomi',      hdate, !this.diaspora),
+        rambamOneChapter: renderLearning('rambam1',      hdate, !this.diaspora),
+        mishnaYomi:       renderLearning('mishnaYomi',   hdate, !this.diaspora),
+        nachYomi:         renderLearning('nachYomi',     hdate, !this.diaspora),
+        tanakhYomi:       renderLearning('tanakhYomi',   hdate, !this.diaspora),
+        chofetzChaim:     renderLearning('chofetzChaim', hdate, !this.diaspora),
+        psalms:           renderLearning('psalms',       hdate, !this.diaspora),
       });
     }
 
@@ -226,54 +254,6 @@ export class DateService {
     };
   }
 
-  // ── Daf Yomi (simplified — real implementation uses full cycle table) ──
-
-  private getDafYomi(date: Date): string {
-    // Daf Yomi cycle 14 started Jan 5, 2020
-    const cycleStart = new Date('2020-01-05');
-    const daysSinceStart = Math.floor((date.getTime() - cycleStart.getTime()) / 86400000);
-    const totalDafs = 2711; // Total daf in Shas
-    const currentDaf = daysSinceStart % totalDafs;
-
-    const tractates = [
-      { name: 'ברכות', dafs: 64 }, { name: 'שבת', dafs: 157 },
-      { name: 'עירובין', dafs: 105 }, { name: 'פסחים', dafs: 121 },
-      { name: 'שקלים', dafs: 22 }, { name: 'יומא', dafs: 88 },
-      { name: 'סוכה', dafs: 56 }, { name: 'ביצה', dafs: 40 },
-      { name: 'ראש השנה', dafs: 35 }, { name: 'תענית', dafs: 31 },
-      { name: 'מגילה', dafs: 32 }, { name: 'מועד קטן', dafs: 29 },
-      { name: 'חגיגה', dafs: 27 }, { name: 'יבמות', dafs: 122 },
-      { name: 'כתובות', dafs: 112 }, { name: 'נדרים', dafs: 91 },
-      { name: 'נזיר', dafs: 66 }, { name: 'סוטה', dafs: 49 },
-      { name: 'גיטין', dafs: 90 }, { name: 'קידושין', dafs: 82 },
-      { name: 'בבא קמא', dafs: 119 }, { name: 'בבא מציעא', dafs: 119 },
-      { name: 'בבא בתרא', dafs: 176 }, { name: 'סנהדרין', dafs: 113 },
-      { name: 'מכות', dafs: 24 }, { name: 'שבועות', dafs: 49 },
-      { name: 'עבודה זרה', dafs: 76 }, { name: 'הוריות', dafs: 14 },
-      { name: 'זבחים', dafs: 120 }, { name: 'מנחות', dafs: 110 },
-      { name: 'חולין', dafs: 142 }, { name: 'בכורות', dafs: 61 },
-      { name: 'ערכין', dafs: 34 }, { name: 'תמורה', dafs: 34 },
-      { name: 'כריתות', dafs: 28 }, { name: 'מעילה', dafs: 22 },
-      { name: 'נידה', dafs: 73 },
-    ];
-
-    let remaining = currentDaf;
-    for (const t of tractates) {
-      if (remaining < t.dafs) {
-        return `${t.name} דף ${toHebrewNumeral(remaining + 2)}`;
-      }
-      remaining -= t.dafs;
-    }
-    return '';
-  }
-
-  private getRambamChapter(date: Date): string {
-    // Rambam 1-chapter cycle: 1000 chapters over ~3 years
-    const cycleStart = new Date('2023-05-25');
-    const daysSinceStart = Math.floor((date.getTime() - cycleStart.getTime()) / 86400000);
-    const chapter = (daysSinceStart % 1000) + 1;
-    return `פרק ${toHebrewNumeral(chapter)}`;
-  }
 }
 
 export const dateService = new DateService();
