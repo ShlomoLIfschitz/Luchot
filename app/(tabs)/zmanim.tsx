@@ -69,7 +69,7 @@ export default function ZmanimScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader />
+        <ScreenHeader date={selectedDate} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}

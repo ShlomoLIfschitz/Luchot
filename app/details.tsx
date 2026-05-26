@@ -124,7 +124,7 @@ export default function DetailsScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader title="פרטי לימוד" />
+        <ScreenHeader date={selectedDate} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}

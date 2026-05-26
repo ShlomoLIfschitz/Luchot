@@ -93,7 +93,7 @@ export default function WeekScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="שבוע" />
+      <ScreenHeader date={selectedDate} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
