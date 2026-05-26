@@ -1,6 +1,7 @@
 // app/(tabs)/_layout.tsx
 // Phase 3.4 — v2 tab layout. Four visible tabs (עברי / לועזי / יום / זמנים).
-// Settings hidden from tab bar (href: null); accessible via hamburger (Phase 3.7).
+// Phase 3.7a-2 — settings Tabs.Screen removed; Settings is now a standalone
+// screen at app/settings.tsx, accessible only via the hamburger drawer.
 
 import { Tabs } from 'expo-router';
 import { BookOpenText, Calendar, Sun, Clock } from 'lucide-react-native';
@@ -44,12 +45,6 @@ export default function TabLayout() {
         options={{
           title: 'זמנים',
           tabBarIcon: ({ color, size }) => <Clock color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          href: null, // Hidden from tab bar — accessible via hamburger (Phase 3.7)
         }}
       />
     </Tabs>
