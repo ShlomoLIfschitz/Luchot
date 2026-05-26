@@ -16,6 +16,16 @@ export interface HebrewDateInfo {
   isRoshChodesh: boolean;
 }
 
+/**
+ * A single daily learning item. Contains both the display text
+ * (Hebrew, rendered via @hebcal/learning) and a direct link to
+ * the corresponding Sefaria source.
+ */
+export interface LearningItem {
+  display: string;  // Hebrew rendered text, e.g. "ברכות דף ב"
+  url:     string;  // Sefaria URL, e.g. "https://www.sefaria.org/Berakhot.2?lang=bi"
+}
+
 export interface DayData {
   gregorianDate: Date;
   hebrewDate: HebrewDateInfo;
@@ -25,14 +35,14 @@ export interface DayData {
   isYomTov: boolean;
   isCholHamoed: boolean;
   omerDay?: number;           // 1-49 during Sefirat HaOmer
-  dafYomi?: string;           // Bavli Daf Yomi via @hebcal/learning ('dafYomi')
-  rambamOneChapter?: string;  // Rambam 1-chapter cycle via @hebcal/learning ('rambam1')
+  dafYomi?:          LearningItem;  // Bavli Daf Yomi via @hebcal/learning ('dafYomi')
+  rambamOneChapter?: LearningItem;  // Rambam 1-chapter cycle via @hebcal/learning ('rambam1')
   // ── Phase 3.7b-1: additional learning schedules ─────────────────────────
-  mishnaYomi?: string;        // Mishnah Yomi (2 mishnayot/day)
-  nachYomi?: string;          // Nach Yomi (1 chapter/day)
-  tanakhYomi?: string;        // Tanakh Yomi (Israeli program)
-  chofetzChaim?: string;      // Chofetz Chaim — daily halacha
-  psalms?: string;            // Tehillim (monthly cycle)
+  mishnaYomi?:   LearningItem;  // Mishnah Yomi (2 mishnayot/day)
+  nachYomi?:     LearningItem;  // Nach Yomi (1 chapter/day)
+  tanakhYomi?:   LearningItem;  // Tanakh Yomi (Israeli program)
+  chofetzChaim?: LearningItem;  // Chofetz Chaim — daily halacha
+  psalms?:       LearningItem;  // Tehillim (monthly cycle)
   // ── Phase 4 deferred ─────────────────────────────────────────────────────
   // rambamThreeChapters — not in @hebcal/learning v5.1.2
   // seferHaMitzvot        — not in @hebcal/learning v5.1.2
@@ -102,14 +112,26 @@ export function toHebrewYear(year: number): string {
 
 // ── Daily Learning Helper ─────────────────────────────────
 // Looks up a named learning schedule for a given Hebrew date and returns
-// a Hebrew string (fallback: English, fallback: undefined).
+// a LearningItem (display text + Sefaria URL), or undefined if no event
+// exists for this date or if the event has no URL.
 // The @hebcal/learning side-effect import above populates the registry.
 
 /** il = true for Israel, false for Diaspora (mirrors HebrewCalendar `il` flag) */
-function renderLearning(scheduleName: string, hd: HDate, il: boolean): string | undefined {
+function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningItem | undefined {
   const event = DailyLearning.lookup(scheduleName, hd, il);
   if (!event) return undefined;
-  return event.render('he') || event.render('en') || undefined;
+
+  const display = event.render('he');
+  // url() may not exist on all schedule events; defensive check guards against
+  // future schedule additions in @hebcal/learning that might not expose a URL.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const url = typeof (event as any).url === 'function'
+    ? (event as any).url() as string
+    : undefined;
+
+  if (!display || !url) return undefined;
+
+  return { display, url };
 }
 
 // ── Core DateService ──────────────────────────────────────
