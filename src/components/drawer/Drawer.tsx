@@ -31,6 +31,7 @@ import {
   BookOpenText,
   Sun,
   Clock,
+  Library,
   Settings as SettingsIcon,
 } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
@@ -180,6 +181,11 @@ export function Drawer() {
               Icon={Clock}
               label="זמנים"
               onPress={() => navigateTo('/(tabs)/zmanim')}
+            />
+            <DrawerItem
+              Icon={Library}
+              label="פרטי לימוד"
+              onPress={() => navigateTo('/details')}
             />
 
             {/* Divider */}
