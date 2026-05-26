@@ -30,6 +30,7 @@ import {
   Calendar,
   BookOpenText,
   Sun,
+  CalendarRange,
   Clock,
   Library,
   Settings as SettingsIcon,
@@ -176,6 +177,12 @@ export function Drawer() {
               Icon={Sun}
               label="יום"
               onPress={() => navigateTo('/(tabs)/day')}
+            />
+            {/* NEW in 3.7b-3 */}
+            <DrawerItem
+              Icon={CalendarRange}
+              label="שבוע"
+              onPress={() => navigateTo('/week')}
             />
             <DrawerItem
               Icon={Clock}
