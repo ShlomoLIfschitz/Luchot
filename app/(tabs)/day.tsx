@@ -162,10 +162,10 @@ export default function DayScreen() {
               />
             )}
 
-            {dayData.rambamChapter && (
+            {dayData.rambamOneChapter && (
               <DetailRow
                 label='רמב״ם יומי'
-                value={dayData.rambamChapter}
+                value={dayData.rambamOneChapter}
                 colors={colors}
                 actionLabel="→ ספריא"
                 onAction={() => Linking.openURL('https://www.sefaria.org.il/Mishneh_Torah')}
