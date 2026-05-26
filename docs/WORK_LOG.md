@@ -6,6 +6,53 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 3.7a-2 (Settings relocation + cleanup + QuickActionSheet wiring)
+
+**Phase:** Phase 3.7a-2
+**Commits:** `8a040b0` (SettingsProvider purge + settings move), `9ba9ae0` (settings rewrite + _layout), `a2064bc` (Drawer route), `844f55a` (QuickActionSheet wiring)
+**Duration:** ~1 session
+
+### What got done
+- **`src/providers/SettingsProvider.tsx`** — purged 5 dead v1 fields: `showHebrew`, `showGregorian`, `diagonalDirection`, `rememberLastView`, `defaultViewMode`. Removed actions: `toggleHebrew`, `toggleGregorian`, `setDiagonalDirection`. Removed type exports: `DiagonalDirection`, `ViewMode`. Cleaned matching entries from `loadFromStorage` Promise.all and `set()` call. No other file in `src/` or `app/` referenced these fields.
+- **`app/(tabs)/settings.tsx` → `app/settings.tsx`** — moved out of tabs via `git mv`. Settings is now a standalone screen accessible only via the hamburger drawer.
+- **`app/(tabs)/_layout.tsx`** — removed the `<Tabs.Screen name="settings" options={{ href: null }} />` block. Tab layout is now exactly 4 screens (עברי / לועזי / יום / זמנים), no hidden entries.
+- **`app/settings.tsx` (rewrite)** — full rewrite of the Settings screen:
+  - Dead toggles removed: `showHebrew`, `showGregorian`.
+  - Icon background squares (`iconBg` hex literals) replaced with plain lucide icons (`Moon`, `Globe`, `CalendarDays`, `Clock`, `MapPin`, `Bell`). The `SettingRow` component now takes `Icon: ComponentType<any>` directly — same pattern as `DrawerItem`.
+  - All hex color literals replaced with token references (`colors.*`, `overlay.modal`, `radius.xl`, etc.).
+  - `PickerModal` now uses `overlay.modal`, `radius.xl`, `colors.textInverse` instead of hardcoded values.
+  - `ScreenHeader` added with `title="הגדרות"` — consistent with other screens.
+  - "עברית למעלה" toggle kept — field is live and will drive the universal date header in Phase 3.7c.
+  - Pickers moved outside `ScrollView` to overlay the full screen properly.
+- **`src/components/drawer/Drawer.tsx`** — Settings navigation target updated from `'/(tabs)/settings'` to `'/settings'`.
+- **`src/components/calendar/MonthGrid.tsx`** — QuickActionSheet wired to NoteEditor:
+  - Added imports: `NoteEditor`, `useNotes`, `dateService`.
+  - Added state: `noteEditorVisible: boolean`.
+  - `editorDate` = `actionSheetDate ?? selectedDate`; `editorHebrewDate` derived via `dateService.getDayData`.
+  - `addNote` and `addRecurring` handlers now call `setNoteEditorVisible(true)`.
+  - `NoteEditor` mounted in JSX before `QuickActionSheet`, controlled by `visible` prop.
+- Typecheck clean at every step (after each edit).
+- Working tree CLEAN after final commit.
+
+### Decisions made / discoveries
+- **`git mv` + SettingsProvider staged together.** When committing the SettingsProvider purge, `git mv` had already staged the rename — both landed in commit 1. The rewrite landed in commit 2. End result is identical; commit boundary slightly shifted from the plan.
+- **`addNote` and `addRecurring` open same editor state.** NoteEditor has no `defaultNoteType` prop. Both quick actions open with `noteType: 'note'`; user picks the correct type via editor type chips. This is the honest minimal implementation — adding a preset would require a NoteEditor prop change (Phase 4 polish).
+- **`noteEditorRecurring` state not added.** Per architect decision: removed (unused). Both actions do the same thing for now, documented in limitation #2 in file header.
+- **PowerShell here-string quoting.** Commit messages with Hebrew quote characters (`"`) caused git to misparse the here-string. Used `$msg | git commit -F -` pattern for multi-line messages with special characters.
+- **Settings `PickerModal` outside `ScrollView`.** Original spec put pickers inside ScrollView. Moved them outside so they render as full-screen overlays (modals should not be constrained by scroll container z-index on Android).
+
+### Open items / blockers
+1. **`addNote` / `addRecurring` open with same initial state.** Both open NoteEditor with `noteType: 'note'`; user selects type inside editor. A `defaultNoteType` prop on NoteEditor to preset the type selector is deferred to Phase 4.
+2. **`hebrewOnTop` toggle row in Settings** — field kept and toggle visible, but it has no visible effect until the universal date header is built in Phase 3.7c.
+3. **`defaultCalendarType` field in SettingsProvider** — kept; usage TBD in Phase 3.7b/c.
+4. **All prior Phase 3.6 open items remain** (location placeholder, candle lighting hardcoded at 18min, RABBANUT shita).
+5. **Phase 4 items remain** (per-hour note bucketing, header date-tap, user notes as calendar tags, location city name).
+
+### Next steps
+- Phase 3.7b — Week view + Details screen (via drawer navigation, not tabs).
+
+---
+
 ## 2026-05-26 — Session: Phase 3.7a-1 (Drawer infrastructure + ScreenHeader)
 
 **Phase:** Phase 3.7a-1
