@@ -102,6 +102,14 @@ Goal: build the drawer that lives off the universal header. Contains: Week view 
 - **Depends on:** 3.4 (settings must leave the tabs first)
 - **Unblocks:** MVP
 
+#### Sub-phases status:
+- **3.7a-1** ✅ Drawer infrastructure + ScreenHeader (commits `0f90e39`–`5d3c54c`)
+- **3.7a-2** ✅ Settings relocation + SettingsProvider cleanup + QuickActionSheet wiring (commits `8a040b0`–`844f55a`)
+- **3.7b-1** ✅ @hebcal/learning integration — data layer (commits `847b7a5`–`1c249d5`)
+- **3.7b-2** ✅ LearningItem refactor + Details screen (commits `bd8ec1c`–`4018fb9`)
+- **3.7b-3** ✅ WeekGrid + Week screen (commits `d51db5b`–`7932310`)
+- **3.7c** 🔲 About + Tour + final polish — **NEXT**
+
 ---
 
 ## Phase 4 — MVP polish *(post-Phase 3)*

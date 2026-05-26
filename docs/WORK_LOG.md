@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 3.7b-3 (WeekGrid + Week screen)
+
+**Phase:** Phase 3.7b-3
+**Commits:** `d51db5b` (WeekGrid component), `ce3a379` (Week screen), `7932310` (Drawer entry)
+**Duration:** ~1 session
+
+### What got done
+- **`src/components/calendar/WeekGrid.tsx` created** — presentational + interaction component, 7 DayCells in a horizontal row. Key design decisions:
+  - `getWeekDays(anchor, firstDayOfWeek)` module-level helper: derives the 7-day window from the selected date, respects Sunday/Monday week start setting.
+  - `onPress` → immediately navigates to Day tab + sets selectedDate (no select-first, unlike MonthGrid).
+  - `onLongPress` → QuickActionSheet (same pattern as MonthGrid).
+  - Swipe gesture: `velocityX > 400` moves `±7 days` on `selectedDate` (week-at-a-time navigation). RTL: left swipe = next week.
+  - `buildDayTags(day, [])` — empty notes array, consistent with MonthGrid Phase 4 deferral.
+  - `FirstDayOfWeek` type imported from SettingsProvider for type safety.
+  - Full NoteEditor + QuickActionSheet integration mirroring MonthGrid.
+- **`app/week.tsx` created** — standalone screen at `/week`. Structure:
+  - `getWeekStart` helper (extracted from the derived memo) to compute week boundary.
+  - Bilingual range header: "כ״ב–כ״ח אייר תשפ״ו" / "17–23 May 2026" style. Cross-month range shows both month names.
+  - Parasha banner (tagHoliday colors, consistent with Day screen holiday banner): finds Saturday in the 7-day window, reads `dayData.parasha`. Absent weeks (no parasha) — banner silently omitted.
+  - Day labels row above grid: short Hebrew weekday names via `toLocaleDateString('he-IL', { weekday: 'short' })`.
+  - `hebrewOnTop` setting drives both the header (primary/secondary range) and `WeekGrid`'s `mode` prop.
+  - Parasha banner uses `radius.lg` (token) instead of the spec's hardcoded `12`.
+- **`src/components/drawer/Drawer.tsx`** — added `CalendarRange` import; added "שבוע" DrawerItem between "יום" and "זמנים".
+- **`docs/ROADMAP.md`** — updated 3.7 section with sub-phase status list; marked 3.7b-3 done; flagged 3.7c as next.
+- Typecheck green at every commit boundary.
+
+### Decisions / deviations from spec
+- **`radius.lg` for parasha banner instead of hardcoded `12`** — spec used `borderRadius: 12` inline; replaced with `radius.lg` (which equals `12` per `src/constants/radius.ts`) for token consistency. No functional difference.
+- **`getWeekStart` helper extracted as module-level function** — avoids duplicating the offset logic between the `useMemo` and any future callers.
+- **`FirstDayOfWeek` imported from SettingsProvider in WeekGrid** — stronger typing than inline `0 | 1`. The type is identical but named, preventing accidental widening.
+
+### Open items / blockers
+1. **Phase 3.7c (About + Tour + final polish)** — last Phase 3 sub-phase. Completes Phase 3 entirely, unblocks MVP.
+2. **User notes not shown as tags in WeekGrid** — same deferral as MonthGrid (Phase 4 batching strategy). `buildDayTags(day, [])` produces tags only from holidays/Rosh Chodesh/Omer.
+3. **All prior open items remain** (hebrewOnTop no visible effect until 3.7c universal header; 3 deferred learning schedules in ROADMAP 4-A; location placeholder in Zmanim/Settings; etc.).
+
+### Next steps
+- Phase 3.7c — About screen, Tour, universal date header wiring, final polish.
+
+---
+
 ## 2026-05-27 — Session: Phase 3.7b-2 (Details screen + LearningItem refactor)
 
 **Phase:** Phase 3.7b-2
