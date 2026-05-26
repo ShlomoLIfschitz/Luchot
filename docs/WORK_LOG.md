@@ -6,6 +6,50 @@
 
 ---
 
+## 2026-05-26 — Session: Phase 3.7a-1 (Drawer infrastructure + ScreenHeader)
+
+**Phase:** Phase 3.7a-1
+**Commits:** `0f90e39` (DrawerProvider), `5c9bfda` (DrawerItem), `b9f8a70` (Drawer), `ec216f1` (ScreenHeader), `5d3c54c` (wire all tabs + _layout)
+**Duration:** ~1 session
+
+### What got done
+- Created `src/providers/DrawerProvider.tsx` — tiny Zustand store (16 lines): `isOpen`, `open()`, `close()`, `toggle()`. No persistence (drawer state should not survive restarts). Pattern mirrors CalendarProvider/SettingsProvider exactly.
+- Created `src/components/drawer/DrawerItem.tsx` — single row in the drawer. Props: `Icon`, `label`, `onPress`, `active?`. Active state uses `colors.accentLight` bg + `colors.accent` text/icon color. Icon type is `React.ComponentType<any>` (see decisions below).
+- Created `src/components/drawer/Drawer.tsx` — sliding panel built from scratch with react-native-reanimated 3 + GestureDetector. No new npm dependencies. Key details:
+  - Anchored to `right: 0` (RTL slide-in from right edge).
+  - `translateX: 0` = open, `translateX: drawerWidth` = closed.
+  - Drawer width = `min(screenWidth × 0.8, 320px)`.
+  - Backdrop: `overlay.modal` (`rgba(0,0,0,0.45)`), tappable to close.
+  - Swipe-to-close: drag rightward ≥60px or velocity ≥400 closes; otherwise snaps back.
+  - `pointerEvents` on backdrop lifted out of `useAnimatedStyle` into a `useState` bool (delayed off by `ANIMATION_DURATION` ms) — avoids Reanimated 3 edge-case bugs with pointerEvents in animated styles.
+  - 100ms `setTimeout` delay on `router.push` lets close animation start before route transition (smoother UX).
+  - Placeholder nav items: לוח עברי, לוח לועזי, יום, זמנים, הגדרות.
+- Created `src/components/common/ScreenHeader.tsx` — universal header. Props: `title?`. Always has hamburger button (Menu icon, 24px) on leading edge calling `useDrawerStore.open`. Right spacer (32px) balances title centering. `StatusBar.currentHeight ?? 0` for Android status-bar clearance.
+- Modified `app/_layout.tsx` — added `<Drawer />` as sibling of `<Stack />` inside `SafeAreaProvider`, after Stack so it renders on top via z-stack order.
+- Modified `app/(tabs)/index.tsx`, `app/(tabs)/gregorian.tsx` — added `<ScreenHeader />` as first child of root View, before MonthGrid.
+- Modified `app/(tabs)/day.tsx`, `app/(tabs)/zmanim.tsx` — added `<ScreenHeader />` inside GestureDetector's View but outside ScrollView, so it stays fixed while content scrolls.
+- `app/(tabs)/settings.tsx` — **NOT TOUCHED**. Reserved baseline for Phase 3.7a-2.
+- Typecheck clean throughout.
+
+### Decisions made / discoveries
+- **`DrawerIcon` type → `React.ComponentType<any>`.** Attempted `React.ComponentType<{ size?: number | string; color?: string; ... }>` (both versions). TypeScript rejects concrete Lucide icons because `LucideProps` inherits from `SvgProps` where `color: ColorValue` (= `string | OpaqueColorValue`), and `size: string | number`. The `propTypes: WeakValidationMap<P>` compatibility check cascades through the entire SVG type hierarchy. `ComponentType<any>` is the pragmatic de-facto standard for "icon component" props in React Native — same pattern as `Icon: any` in `QuickActionSheet`. Runtime safety preserved because all call sites pass known Lucide icons.
+- **`pointerEvents` in backdrop** — Applied Adjustment 2 (architect's fallback) proactively: `useState<boolean>` controls `pointerEvents` on `Animated.View` directly, synchronized with open/close state via `useEffect` (with a `setTimeout` on close matching animation duration). Cleaner than relying on Reanimated worklet style values.
+- **`DrawerIcon` adjustment from architect** — Confirmed: using the generic fallback (`ComponentType<any>`) from start, not the original `LucideIcon` import. Saves a typecheck round-trip.
+- **Phase 3.7a-1 is foundation only.** Drawer items are navigation-only placeholders. No active state wiring (all `active={false}` implicitly). No week/details/about/tour items yet.
+
+### Open items / blockers
+1. **Settings relocation pending Phase 3.7a-2** — `app/(tabs)/settings.tsx` still in tabs (M baseline). Moves to `app/settings.tsx` + dead state cleanup in 3.7a-2.
+2. **5 dead fields in SettingsProvider** — `showHebrew`, `showGregorian`, `diagonalDirection`, `rememberLastView`, `defaultViewMode` (+ related setters/loaders). Cleanup deferred to 3.7a-2.
+3. **9 hardcoded hex `iconBg` literals + PickerModal hardcoded values in `settings.tsx`** — token cleanup deferred to 3.7a-2.
+4. **QuickActionSheet `addNote`/`addRecurring` handlers are no-ops** — NoteEditor wiring deferred to 3.7a-2.
+5. **Drawer placeholder items** — Week view, Details screen, About, Tour entries pending 3.7b–3.7c.
+6. **All prior open items from Phase 3.6 remain** (location placeholder, candle lighting hardcoded at 18min, RABBANUT shita, per-hour note bucketing, header date-tap, user notes as calendar tags).
+
+### Next steps
+- Phase 3.7a-2: Settings relocation (`app/(tabs)/settings.tsx` → `app/settings.tsx`), remove 3 dead toggles, replace 9 hex iconBg literals with tokens, purge 5 dead SettingsProvider fields, wire QuickActionSheet addNote/addRecurring → NoteEditor.
+
+---
+
 ## 2026-05-26 — Session: Phase 3.6 (Zmanim screen full implementation)
 
 **Phase:** Phase 3.6
