@@ -115,6 +115,20 @@ Light sketch — details to be filled in when we get there.
 - Empty states and error boundaries
 - Onboarding tour (the "Tour" item in the hamburger)
 
+### 4-A — Learning schedules expansion *(deferred from Phase 3.7b-1)*
+
+In Phase 3.7b-1 we integrated `@hebcal/learning@5.1.2`. Three schedules that appear in standard Israeli calendar apps are **not available in v5.1.2** and were intentionally deferred:
+
+| Schedule | Reason deferred | Path forward |
+|---|---|---|
+| `rambamThreeChapters` | Not registered in v5.1.2 | Upgrade to @hebcal/learning v6 (requires @hebcal/core v6 upgrade — separate work) |
+| `seferHaMitzvot` | Not registered in v5.1.2 | Same — upgrade path |
+| `arukhHaShulchan` | Not registered in v5.1.2 | Same — upgrade path |
+
+**To unlock:** Upgrade `@hebcal/core` + `@hebcal/learning` from v5 → v6. This is a non-trivial dependency upgrade (v6 has breaking API changes). Do not attempt mid-phase — schedule as a dedicated upgrade task within Phase 4. Once upgraded, add the three fields to `DayData` and surface them in the Day screen + Details panel.
+
+**Also deferred:** `yerushalmi`, `dafWeekly`, `shemiratHaLashon`, `pirkeiAvotSummer` from v5.1.2 extras — lower priority; add to Phase 4 backlog only if architect decides they belong in the MVP.
+
 ---
 
 ## Phase 5+ — Beyond MVP *(speculative)*
@@ -276,6 +290,15 @@ commit ל-`NoteEditor.tsx` (modal UI מלא מחובר ל-`useNotes`) ול-`Mont
 - ביצועים: ולידציה ל-cache החודשי, ביצועי גלילה ב-Day screen
 - מצבי ריק וגבולות שגיאה
 - סיור משתמש (פריט ה-"Tour" בהמבורגר)
+
+### 4-A — הרחבת לוחות לימוד *(נדחה מ-Phase 3.7b-1)*
+
+ב-Phase 3.7b-1 שילבנו `@hebcal/learning@5.1.2`. שלושה לוחות שמופיעים בלוחות ישראליים סטנדרטיים **אינם זמינים ב-v5.1.2** ונדחו במכוון:
+- **רמב"ם 3 פרקים** — אינו רשום ב-v5.1.2
+- **ספר המצוות** — אינו רשום ב-v5.1.2
+- **ערוך השולחן** — אינו רשום ב-v5.1.2
+
+**לביטול הדחייה:** שדרוג `@hebcal/core` + `@hebcal/learning` מ-v5 → v6. זהו שדרוג תלויות לא-טריוויאלי. לתזמן כמשימת שדרוג ייעודית ב-Phase 4 — לא לנסות באמצע פאזה אחרת. ראה הפרטים בסעיף האנגלי למעלה.
 
 ---
 

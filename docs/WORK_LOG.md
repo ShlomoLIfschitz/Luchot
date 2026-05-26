@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 3.7b-1 (@hebcal/learning integration — data layer)
+
+**Phase:** Phase 3.7b-1
+**Commits:** see commit log — chore (install), feat (DateService), refactor (day.tsx), docs (ROADMAP + WORK_LOG)
+**Duration:** ~1 session (continued across context boundary)
+
+### What got done
+- **Installed `@hebcal/learning@5.1.2`** (pinned — v6 requires @hebcal/core v6, incompatible with installed 5.10.1).
+- **Extended `src/services/DateService.ts`** — data layer only, no UI changes:
+  - Added `DailyLearning` to the `@hebcal/core` named import.
+  - Added `import '@hebcal/learning';` side-effect import at top of file (registers all learning schedules into the `DailyLearning` registry on module load).
+  - Added module-level `renderLearning(scheduleName, hd, il)` helper: calls `DailyLearning.lookup(name, hd, il)`, returns `event.render('he') || event.render('en') || undefined`.
+  - Updated `DayData` interface: renamed `rambamChapter` → `rambamOneChapter`; added 5 new fields: `mishnaYomi`, `nachYomi`, `tanakhYomi`, `chofetzChaim`, `psalms`; added deferred Phase 4 comment for the three missing schedules.
+  - Updated `getMonthData` push block: replaced homebrew `getDafYomi`/`getRambamChapter` calls with `renderLearning` calls for all 7 schedules. `il` flag passed as `!this.diaspora`.
+  - Removed private `getDafYomi()` method (37-tractate hardcoded table).
+  - Removed private `getRambamChapter()` method (simple modulo heuristic).
+- **Updated `app/(tabs)/day.tsx`** — renamed `dayData.rambamChapter` → `dayData.rambamOneChapter` (2 occurrences). No logic changes; only the field reference.
+- **Updated `docs/ROADMAP.md`** — added Phase 4 subsection 4-A "Learning schedules expansion" documenting the 3 deferred schedules, the reason (v5.1.2 limitation), and the upgrade path (v6).
+- Typecheck clean after all changes.
+
+### Pre-flight discoveries (during investigation before coding)
+- **`@hebcal/learning@5.1.2` actual registered schedules** (confirmed by unpacking tgz and reading `index.cjs`): `dafYomi`, `mishnaYomi`, `nachYomi`, `tanakhYomi`, `chofetzChaim`, `psalms`, `rambam1` (plus v5 extras: `yerushalmi`, `dafWeekly`, `shemiratHaLashon`, `pirkeiAvotSummer`).
+- **Schedules NOT in v5.1.2**: `rambamThreeChapters`, `seferHaMitzvot`, `arukhHaShulchan` — guessed by spec, confirmed absent. Not substituted. Deferred to Phase 4-A.
+- **`DailyLearning.lookup` signature**: requires 3 args — `(name: string, hd: HDate, il: boolean)`. Spec omitted the `il` param; caught by typecheck; fixed before committing.
+- **Version selection**: @hebcal/learning v6.9.1 requires @hebcal/core@^6.5.1 (incompatible). Architect approved staying on v5.1.2 and deferring v6 to Phase 4.
+
+### Decisions made
+- **Architect decision 4-A**: Drop `rambamThreeChapters`, `seferHaMitzvot`, `arukhHaShulchan` entirely from Phase 3.7b-1. Document deferred items in ROADMAP Phase 4 subsection 4-A. Confirmed `shemiratHaLashon` is NOT a substitute for `seferHaMitzvot`.
+- **No v5 extras**: `yerushalmi`, `dafWeekly`, `shemiratHaLashon`, `pirkeiAvotSummer` from v5 extras are lower priority and not added to DayData (added to Phase 4 backlog only if architect decides later).
+- **`il` flag for learning lookup** = `!this.diaspora`, consistent with `HebrewCalendar.calendar({ il: !this.diaspora })` already in `getMonthData`.
+
+### Open items / blockers
+1. **New DayData fields not yet surfaced in Day screen.** `mishnaYomi`, `nachYomi`, `tanakhYomi`, `chofetzChaim`, `psalms` are in `DayData` but not rendered in `app/(tabs)/day.tsx`. This is intentional — UI surfacing is Phase 3.7b-2 (Details screen via drawer).
+2. **Three deferred learning schedules** (rambamThreeChapters, seferHaMitzvot, arukhHaShulchan) — require @hebcal/learning v6 upgrade. Documented in ROADMAP Phase 4-A.
+3. **All prior open items from Phase 3.7a-2 remain** (see entry below).
+
+### Next steps
+- Phase 3.7b-2 — Details screen that surfaces the new `DayData` learning fields via the drawer.
+
+---
+
 ## 2026-05-27 — Session: Phase 3.7a-2 (Settings relocation + cleanup + QuickActionSheet wiring)
 
 **Phase:** Phase 3.7a-2
