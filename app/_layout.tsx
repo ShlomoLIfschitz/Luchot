@@ -8,6 +8,7 @@ import { StorageService } from '../src/services/StorageService';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
 import { dateService } from '../src/services/DateService';
+import { Drawer } from '../src/components/drawer/Drawer';
 
 export default function RootLayout() {
   const darkMode = useSettingsStore((s) => s.darkMode);
@@ -30,6 +31,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerShown: false }} />
+        {/* Drawer rendered AFTER Stack so it sits on top via z-stack
+            (last child wins for absolute-positioned overlays). */}
+        <Drawer />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

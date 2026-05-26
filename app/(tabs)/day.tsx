@@ -1,5 +1,6 @@
 // app/(tabs)/day.tsx
 // Phase 3.5 — Day screen. Full implementation per docs/SCREENS.md.
+// Phase 3.7a-1 — ScreenHeader added (outside ScrollView, stays fixed).
 //
 // NoteEditor adaptation note (vs. original Phase 3.5 spec):
 //   NoteEditor is a React Native Modal component, not a @gorhom/bottom-sheet.
@@ -33,6 +34,7 @@ import {
   type DayData,
 } from '../../src/services/DateService';
 import { radius } from '../../src/constants/radius';
+import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
 
@@ -104,6 +106,7 @@ export default function DayScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <ScreenHeader />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}

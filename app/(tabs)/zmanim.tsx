@@ -19,6 +19,7 @@ import { ZmanimFullList } from '../../src/components/zmanim/ZmanimFullList';
 import { dateService, toHebrewNumeral, toHebrewYear } from '../../src/services/DateService';
 import type { ZmanimMethod } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
+import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 
 const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
   { value: 'GRA',      label: 'גר״א' },
@@ -68,6 +69,7 @@ export default function ZmanimScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <ScreenHeader />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
