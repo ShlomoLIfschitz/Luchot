@@ -6,6 +6,98 @@
 
 ---
 
+## 2026-05-27 — MVP CLOSURE — Luchot v1.0.0 🎉
+
+All six VISION.md success criteria are met. Phase 4 is complete.
+
+### VISION criteria status
+
+1. ✓ **Opening the app shows Hebrew date + Gregorian date + holidays + Parasha + Daf Yomi + Rambam + Omer count + candle lighting if Friday** — Day screen (ScreenHeader, holiday banner, Torah details section, ZmanimList with candle lighting row)
+2. ✓ **Switching between Hebrew and Gregorian calendar views preserves context** — עברי and לועזי tabs share `selectedDate` from CalendarProvider
+3. ✓ **Tapping any day reveals full details (zmanim, learning items, holidays)** — Day tab + Details drawer screen
+4. ✓ **Personal notes, events, birthdays, yahrzeits appear on the calendar** — NoteEditor + useNotes + tags visible in MonthGrid + WeekGrid (Phase 4.2)
+5. ✓ **14 halachic zmanim per day for the user's location and shita** — ZmanimService + per-city candle lighting (Phase 4.3) + location picker (Phase 4.5)
+6. ✓ **Full Hebrew RTL UI** — every screen, every component, text-align right throughout
+
+### Phase 5 opens with
+- Notifications wiring (Omer reminders, candle lighting alerts)
+- Learning schedules expansion (rambamThreeChapters, seferHaMitzvot, arukhHaShulchan — requires @hebcal/core v6)
+- Per-hour notes (time-anchored note entries in the Day screen)
+- Week view expansion
+- Yerushalmi Yomi
+- Proper Rabbanut shita (requires location picker — now complete)
+
+Tagged: `mvp-1.0.0`
+
+---
+
+## 2026-05-27 — Session: Phase 4.5 (Location picker UI) — Phase 4 COMPLETE
+
+**Phase:** Phase 4.5 — final phase of Phase 4
+**Commits:** `3423cbd` (omerReminders cleanup), `7f9a3b4` (cities + utilities), `4bfbbf2` (LocationProvider), `86816ff` (_layout startup), `b8663ef` (picker screen), `8a00f2a` (Zmanim chip + Drawer)
+**Duration:** ~¾ session
+
+### What got done
+
+- **`@hebcal/cities@5.0.1`** — installed, compatible with `@hebcal/core@5.10.1` (`peerDependencies: @hebcal/core ^5.0.3`). Side-effect import registers ~700 cities into Hebcal's `Location` class. **36/40 originally-planned cities resolved** (4 dropped: Kefar Sava, Beit Shemesh, Rosh HaAyin, Antwerp — not found in @hebcal/cities@5.0.1).
+
+- **`src/constants/cities.ts`** — 36-city curated list (22 Israeli + 14 international) with Hebrew display names keyed by @hebcal/core lookup key. Exports `CITIES`, `CityEntry`, `findCityByKey`.
+
+- **`src/utils/locationLookup.ts`** — three utilities:
+  - `lookupCityByCoords(lat, lng)` — city if within 15 km; null otherwise
+  - `findNearestCity(lat, lng)` — always returns closest curated city
+  - `getCityCoordinates(hebcalKey)` — pulls lat/lng from Hebcal
+
+- **`src/providers/LocationProvider.tsx`** — major extension:
+  - State: added `cityHebcalKey?: string` + `source: 'gps' | 'manual' | 'default'`
+  - `setLocationFromGps(lat, lng)` — runs city lookup, persists all 4 keys
+  - `setLocationFromCity(hebcalKey)` — pulls coords from Hebcal, persists
+  - `loadFromStorage()` — rehydrates on cold start; migration path for existing users (backfills `cityHebcalKey` via `lookupCityByCoords` if missing)
+  - Old `setLocation(lat, lng)` removed
+  - `import '@hebcal/cities'` side-effect at top of file
+
+- **`app/_layout.tsx`** — `useLocationStore.getState().loadFromStorage()` added to init sequence (parallel with settings load)
+
+- **`app/locationPicker.tsx`** — new screen at `/locationPicker`:
+  - GPS button (requests permission → setLocationFromGps → back)
+  - Search box (Hebrew name or English key)
+  - Israeli cities section (22 cities)
+  - International cities section (14 cities)
+  - Selected city highlighted with accent color + ✓
+
+- **`app/settings.tsx`** — location row replaced: was GPS-only button, now shows current city name + `›` arrow linking to `/locationPicker`
+
+- **`app/(tabs)/zmanim.tsx`** — location chip now interactive:
+  - Shows real city name (not hardcoded `'ישראל'`)
+  - Shows `Navigation` icon when source is `'gps'`
+  - Tapping navigates to `/locationPicker`
+
+- **`src/components/drawer/Drawer.tsx`** — `MapPin / מיקום` item added between פרטי לימוד and the Settings divider
+
+- **`app/settings.tsx` + `src/providers/SettingsProvider.tsx`** (Commit 0) — `omerReminders` toggle removed entirely (was never wired to NotificationService; prevents user confusion; returns in Phase 5 with real functionality)
+
+- Typecheck green at every commit boundary.
+
+### Decisions made
+
+- **Option A (install @hebcal/cities) over Option B (hardcoded coords)**: 218 KB unpackaged, zero maintenance, future-proof for Phase 5 expansion. VISION-compliant (offline-only data).
+- **4 cities dropped** (not in @hebcal/cities@5.0.1): Kefar Sava, Beit Shemesh, Rosh HaAyin, Antwerp. Per spec rule: "If 1-4 keys fail, document and remove." Cities remain shippable at 36.
+- **`findNearestCity` as fallback in settings + Zmanim chip**: user always sees a city name even if their exact GPS coords are more than 15 km from a curated city.
+- **omerReminders removed** (Commit 0): was Phase 4.6 work, Phase 4.6 deferred to Phase 5. Removing the toggle prevents surfacing a non-functional feature.
+- **`@hebcal/cities` side-effect import in LocationProvider.tsx**: only one file needs to trigger the registration; LocationProvider is always loaded at startup.
+
+### Open issues / blocked
+
+- Kefar Sava, Beit Shemesh, Rosh HaAyin, Antwerp still not in Hebcal@5. Can be added in Phase 5 if @hebcal/cities v6 (with @hebcal/core v6) covers them.
+- Havdalah custom offset (Rabbeinu Tam, 50-min) deferred to Phase 5.
+- Notifications wiring deferred to Phase 5.
+
+### Next steps
+
+Phase 5 (post-MVP). Awaiting real user feedback before committing to specific work order.
+
+---
+
 ## 2026-05-27 — Session: Phase 4.4 (Date picker)
 
 **Phase:** Phase 4.4

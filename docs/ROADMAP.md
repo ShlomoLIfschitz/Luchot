@@ -117,26 +117,18 @@ Goal: build the drawer that lives off the universal header. Contains: Week view 
 
 ---
 
-## Phase 4 — MVP polish *(ACTIVE — began 2026-05-27)*
+## Phase 4 — MVP polish *(COMPLETE — 2026-05-27)* 🎉
 
-Phase 3 is complete. Phase 4 closes the remaining gap to MVP.
+> **MVP CLOSED 2026-05-27. Tagged `mvp-1.0.0`. Phase 5 is the active phase.**
+
+Phase 3 and Phase 4 are complete. All VISION.md success criteria met.
 
 **Completed in Phase 4:**
 - **4.1 — RABBANUT shita removal** ✅ (commits `3800eed`–`0370076` + docs)
 - **4.2 — Notes-in-grids** ✅ (commits `aa57d57`–`c62f2eb`) — batch data layer (getNotesInRange, getAllRecurringNotes, expandRecurringNotes, useDatesNotes) + MonthGrid + WeekGrid wiring + useNotes Gregorian recurring fix
 - **4.3 — Per-city candle lighting** ✅ (commits `a6f96fc`–`bce6f26`) — candleLightingOffset utility; Jerusalem 40 min, Haifa 30 min, Safed 40 min; offset shown in Zmanim UI when non-default; ZmanimList now shows candle lighting on Day screen
 - **4.4 — Date picker** ✅ (commits `1afc06d`–`936344f`) — useDatePicker hook (iOS spinner modal + Android native dialog); ScreenHeader onDatePress + ChevronDown affordance; wired into Day, Zmanim, Details, Week screens
-
-**Upcoming agenda (priority order):**
-
-1. **4-A — Learning schedules expansion** — see subsection below (requires @hebcal/core v6 upgrade)
-2. **Location picker UX** — replace GPS-only flow with city/manual entry; show city name in Zmanim header
-3. **Notifications wiring** — NotificationService → event entities (Omer reminders currently toggle-only)
-4. **hebrewOnTop + universal date header polish** — ScreenHeader date now shows; verify all edge cases (month boundaries, leap years)
-5. **Accessibility** — dynamic type, screen reader labels, RTL-aware focus order
-6. **Performance** — month cache validation on diaspora toggle, scroll perf in Day screen hourly grid
-7. **Empty states and error boundaries** — graceful handling for missing zmanim, network-dependent future features
-8. **Onboarding tour** — the "Tour" item to add to the hamburger drawer
+- **4.5 — Location picker UI** ✅ (commits `3423cbd`–`8a00f2a`) — @hebcal/cities@5.0.1 installed; 36-city curated list with Hebrew names; LocationProvider extended with city name + source + persistence; locationPicker screen; Zmanim chip now interactive showing real city + GPS indicator; Drawer location item; omerReminders toggle removed (notifications deferred to Phase 5)
 
 ### 4-A — Learning schedules expansion *(deferred from Phase 3.7b-1)*
 
@@ -154,18 +146,27 @@ In Phase 3.7b-1 we integrated `@hebcal/learning@5.1.2`. Three schedules that app
 
 ---
 
-## Phase 5+ — Beyond MVP *(speculative)*
+## Phase 5 — Post-MVP *(ACTIVE — awaiting user feedback)*
 
-Even lighter sketch — these are ideas, not commitments.
+Phase 4 / MVP is complete. Phase 5 is the next phase. Work order will be
+determined by real user feedback — no sub-phases are committed yet.
 
-- **Rabbanut shita (proper implementation)** — Phase 4.1 removed the RABBANUT option because the old code was silently computing GRA instead. If Rabbanut zmanim are needed in a future phase, implement them correctly: Rabbanut zmanim are GRA-based but with Jerusalem-specific adjustments and varying candle-lighting times per city (e.g., Jerusalem 40 min, Tel Aviv 20 min). Requires the location picker (Phase 4) to be complete first.
-- **Expanded city candle-lighting list (20+ cities worldwide)** — Phase 4.3 encodes three Israeli cities. A fuller list (Tel Aviv, Beer Sheva, Eilat, Bnei Brak, Netanya, major Diaspora cities) would require the `SPECIAL_CITIES` array in `candleLightingOffset.ts` to grow or be replaced with a proper lookup table. Coordinate with the location picker UX work.
-- **Havdalah custom selection** — currently `tzeitHakochavim` (8.5° geometric twilight) via Hebcal default. Some communities use Rabbeinu Tam (72 min after sunset) or the 50-minute convention. A per-user or per-location Havdalah preference needs the same offset/city-minhag pattern used for candle lighting.
-- iCloud / Google sync (would lean on the Google Calendar–compatible schema)
-- Widgets (iOS home screen, Android launcher)
-- Multi-location support (e.g., for travelers)
-- Sharing events / yahrzeits with family
-- Web companion *(probably never — offline-first is the identity)*
+**Backlog (priority to be confirmed by Architect after initial user testing):**
+
+- **Notifications wiring** — `omerReminders` toggle was removed from MVP because it was never wired. Reintroduce with actual `NotificationService` → Expo Notifications → schedule Omer reminders, candle-lighting alerts. Requires notification permissions flow.
+- **Learning schedules expansion** — three schedules unavailable in @hebcal/learning@5.1.2: `rambamThreeChapters`, `seferHaMitzvot`, `arukhHaShulchan`. Requires upgrading @hebcal/core + @hebcal/learning from v5 → v6 (breaking API changes — dedicate a full session).
+- **Yerushalmi Yomi** — available in @hebcal/learning; add to DayData + Details screen.
+- **Per-hour notes** — time-anchored note entries in the Day screen's hourly schedule. EventSchema `start.dateTime` field exists (Google Calendar compat); just needs NoteEditor time picker + Day screen rendering.
+- **Rabbanut shita (proper implementation)** — Phase 4.1 removed RABBANUT because the old code silently computed GRA. Implement correctly: Rabbanut = GRA-based with Jerusalem-specific adjustments + per-city candle times. Now unblocked (location picker is complete).
+- **Expanded city candle-lighting list** — `candleLightingOffset.ts` currently hardcodes Jerusalem/Haifa/Safed. Now that the 36-city picker exists, replace the bounding-box approach with the curated city list for the ~15 cities that have non-default offsets.
+- **Havdalah custom selection** — currently `tzeitHakochavim` (8.5° twilight). Add per-user preference for Rabbeinu Tam (72 min) or 50-minute convention.
+- **Week view expansion** — swipe between weeks; Week screen currently shows only the week containing `selectedDate`.
+- **Accessibility** — dynamic type, screen reader labels (`accessibilityRole`, `accessibilityLabel`), RTL-aware focus order.
+- **Performance audit** — month cache validation on diaspora toggle, scroll perf in Day screen hourly grid.
+- **Onboarding tour** — the "Tour" drawer item (placeholder since Phase 3.7).
+- **iCloud / Google sync** *(lower priority)* — leverages the Google Calendar-compatible EventSchema.
+- **Widgets** *(speculative)* — iOS home screen, Android launcher.
+- **Web companion** *(probably never — offline-first is the identity)*.
 
 ---
 
