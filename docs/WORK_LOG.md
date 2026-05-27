@@ -6,6 +6,52 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 4.2-2 (Notes UI integration in grids) — Phase 4.2 COMPLETE
+
+**Phase:** Phase 4.2-2 — UI integration sub-phase of Phase 4.2
+**Commits:** `6edfba4` (useNotes recurring fix), `6a7860e` (expose refreshKey), `42ecb21` (MonthGrid), `e02d716` (WeekGrid)
+**Duration:** ~½ session
+
+### What got done
+
+- **`src/hooks/useNotes.ts`** — extended the load function to add a third parallel query path: `getAllRecurringNotes()` + `expandRecurringNotes(recurringNotes, date, date)`. Results merged by note `id` into the existing `existingNotes` from the two prior queries (id-keyed `Map` deduplicates Hebrew recurring notes that arrive via both paths). `refreshKey` now included in the return object (`{ notes, saveNote, deleteNote, refreshKey }`).
+
+- **`src/components/calendar/MonthGrid.tsx`** — wired `useDatesNotes`:
+  - Added imports: `useDatesNotes`, `formatDateKey`
+  - Exposed `refreshKey` from `useNotes(editorDate)` call
+  - Added `gridStart` / `gridEnd` useMemo (first/last day of `monthData`)
+  - `notesByDate = useDatesNotes(gridStart, gridEnd, refreshKey)` called after grid construction
+  - `renderItem`: replaced `buildDayTags(item, [])` with `buildDayTags(item, notesByDate.get(formatDateKey(item.gregorianDate)) ?? [])`
+  - Added `notesByDate` to `renderItem`'s useCallback dep array
+  - Removed "Known limitation #1" (notes deferred) from file comment
+
+- **`src/components/calendar/WeekGrid.tsx`** — identical pattern:
+  - Added imports: `useDatesNotes`, `formatDateKey`
+  - Exposed `refreshKey` from `useNotes`
+  - `weekStart = weekDays[0].gregorianDate`, `weekEnd = weekDays[6].gregorianDate`
+  - `notesByDate = useDatesNotes(weekStart, weekEnd, refreshKey)`
+  - Replaced `buildDayTags(day, [])` in the `weekDays.map()` callback
+
+- Typecheck green at every commit boundary.
+
+### Decisions made
+
+- **`import type` circular non-issue** — `expandRecurringNotes` imports `CalendarNote` as `import type` from `useNotes`. Type-only imports are erased at compile time; no circular runtime dependency.
+- **`weekStart` / `weekEnd` as plain consts** (not useMemo) in WeekGrid — `useDatesNotes` uses string keys internally (`formatDateKey`), so Date reference instability doesn't trigger spurious re-fetches. Plain consts are simpler.
+- **MonthGrid `gridStart`/`gridEnd` use useMemo** — slightly more expensive than WeekGrid's inline computation, so memoizing is cleaner. `monthData` is already stable from Zustand.
+- **`refreshKey` propagation chain**: `saveNote`/`deleteNote` → `setRefreshKey` (in useNotes) → returned `refreshKey` → `useDatesNotes(refreshKey)` → re-fetches Map → `renderItem` sees new Map (via dep array) → FlatList re-renders affected cells.
+
+### Open issues / blocked
+
+- **Performance note on useNotes**: each Day screen render now makes 3 parallel DB queries instead of 2 (`getAllRecurringNotes` added). Acceptable for any realistic note count. Future optimization: SQL filter `WHERE (recurrence_type = 'yearly_gregorian' AND month(start_date) = ? AND day(start_date) = ?) OR (recurrence_type = 'yearly_hebrew' AND hebrew_month = ? AND hebrew_day = ?)` to avoid fetching ALL recurring notes per load. Documented for Phase 5.
+- **MonthGrid FlatList re-render on notes change**: when `notesByDate` Map updates (after a save), `renderItem` callback reference changes (new `useCallback`), causing FlatList to re-render all 42 cells. Acceptable for Phase 4; future optimization: React.memo on DayCell with stable prop comparison.
+- **Day screen Gregorian recurring**: bug now fixed end-to-end. Day screen (`useNotes`) + MonthGrid + WeekGrid all show recurring Gregorian notes on the correct yearly dates.
+
+### Next steps
+- Phase 4.2 complete. Next Phase 4 items per ROADMAP priority: location picker UX, notifications wiring.
+
+---
+
 ## 2026-05-27 — Session: Phase 4.2-1 (Data layer for notes-in-grids)
 
 **Phase:** Phase 4.2-1 — data layer sub-phase of Phase 4.2
