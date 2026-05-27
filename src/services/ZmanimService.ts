@@ -2,6 +2,7 @@
 // Adapted for kosher-zmanim@0.9.x (npm): uses ComplexZmanimCalendar + Luxon DateTime → JS Date.
 
 import { ComplexZmanimCalendar, GeoLocation } from 'kosher-zmanim';
+import { getCandleLightingOffset } from '../utils/candleLightingOffset';
 
 export type ZmanimMethod = 'GRA' | 'MGA';
 
@@ -21,9 +22,13 @@ export interface ZmanimResult {
   tzeitHakochavim: Date | null;
   tzeitRabbeinu: Date | null;
 
-  // NEW in Phase 3.6
-  candleLighting: Date | null;  // 18 min before sunset on Friday only
+  // Phase 3.6
+  candleLighting: Date | null;  // N min before sunset on Friday only
   havdalah: Date | null;        // tzeitHakochavim on Saturday only
+
+  // Phase 4.3 — per-city minhag metadata (set only when isFriday)
+  candleLightingOffsetMinutes?: number; // e.g. 40 for Jerusalem, 18 elsewhere
+  candleLightingCityNameHe?: string;    // e.g. "ירושלים"; absent for default 18-min
 }
 
 const zmanimCache = new Map<string, ZmanimResult>();
@@ -77,12 +82,21 @@ export function getZmanim(
     const shkia           = toJsDate(czc.getSunset());
     const tzeitHakochavim = toJsDate(czc.getTzaisGeonim8Point5Degrees());
 
-    // Candle lighting — Friday only (JS day 5), 18 min before sunset.
-    // 18 min is the Diaspora/Israel-outside-Jerusalem standard.
-    // Per-city customization (Jerusalem 40 min, etc.) is Phase 4 work.
+    // Candle lighting — Friday only (JS day 5).
+    // Offset is city-specific (Jerusalem 40 min, Haifa 30 min, Safed 40 min,
+    // everywhere else 18 min). getCandleLightingOffset is a pure function —
+    // safe to call on every invocation; cost is negligible.
+    const isFriday = date.getDay() === 5;
+    const clOffsetResult = getCandleLightingOffset(latitude, longitude);
+    const clOffset = clOffsetResult.minutes;
+
     let candleLighting: Date | null = null;
-    if (date.getDay() === 5 && shkia) {
-      candleLighting = new Date(shkia.getTime() - 18 * 60 * 1000);
+    let candleLightingOffsetMinutes: number | undefined;
+    let candleLightingCityNameHe: string | undefined;
+    if (isFriday && shkia) {
+      candleLighting = new Date(shkia.getTime() - clOffset * 60 * 1000);
+      candleLightingOffsetMinutes = clOffset;
+      candleLightingCityNameHe = clOffsetResult.cityNameHe;
     }
 
     // Havdalah — Saturday only (JS day 6), equals tzeitHakochavim.
@@ -108,6 +122,8 @@ export function getZmanim(
       tzeitRabbeinu: toJsDate(czc.getTzais72()),
       candleLighting,
       havdalah,
+      candleLightingOffsetMinutes,
+      candleLightingCityNameHe,
     };
 
     zmanimCache.set(key, result);
