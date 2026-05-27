@@ -1,13 +1,14 @@
 // src/components/drawer/Drawer.tsx
-// Hamburger drawer — slides in from the right (RTL) when isOpen is true.
+// Hamburger drawer — slides in from the LEFT when isOpen is true.
+// The hamburger button is on the left side of the screen header,
+// so the drawer slides from the same side for visual consistency.
 // Built from scratch using react-native-reanimated 3 + GestureDetector.
 // No new npm dependencies.
 //
 // Layout logic:
-//   translateX: 0 = open (panel at right edge, fully visible)
-//   translateX: drawerWidth = closed (panel off-screen to the right)
-//   In RTL, the right edge IS the "near" edge, so this produces a
-//   natural slide-in-from-right effect.
+//   translateX:  0           = open  (panel at left edge, fully visible)
+//   translateX: -drawerWidth = closed (panel off-screen to the left)
+//   Swipe LEFT to close, swipe RIGHT (back) snaps to open.
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -58,8 +59,8 @@ export function Drawer() {
   const isOpen = useDrawerStore((s) => s.isOpen);
   const closeDrawer = useDrawerStore((s) => s.close);
 
-  // translateX: 0 = open (visible at right edge), drawerWidth = closed (off-screen)
-  const translateX = useSharedValue(drawerWidth);
+  // translateX: 0 = open (visible at left edge), -drawerWidth = closed (off-screen left)
+  const translateX = useSharedValue(-drawerWidth);
   const backdropOpacity = useSharedValue(0);
 
   // backdropInteractive: lifted out of animated style to avoid Reanimated 3
@@ -72,7 +73,7 @@ export function Drawer() {
       backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION });
       setBackdropInteractive(true);
     } else {
-      translateX.value = withTiming(drawerWidth, { duration: ANIMATION_DURATION });
+      translateX.value = withTiming(-drawerWidth, { duration: ANIMATION_DURATION });
       backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION });
       // Delay disabling interaction until the close animation finishes
       const timer = setTimeout(() => setBackdropInteractive(false), ANIMATION_DURATION);
@@ -88,21 +89,21 @@ export function Drawer() {
     opacity: backdropOpacity.value,
   }));
 
-  // Swipe-to-close: drag the panel to the right (away from screen center in RTL)
+  // Swipe-to-close: drag the panel to the LEFT (back toward the screen edge)
   // runOnJS is required because Zustand setters run on the JS thread,
   // not on the Reanimated worklet thread.
   const swipeGesture = Gesture.Pan()
     .onUpdate((e) => {
-      // Only allow rightward drag (positive translationX = outward in RTL)
-      if (e.translationX > 0) {
+      // Only allow leftward drag (negative translationX = toward off-screen)
+      if (e.translationX < 0) {
         translateX.value = e.translationX;
-        backdropOpacity.value = Math.max(0, 1 - e.translationX / drawerWidth);
+        backdropOpacity.value = Math.max(0, 1 - Math.abs(e.translationX) / drawerWidth);
       }
     })
     .onEnd((e) => {
       const shouldClose =
-        e.velocityX > SWIPE_CLOSE_VELOCITY ||
-        e.translationX > SWIPE_CLOSE_DISTANCE;
+        e.velocityX < -SWIPE_CLOSE_VELOCITY ||    // fast leftward flick
+        e.translationX < -SWIPE_CLOSE_DISTANCE;   // dragged far enough left
       if (shouldClose) {
         runOnJS(closeDrawer)();
       } else {
@@ -142,7 +143,7 @@ export function Drawer() {
         />
       </Animated.View>
 
-      {/* Drawer panel — anchored to right edge, slides in/out */}
+      {/* Drawer panel — anchored to left edge, slides in/out */}
       <GestureDetector gesture={swipeGesture}>
         <Animated.View
           style={[
@@ -150,7 +151,7 @@ export function Drawer() {
             {
               width: drawerWidth,
               backgroundColor: colors.surface,
-              borderLeftColor: colors.border,
+              borderRightColor: colors.border,
             },
             animatedDrawerStyle,
           ]}
@@ -234,9 +235,9 @@ const styles = StyleSheet.create({
   drawer: {
     position: 'absolute',
     top: 0,
-    right: 0,            // anchored to right edge — RTL slide-in
+    left: 0,             // anchored to left edge — matches hamburger button
     bottom: 0,
-    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
     paddingTop: (StatusBar.currentHeight ?? 0) + 16,
   },
   header: {
