@@ -11,12 +11,12 @@
 //   - "עברית למעלה" toggle kept — field is live and will drive the
 //     universal date header in Phase 3.7c
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  View, Text, Switch, StyleSheet, ScrollView, Pressable, Alert,
+  View, Text, Switch, StyleSheet, ScrollView, Pressable,
   Modal, TouchableWithoutFeedback,
 } from 'react-native';
-import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import {
   Moon,
   Globe,
@@ -31,6 +31,8 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { radius } from '../src/constants/radius';
 import { overlay } from '../src/constants/overlay';
+import { findCityByKey } from '../src/constants/cities';
+import { findNearestCity } from '../src/utils/locationLookup';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
@@ -169,25 +171,22 @@ export default function SettingsScreen() {
     setDiaspora: setSettingsDiaspora,
   } = useSettingsStore();
 
+  const router = useRouter();
   const calendarSetDiaspora = useCalendarStore((s) => s.setDiaspora);
-  const setLocation = useLocationStore((s) => s.setLocation);
+  const { cityHebcalKey, latitude, longitude } = useLocationStore();
 
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
 
-  const onUseDeviceLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'הרשאה נדרשת',
-        'אשר גישה למיקום בהגדרות המכשיר כדי לחשב זמנים מדויקים.',
-      );
-      return;
+  // Derive current city name for display in the location row
+  const currentCityName = useMemo(() => {
+    if (cityHebcalKey) {
+      const entry = findCityByKey(cityHebcalKey);
+      if (entry) return entry.nameHe;
     }
-    const pos = await Location.getCurrentPositionAsync({});
-    setLocation(pos.coords.latitude, pos.coords.longitude);
-    Alert.alert('מיקום עודכן', 'זמני היום מחושבים לפי המיקום הנוכחי.');
-  };
+    const { city } = findNearestCity(latitude, longitude);
+    return city.nameHe;
+  }, [cityHebcalKey, latitude, longitude]);
 
   const themeLabel =
     darkMode === 'system' ? 'לפי המכשיר' : darkMode === 'dark' ? 'כהה' : 'בהיר';
@@ -301,11 +300,16 @@ export default function SettingsScreen() {
           />
           <SettingRow
             Icon={MapPin}
-            label="עדכן מיקום (GPS)"
+            label="מיקום"
             colors={colors}
-            onPress={onUseDeviceLocation}
+            onPress={() => router.push('/locationPicker' as any)}
             right={
-              <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+              <>
+                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
+                  {currentCityName}
+                </Text>
+                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+              </>
             }
             isLast
           />
