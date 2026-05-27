@@ -3,16 +3,13 @@
 // quick action now navigate to the Day tab.
 // Phase 3.7a-2 — addNote and addRecurring quick actions wired to NoteEditor.
 // Phase 4.2-2 — useDatesNotes wired; user notes now appear as tags.
-//
-// Known limitations (intentional, deferred to later phases):
-//   1. addNote and addRecurring both open NoteEditor with default state
-//      (noteType: 'note'). The user selects the specific type via the
-//      editor's type chips. A direct preset would require a defaultNoteType
-//      prop on NoteEditor; deferred to Phase 4 polish.
+// Phase 4.6-C — FlatList replaced with View grid; mode prop drives RTL/LTR
+//               direction. Hebrew mode: row-reverse (Sunday right, Shabbat left).
+//               Gregorian mode: row (Sunday left, Saturday right).
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useCalendarStore } from '../../providers/CalendarProvider';
@@ -34,15 +31,20 @@ import { formatDateKey } from '../../utils/dateUtils';
 export type MonthGridMode = 'hebrew' | 'gregorian';
 
 interface MonthGridProps {
-  /** Determines primary/secondary date label assignment.
-   *  Pass 'hebrew' for the עברי tab, 'gregorian' for the לועזי tab. */
+  /** Determines primary/secondary date label assignment and grid direction.
+   *  Pass 'hebrew' for the עברי tab (RTL, Sunday right), 'gregorian' for
+   *  the לועזי tab (LTR, Sunday left). */
   mode: MonthGridMode;
 }
 
 // ── Day name headers ───────────────────────────────────────────────────────────
+// Arrays are in logical Sunday-first order. The visual order is flipped for
+// Hebrew mode by flexDirection: 'row-reverse' on the header and week rows.
 
-const DAYS_HE_SUN_FIRST = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
-const DAYS_HE_MON_FIRST = ['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 'א׳'];
+const DAY_NAMES_HE_SUN_FIRST = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+const DAY_NAMES_HE_MON_FIRST = ['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 'א׳'];
+const DAY_NAMES_EN_SUN_FIRST = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES_EN_MON_FIRST = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -66,8 +68,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const actionSheetRef = useRef<BottomSheet>(null);
 
   // NoteEditor state — opened by addNote / addRecurring quick actions.
-  // Both actions currently open the editor with default state; the user
-  // selects the specific type via the editor's type chips (see limitation #2).
   const [noteEditorVisible, setNoteEditorVisible] = useState(false);
 
   // Use actionSheetDate when set (the long-pressed day); fall back to
@@ -79,31 +79,64 @@ export function MonthGrid({ mode }: MonthGridProps) {
   );
   const { saveNote, refreshKey } = useNotes(editorDate);
 
+  // ── Layout direction ───────────────────────────────────────────────────────
+  // Hebrew mode: row-reverse → Sunday at right edge, Shabbat at left edge.
+  // Gregorian mode: row (LTR) → Sunday at left edge, Saturday at right edge.
+  const isRtl = mode === 'hebrew';
+
+  // ── Day name selection ─────────────────────────────────────────────────────
+  const dayNames = mode === 'hebrew'
+    ? (firstDayOfWeek === 0 ? DAY_NAMES_HE_SUN_FIRST : DAY_NAMES_HE_MON_FIRST)
+    : (firstDayOfWeek === 0 ? DAY_NAMES_EN_SUN_FIRST : DAY_NAMES_EN_MON_FIRST);
+
   // ── Grid construction ──────────────────────────────────────────────────────
-  // Prepend empty cells to align the first day of the month correctly.
-  const gridData = useMemo(() => {
-    if (!monthData.length) return [];
+  // Compute the number of empty leading cells to align the first day of
+  // the month to the correct column. The visual direction (RTL/LTR) is
+  // handled by flexDirection on the row container — the offset itself is
+  // the same for both modes.
+  const startDayOffset = useMemo(() => {
+    if (!monthData.length) return 0;
     const firstDay = monthData[0].gregorianDate.getDay();
-    const offset = firstDayOfWeek === 1 ? (firstDay + 6) % 7 : firstDay;
-    const empties = Array(offset).fill(null);
-    return [...empties, ...monthData];
+    return firstDayOfWeek === 1 ? (firstDay + 6) % 7 : firstDay;
   }, [monthData, firstDayOfWeek]);
 
+  // Build a 2-D array of weeks: each inner array has exactly 7 entries
+  // (null for padding cells, DayData for real days).
+  const weeks = useMemo<(DayData | null)[][]>(() => {
+    if (!monthData.length) return [];
+    const result: (DayData | null)[][] = [];
+    let currentWeek: (DayData | null)[] = [];
+
+    // Leading empty cells
+    for (let i = 0; i < startDayOffset; i++) {
+      currentWeek.push(null);
+    }
+    // Days of the month
+    for (const day of monthData) {
+      currentWeek.push(day);
+      if (currentWeek.length === 7) {
+        result.push(currentWeek);
+        currentWeek = [];
+      }
+    }
+    // Trailing empty cells to complete the last week
+    while (currentWeek.length > 0 && currentWeek.length < 7) {
+      currentWeek.push(null);
+    }
+    if (currentWeek.length === 7) result.push(currentWeek);
+
+    return result;
+  }, [monthData, startDayOffset]);
+
   // ── Notes for the displayed month ─────────────────────────────────────────
-  // Pass the full calendar-month range to useDatesNotes. The grid may show
-  // fewer rows (short months) or more (long months with offset), but the
-  // range is always [first day .. last day] of monthData — no padding cells
-  // from adjacent months are rendered, so this is the exact set we need.
   const gridStart = useMemo(
-    () => (monthData.length ? monthData[0].gregorianDate                         : new Date()),
+    () => (monthData.length ? monthData[0].gregorianDate : new Date()),
     [monthData],
   );
   const gridEnd = useMemo(
     () => (monthData.length ? monthData[monthData.length - 1].gregorianDate : new Date()),
     [monthData],
   );
-  // refreshKey from useNotes bumps after saveNote / deleteNote, causing
-  // useDatesNotes to re-fetch and the grid to update immediately.
   const notesByDate = useDatesNotes(gridStart, gridEnd, refreshKey);
 
   // ── Date helpers ───────────────────────────────────────────────────────────
@@ -112,8 +145,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
   }, []);
 
   // ── Label computation ──────────────────────────────────────────────────────
-  // Determines which date (Hebrew or Gregorian) is primary vs secondary
-  // based on the mode prop passed by the tab screen.
   const getLabels = useCallback(
     (d: DayData): { primary: string; secondary: string } => {
       const greg   = d.gregorianDate.getDate().toString();
@@ -127,8 +158,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
 
   // ── Interaction handlers ───────────────────────────────────────────────────
 
-  // First tap → select day. Second tap on already-selected day → navigate.
-  // Navigation is a TODO until the Day tab exists (Phase 3.4).
   const handleDayPress = useCallback(
     (dayData: DayData) => {
       if (isSameDay(dayData.gregorianDate, selectedDate)) {
@@ -137,10 +166,9 @@ export function MonthGrid({ mode }: MonthGridProps) {
         setSelectedDate(dayData.gregorianDate);
       }
     },
-    [selectedDate, isSameDay, setSelectedDate],
+    [selectedDate, isSameDay, setSelectedDate, router],
   );
 
-  // Long-press → select day + open quick action sheet.
   const handleDayLongPress = useCallback(
     (dayData: DayData) => {
       setSelectedDate(dayData.gregorianDate);
@@ -150,7 +178,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
     [setSelectedDate],
   );
 
-  // Quick action dispatch — no-ops until Phase 3.4–3.5 wires the targets.
   const handleQuickAction = useCallback(
     (action: QuickAction) => {
       switch (action) {
@@ -165,7 +192,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
           break;
       }
     },
-    [],
+    [router],
   );
 
   // ── Swipe gesture ──────────────────────────────────────────────────────────
@@ -174,41 +201,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
       navigateMonth(e.velocityX < 0 ? 1 : -1);
     }
   });
-
-  // ── Cell renderer ─────────────────────────────────────────────────────────
-  const renderItem = useCallback(
-    ({ item, index }: { item: DayData | null; index: number }) => {
-      if (!item) {
-        return <View style={styles.emptyCell} />;
-      }
-
-      const { primary, secondary } = getLabels(item);
-      const isToday    = isSameDay(item.gregorianDate, today);
-      const isSelected = isSameDay(item.gregorianDate, selectedDate);
-      const isFriday   = item.gregorianDate.getDay() === 5;
-      const dayKey     = formatDateKey(item.gregorianDate);
-      const dayNotes   = notesByDate.get(dayKey) ?? [];
-      const tags       = buildDayTags(item, dayNotes);
-
-      return (
-        <View style={styles.cellWrapper}>
-          <DayCell
-            primaryLabel={primary}
-            secondaryLabel={secondary}
-            isToday={isToday}
-            isSelected={isSelected}
-            isShabbat={item.hebrewDate.isShabbat}
-            isHoliday={item.isYomTov || item.holidays.length > 0}
-            isFriday={isFriday}
-            tags={tags}
-            onPress={() => handleDayPress(item)}
-            onLongPress={() => handleDayLongPress(item)}
-          />
-        </View>
-      );
-    },
-    [today, selectedDate, getLabels, isSameDay, handleDayPress, handleDayLongPress, notesByDate],
-  );
 
   // ── Month title computation ────────────────────────────────────────────────
   const gregMonthName = useMemo(() => {
@@ -222,7 +214,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
     return `${anchor.hebrewDate.monthName} ${toHebrewYear(anchor.hebrewDate.year)}`;
   }, [monthData]);
 
-  // Header titles respect mode — primary (large) matches mode priority.
   const primaryTitle   = mode === 'hebrew' ? hebrewMonthTitle : gregMonthName;
   const secondaryTitle = mode === 'hebrew' ? gregMonthName    : hebrewMonthTitle;
 
@@ -237,7 +228,6 @@ export function MonthGrid({ mode }: MonthGridProps) {
             <Text style={[styles.navArrow, { color: colors.accent }]}>‹</Text>
           </Pressable>
 
-          {/* Tap (not long-press) now opens the month/year picker — per SCREENS.md */}
           <Pressable
             onPress={() => setPickerVisible(true)}
             style={styles.headerCenter}
@@ -255,29 +245,57 @@ export function MonthGrid({ mode }: MonthGridProps) {
           </Pressable>
         </View>
 
-        {/* Day Name Headers */}
-        <View style={styles.dayNames}>
-          {(firstDayOfWeek === 1 ? DAYS_HE_MON_FIRST : DAYS_HE_SUN_FIRST).map((d, i) => (
+        {/* Day Name Headers — direction driven by mode */}
+        <View style={[styles.dayNames, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}>
+          {dayNames.map((name, i) => (
             <Text key={i} style={[styles.dayName, { color: colors.textTertiary }]}>
-              {d}
+              {name}
             </Text>
           ))}
         </View>
 
-        {/* Calendar Grid */}
-        <FlatList
-          data={gridData}
-          renderItem={renderItem}
-          keyExtractor={(item, index) =>
-            item ? item.gregorianDate.toISOString() : `empty-${index}`
-          }
-          numColumns={7}
-          scrollEnabled={false}
-          initialNumToRender={42}
-          maxToRenderPerBatch={42}
-          windowSize={1}
-          removeClippedSubviews={false}
-        />
+        {/* Calendar Grid — View-based 7-column layout.
+            Each week row uses the same direction as the day-name header.
+            DayCell is unchanged — flex: 1 on the wrapper distributes width. */}
+        <View>
+          {weeks.map((week, wIdx) => (
+            <View
+              key={wIdx}
+              style={[styles.weekRow, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}
+            >
+              {week.map((day, dIdx) => {
+                if (!day) {
+                  return <View key={`e-${wIdx}-${dIdx}`} style={styles.emptyCell} />;
+                }
+
+                const { primary, secondary } = getLabels(day);
+                const isToday    = isSameDay(day.gregorianDate, today);
+                const isSelected = isSameDay(day.gregorianDate, selectedDate);
+                const isFriday   = day.gregorianDate.getDay() === 5;
+                const dayKey     = formatDateKey(day.gregorianDate);
+                const dayNotes   = notesByDate.get(dayKey) ?? [];
+                const tags       = buildDayTags(day, dayNotes);
+
+                return (
+                  <View key={day.gregorianDate.toISOString()} style={styles.cellWrapper}>
+                    <DayCell
+                      primaryLabel={primary}
+                      secondaryLabel={secondary}
+                      isToday={isToday}
+                      isSelected={isSelected}
+                      isShabbat={day.hebrewDate.isShabbat}
+                      isHoliday={day.isYomTov || day.holidays.length > 0}
+                      isFriday={isFriday}
+                      tags={tags}
+                      onPress={() => handleDayPress(day)}
+                      onLongPress={() => handleDayLongPress(day)}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
 
         {/* Month/Year Picker */}
         <MonthYearPicker
@@ -289,10 +307,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
           onClose={() => setPickerVisible(false)}
         />
 
-        {/* NoteEditor — opened by addNote / addRecurring quick actions.
-            Modal-based (not BottomSheet); controlled via visible prop.
-            colors injected because NoteEditor does not call useThemeColors
-            internally. */}
+        {/* NoteEditor — opened by addNote / addRecurring quick actions */}
         <NoteEditor
           visible={noteEditorVisible}
           date={editorDate}
@@ -330,7 +345,9 @@ const styles = StyleSheet.create({
   monthTitle:     { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
   monthSubtitle:  { fontSize: 12, marginTop: 1 },
   navArrow:       { fontSize: 28, fontWeight: '300' },
-  dayNames:       { flexDirection: 'row', paddingBottom: 8 },
+
+  // Day name header row — flexDirection set inline based on mode
+  dayNames: { paddingBottom: 8 },
   dayName: {
     flex: 1,
     textAlign: 'center',
@@ -338,6 +355,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.3,
   },
+
+  // Week rows — flexDirection set inline based on mode
+  weekRow: {},
+
+  // Cell containers — flex: 1 distributes each cell to 1/7 of row width
   cellWrapper: { flex: 1 },
   emptyCell:   { flex: 1, height: 110 }, // matches CELL_HEIGHT in DayCell
 });
