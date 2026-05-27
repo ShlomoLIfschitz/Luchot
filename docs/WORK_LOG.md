@@ -6,6 +6,50 @@
 
 ---
 
+## 2026-05-27 — Phase 4.7 — Post-feedback fixes
+
+Six bugs from on-device Android testing of mvp-1.0.0 + Phase 4.6.
+
+### What was done
+
+**4.7-1 — SQLite "Unimplemented" persists (Expo Go)**
+- Root cause (Scenario B): `expo-sqlite/legacy` investigation revealed that BOTH `openDatabaseAsync` AND `openDatabaseSync` in v14 use `NativeDatabase` (new native module, not in standard Expo Go). The `expo-sqlite/legacy` entry point (package.json `"./legacy"` export) provides the classic `openDatabase()` API that uses the old native module shipped with Expo Go.
+- Fix: complete rewrite of `StorageService.ts` to `import { openDatabase } from 'expo-sqlite/legacy'`. Replaced `execAsync`/`getAllAsync`/`runAsync` with `transactionAsync` / `executeSqlAsync` wrappers (`dbAll`, `dbRun`, `dbFirst`). Public method signatures unchanged.
+
+**4.7-2 — Calendar grid: only first/last rows visible, middle rows collapsed**
+- Root cause: `weekRow: {}` (empty style) in `MonthGrid.tsx`. For rows containing ONLY `cellWrapper` children (weeks 2–5 of most months), Yoga's circular height dependency resolves to 0. DayCell has `flex:1 + height:110` inside `cellWrapper` (column, no defined height); `flex:1` wins and collapses the cell. Rows that contained at least one `emptyCell` with `height:110` (weeks 1 and 6) worked because emptyCell anchored the row height.
+- Fix: added `height:110` to `weekRow` style. All rows now get explicit height; `cellWrapper` stretches to it via default `alignItems:stretch`; DayCell fills correctly.
+
+**4.7-3 — English book names in Details ("I Kings", "Psalms")**
+- Root cause: The 4.6-B regex only stripped LEADING English prefixes ("Daf Yomi: "). Some @hebcal/learning schedules append English book names after the Hebrew citation (e.g., "ה'  I Kings", "ס׳-ס״ה Psalms").
+- Fix: added second regex `.replace(/\s+[A-Za-z][A-Za-z\s]*$/, '')` to strip trailing English. Added Hebrew-character guard (Unicode range `/[֐-׿]/`) to reject outputs with no Hebrew remaining.
+
+**4.7-4 — Details section headers: icon on wrong side**
+- Root cause: `sectionHeader: { flexDirection: 'row' }` (LTR). Icon was the first child → rendered on the LEFT. Hebrew RTL reading starts at the RIGHT, so the icon should be there.
+- Fix: swapped JSX child order in `LearningSection`: `<Text>` first (→ left), `<Icon>` second (→ right). No style changes.
+
+**4.7-5 — Drawer slides from wrong side**
+- Root cause: drawer anchored `right: 0`, translated from `+drawerWidth` to `0`. Hamburger button is on the LEFT; drawer appeared from the opposite side.
+- Fix: anchor changed to `left: 0`; initial translateX = `-drawerWidth`; open/close animations and swipe gesture thresholds all negated accordingly; border changed from `borderLeftWidth` to `borderRightWidth`.
+
+**4.7-6 — Zmanim rows: label and time touching**
+- Root cause: ZmanimFullList `label: { flex:1 }` causes Hebrew text (right-aligned in RTL context) to end flush against the time value. ZmanimList also lacked any gap.
+- Fix: added `gap: 12` to `row` style in both `ZmanimList.tsx` and `ZmanimFullList.tsx`.
+
+### Decisions made
+- `expo-sqlite/legacy` is the definitive path for Expo Go compatibility until a custom dev client is required
+- MonthGrid weekRow height anchors the grid; DayCell internal height unchanged
+- Drawer now slides from the LEFT; this is permanent (hamburger placement drives drawer side)
+
+### Open issues / blocked
+- None. All six issues resolved.
+
+### Next steps
+- Re-test all six bug areas on Android Expo Go
+- When satisfied, proceed to EAS Build for APK (Phase 5 backlog)
+
+---
+
 ## 2026-05-27 — Phase 4.6 — Pre-release fixes
 
 Three sub-phases addressing issues found during on-device testing of `mvp-1.0.0` via Expo Go on Android.
