@@ -3,7 +3,7 @@
 
 import { ComplexZmanimCalendar, GeoLocation } from 'kosher-zmanim';
 
-export type ZmanimMethod = 'GRA' | 'MGA' | 'RABBANUT';
+export type ZmanimMethod = 'GRA' | 'MGA';
 
 export interface ZmanimResult {
   alotHashachar: Date | null;
