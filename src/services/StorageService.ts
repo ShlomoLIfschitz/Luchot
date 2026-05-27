@@ -3,55 +3,70 @@
 import * as SQLite from 'expo-sqlite';
 import { CalendarEvent } from '../schemas/EventSchema';
 
-let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+// ── Database handle ────────────────────────────────────────────────────────────
+// openDatabaseSync returns the same async query methods (execAsync, getAllAsync,
+// runAsync, getFirstAsync) as openDatabaseAsync, but opens synchronously.
+// This is required for standard Expo Go, which ships the classic SQLite native
+// module — the "Next" async API (openDatabaseAsync) throws "Unimplemented"
+// there at runtime.
+let db: SQLite.SQLiteDatabase | null = null;
+let schemaInitialized = false;
 
-function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync('calendar.db');
+function getDb(): SQLite.SQLiteDatabase {
+  if (!db) {
+    db = SQLite.openDatabaseSync('calendar.db');
   }
-  return dbPromise;
+  return db;
+}
+
+async function ensureSchema(): Promise<void> {
+  if (schemaInitialized) return;
+  await getDb().execAsync(`
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      summary TEXT NOT NULL,
+      description TEXT,
+      start_date TEXT NOT NULL,
+      start_datetime TEXT,
+      end_date TEXT,
+      end_datetime TEXT,
+      status TEXT DEFAULT 'confirmed',
+      recurrence TEXT,
+      calendar_type TEXT DEFAULT 'hebrew',
+      hebrew_day INTEGER,
+      hebrew_month INTEGER,
+      hebrew_year INTEGER,
+      hebrew_month_name TEXT,
+      recurrence_type TEXT DEFAULT 'none',
+      category TEXT DEFAULT 'personal',
+      after_sunset INTEGER DEFAULT 0,
+      color_id TEXT,
+      created TEXT,
+      updated TEXT,
+      notification_scheduled INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS preferences (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+  schemaInitialized = true;
 }
 
 export class StorageService {
+  // Called explicitly on app startup from _layout.tsx; also safe to skip —
+  // any public method will call ensureSchema() itself on first use.
   static async init(): Promise<void> {
-    const db = await getDb();
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS events (
-        id TEXT PRIMARY KEY,
-        summary TEXT NOT NULL,
-        description TEXT,
-        start_date TEXT NOT NULL,
-        start_datetime TEXT,
-        end_date TEXT,
-        end_datetime TEXT,
-        status TEXT DEFAULT 'confirmed',
-        recurrence TEXT,
-        calendar_type TEXT DEFAULT 'hebrew',
-        hebrew_day INTEGER,
-        hebrew_month INTEGER,
-        hebrew_year INTEGER,
-        hebrew_month_name TEXT,
-        recurrence_type TEXT DEFAULT 'none',
-        category TEXT DEFAULT 'personal',
-        after_sunset INTEGER DEFAULT 0,
-        color_id TEXT,
-        created TEXT,
-        updated TEXT,
-        notification_scheduled INTEGER DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS preferences (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      );
-    `);
+    await ensureSchema();
   }
 
   // ── Events ────────────────────────────────────────────────
 
   static async saveEvent(event: CalendarEvent): Promise<void> {
-    const db = await getDb();
+    await ensureSchema();
+    const database = getDb();
     const ext = event.hebrewExtensions;
-    await db.runAsync(
+    await database.runAsync(
       `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         event.id, event.summary, event.description ?? null,
@@ -71,9 +86,10 @@ export class StorageService {
   }
 
   static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {
-    const db = await getDb();
+    await ensureSchema();
+    const database = getDb();
     const dateStr = date.toISOString().split('T')[0];
-    const rows = await db.getAllAsync<any>(
+    const rows = await database.getAllAsync<any>(
       `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled'`,
       [dateStr]
     );
@@ -81,8 +97,9 @@ export class StorageService {
   }
 
   static async getEventsForHebrewDate(hebrewDay: number, hebrewMonth: number): Promise<CalendarEvent[]> {
-    const db = await getDb();
-    const rows = await db.getAllAsync<any>(
+    await ensureSchema();
+    const database = getDb();
+    const rows = await database.getAllAsync<any>(
       `SELECT * FROM events WHERE hebrew_day = ? AND hebrew_month = ?
        AND calendar_type = 'hebrew' AND status != 'cancelled'`,
       [hebrewDay, hebrewMonth]
@@ -91,8 +108,9 @@ export class StorageService {
   }
 
   static async deleteEvent(id: string): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
+    await ensureSchema();
+    const database = getDb();
+    await database.runAsync(
       `UPDATE events SET status = 'cancelled', updated = ? WHERE id = ?`,
       [new Date().toISOString(), id]
     );
@@ -107,10 +125,11 @@ export class StorageService {
    * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
    */
   static async getNotesInRange(startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
-    const db = await getDb();
+    await ensureSchema();
+    const database = getDb();
     const startStr = startDate.toISOString().split('T')[0];
     const endStr   = endDate.toISOString().split('T')[0];
-    const rows = await db.getAllAsync<any>(
+    const rows = await database.getAllAsync<any>(
       `SELECT * FROM events
        WHERE start_date >= ?
          AND start_date <= ?
@@ -129,8 +148,9 @@ export class StorageService {
    * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
    */
   static async getAllRecurringNotes(): Promise<CalendarEvent[]> {
-    const db = await getDb();
-    const rows = await db.getAllAsync<any>(
+    await ensureSchema();
+    const database = getDb();
+    const rows = await database.getAllAsync<any>(
       `SELECT * FROM events
        WHERE recurrence_type != 'none'
          AND status != 'cancelled'`,
@@ -142,16 +162,18 @@ export class StorageService {
   // ── Preferences ───────────────────────────────────────────
 
   static async getPref(key: string, defaultValue: string): Promise<string> {
-    const db = await getDb();
-    const row = await db.getFirstAsync<{ value: string }>(
+    await ensureSchema();
+    const database = getDb();
+    const row = await database.getFirstAsync<{ value: string }>(
       `SELECT value FROM preferences WHERE key = ?`, [key]
     );
     return row?.value ?? defaultValue;
   }
 
   static async setPref(key: string, value: string): Promise<void> {
-    const db = await getDb();
-    await db.runAsync(
+    await ensureSchema();
+    const database = getDb();
+    await database.runAsync(
       `INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)`,
       [key, value]
     );
