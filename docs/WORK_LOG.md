@@ -6,6 +6,48 @@
 
 ---
 
+## 2026-05-27 — Phase 4.6 — Pre-release fixes
+
+Three sub-phases addressing issues found during on-device testing of `mvp-1.0.0` via Expo Go on Android.
+
+### What was done
+
+**4.6-A — SQLite Expo Go compatibility fix**
+- `src/services/StorageService.ts`: replaced `openDatabaseAsync` (expo-sqlite v14 "Next" API, requires custom dev client) with `openDatabaseSync` (works in standard Expo Go)
+- Extracted schema creation into module-level `ensureSchema()` with a `schemaInitialized` flag; each public method calls it on first use — lazy-init behavior preserved
+- `StorageService.init()` now delegates to `ensureSchema()` — backward compatible with `_layout.tsx` caller
+- All query methods (`execAsync`, `getAllAsync`, `runAsync`, `getFirstAsync`) are identical on the sync handle — zero downstream signature changes
+
+**4.6-B — Details screen: prefix stripping + layout fix**
+- `src/services/DateService.ts` `renderLearning`: strips leading English prefix (`"Daf Yomi: "`, `"Mishna Yomi: "`, etc.) from each schedule's display string via regex `^[A-Za-z][A-Za-z\s]*:\s*`. The Details screen already shows a Hebrew label per row; the bilingual prefix was redundant and compressed Hebrew text. Guard added for empty-after-strip edge case.
+- `app/details.tsx` `LearningRow` styles: added `textAlign: 'right'` to `rowLabel` and `rowValue`; added `flexShrink: 1` to `rowContent`; added `flexShrink: 0` to `linkBtn`; reduced `linkBtn.paddingHorizontal` 10→8
+
+**4.6-C — Hebrew calendar grid RTL**
+- `src/components/calendar/MonthGrid.tsx`: replaced `FlatList` (always LTR) with manual View-based 7-column grid
+- `isRtl = mode === 'hebrew'` drives `flexDirection: 'row-reverse'` on both the day-name header row and each week row
+- Hebrew mode: Sunday(א׳) rightmost, Shabbat(ש׳) leftmost ✓
+- Gregorian mode: Sunday leftmost, Saturday rightmost, English day names (`Sun`–`Sat`) ✓
+- Added `DAY_NAMES_EN_SUN_FIRST` / `DAY_NAMES_EN_MON_FIRST` arrays for Gregorian mode
+- `startDayOffset` calculation unchanged — visual flipping via `flexDirection` handles both modes without changing offset logic
+- `weeks` 2D array (`(DayData | null)[][]`) replaces flat `gridData` array
+- `DayCell` unchanged; all gesture handlers (tap, long-press, swipe) preserved
+- `FlatList` import removed from react-native
+
+### Decisions made
+- `openDatabaseSync` chosen over downgrading to `expo-sqlite@~13.x` — same API surface, no dependency change, forward-compatible with custom dev builds and production
+- `flexDirection: 'row-reverse'` chosen over `transform: [{ scaleX: -1 }]` mirror hack — gesture events and accessibility work correctly without unmirror workarounds
+- English day names added to Gregorian tab (previously used Hebrew names in both tabs)
+
+### Open issues / blocked
+- None. All three issues resolved.
+
+### Next steps
+- Re-run on Expo Go to verify no more "Unimplemented" crashes
+- Visual check: Hebrew grid Sunday right / Shabbat left; Gregorian grid Sunday left
+- When satisfied, proceed to Phase 5 (Push Notifications + Omer count enhancements) per ROADMAP
+
+---
+
 ## 2026-05-27 — MVP CLOSURE — Luchot v1.0.0 🎉
 
 All six VISION.md success criteria are met. Phase 4 is complete.
