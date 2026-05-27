@@ -6,6 +6,50 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 4.2-1 (Data layer for notes-in-grids)
+
+**Phase:** Phase 4.2-1 — data layer sub-phase of Phase 4.2
+**Commits:** `aa57d57` (StorageService + formatDateKey), `4c91990` (DateService.hebrewToGregorian), `635c3eb` (expandRecurringNotes), `ef41d85` (useDatesNotes + useNotes mapper export)
+**Duration:** ~½ session
+
+### What got done
+
+- **`src/utils/dateUtils.ts`** — added `formatDateKey(date: Date): string` export. Returns `"YYYY-MM-DD"` using UTC components, consistent with how StorageService stores `start_date`. Used by `useDatesNotes` and `expandRecurringNotes`.
+
+- **`src/services/StorageService.ts`** — added two new static query methods:
+  - `getNotesInRange(startDate, endDate)` — fetches non-recurring events (`recurrence_type = 'none'`) whose `start_date` falls in the inclusive range. Recurring events excluded; they come back via `getAllRecurringNotes`.
+  - `getAllRecurringNotes()` — fetches all events with `recurrence_type != 'none'`, regardless of date. Caller decides which instances fall in range.
+  - Both follow the existing `db.getAllAsync<any>(sql, params)` + `rowToEvent` pattern. Existing methods unchanged.
+
+- **`src/services/DateService.ts`** — added `hebrewToGregorian(hebYear, hebMonth, hebDay): Date | null`. Thin wrapper around `new HDate(day, month, year).greg()`. Returns `null` for invalid dates (e.g., Adar II in non-leap year) rather than throwing. Used by `expandRecurringNotes`.
+
+- **`src/utils/expandRecurringNotes.ts`** — new utility. `expandRecurringNotes(notes, rangeStart, rangeEnd)` returns `RecurringInstance[]` (each with `note: CalendarNote` and `date: Date`). Two sub-functions:
+  - `expandHebrewRecurring` — iterates Hebrew years spanning the range; uses `new HDate(rangeEndpoint).getFullYear()` for lightweight year derivation; calls `dateService.hebrewToGregorian` per year; skips nulls (Adar II / invalid).
+  - `expandGregorianRecurring` — iterates Gregorian years; parses month+day from `gregorianDateStr`; validates `Date` constructor didn't normalize (handles Feb 29).
+
+- **`src/hooks/useNotes.ts`** — renamed internal `eventToNote` → `export function eventToCalendarNote`. Logic unchanged; the single internal call site updated. Existing consumers of `useNotes` (Day screen) unaffected — no exported API changed.
+
+- **`src/hooks/useDatesNotes.ts`** — new hook. `useDatesNotes(rangeStart, rangeEnd, refreshKey?)` returns `Map<string, CalendarNote[]>` keyed by `"YYYY-MM-DD"`. Calls both new StorageService methods in parallel, maps events via `eventToCalendarNote`, expands recurring via `expandRecurringNotes`, merges into the map. Cancelled-flag pattern for stale async. Uses `formatDateKey(rangeStart/End)` as stable dep-array proxies for Date objects.
+
+- Typecheck green at every commit boundary.
+
+### Decisions made
+
+- **HDate directly for Hebrew year derivation** — spec suggested `dateService.getDayData()` for Hebrew year of range endpoints; replaced with `new HDate(date).getFullYear()` which is lightweight (no month-level caching, no event generation). Functionally equivalent for this use case.
+- **`formatDateKey` uses `toISOString().split('T')[0]`** (UTC) to match the existing StorageService storage pattern. All date key comparisons in the system use this format; changing to local components would break existing stored data.
+- **`eventToCalendarNote` as export from useNotes** (not extracted to shared utility). Per spec decision (a): simpler, no new file, refactor deferred.
+
+### Open issues / blocked
+
+- **Gregorian recurring bug fixed at data layer** — Day screen (`useNotes`) still calls the old per-date queries (`getEventsForGregorianDate` exact match), so Gregorian recurring notes still don't recur on the Day screen. Full fix deferred to 4.2-2, which will decide whether to update `useNotes` or document as known limitation.
+- **No UI consumes `useDatesNotes` yet** — MonthGrid and WeekGrid still pass empty arrays to `buildDayTags`. Wired in Phase 4.2-2.
+- **`refreshKey` parameter of `useDatesNotes` is unused** — intentional; 4.2-2 wires mutations.
+
+### Next steps
+- Phase 4.2-2: wire `useDatesNotes` into MonthGrid and WeekGrid; decide on Day screen Gregorian recurring fix.
+
+---
+
 ## 2026-05-27 — Session: Phase 4.1 (RABBANUT shita removal)
 
 **Phase:** Phase 4.1 — first sub-phase of Phase 4 (MVP polish)
