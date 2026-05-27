@@ -1,7 +1,7 @@
 // src/components/calendar/WeekGrid.tsx
 // Phase 3.7b-3 — Minimal Week view. Renders 7 DayCells horizontally for
-// the week containing selectedDate. Tags from holidays/Rosh Chodesh/Omer
-// only — user notes integration deferred to Phase 4.
+// the week containing selectedDate.
+// Phase 4.2-2 — useDatesNotes wired; user notes now appear as tags.
 //
 // Differs from MonthGrid:
 //   - 7 cells in one row (vs 5-6 rows of 7 in a month grid)
@@ -18,6 +18,7 @@ import { useCalendarStore } from '../../providers/CalendarProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useNotes } from '../../hooks/useNotes';
+import { useDatesNotes } from '../../hooks/useDatesNotes';
 import { DayCell } from './DayCell';
 import { QuickActionSheet, QuickAction } from './QuickActionSheet';
 import { NoteEditor } from '../notes/NoteEditor';
@@ -27,6 +28,7 @@ import {
   type DayData,
 } from '../../services/DateService';
 import { buildDayTags } from '../../utils/tagMapper';
+import { formatDateKey } from '../../utils/dateUtils';
 import type { FirstDayOfWeek } from '../../providers/SettingsProvider';
 
 type WeekGridMode = 'hebrew' | 'gregorian';
@@ -80,13 +82,19 @@ export function WeekGrid({ mode }: WeekGridProps) {
     () => dateService.getDayData(editorDate).hebrewDate,
     [editorDate],
   );
-  const { saveNote } = useNotes(editorDate);
+  const { saveNote, refreshKey } = useNotes(editorDate);
 
   // 7 days of the current week
   const weekDays = useMemo(
     () => getWeekDays(selectedDate, firstDayOfWeek),
     [selectedDate, firstDayOfWeek],
   );
+
+  // Notes for the 7-day range — refreshKey from useNotes triggers re-fetch
+  // after save/delete so the week row updates immediately.
+  const weekStart    = weekDays[0].gregorianDate;
+  const weekEnd      = weekDays[6].gregorianDate;
+  const notesByDate  = useDatesNotes(weekStart, weekEnd, refreshKey);
 
   // Helpers
   const isSameDay = useCallback((a: Date, b: Date) => {
@@ -160,7 +168,9 @@ export function WeekGrid({ mode }: WeekGridProps) {
             const isToday    = isSameDay(day.gregorianDate, today);
             const isSelected = isSameDay(day.gregorianDate, selectedDate);
             const isFriday   = day.gregorianDate.getDay() === 5;
-            const tags       = buildDayTags(day, []); // empty notes — Phase 4
+            const dayKey     = formatDateKey(day.gregorianDate);
+            const dayNotes   = notesByDate.get(dayKey) ?? [];
+            const tags       = buildDayTags(day, dayNotes);
 
             return (
               <View key={day.gregorianDate.toISOString()} style={styles.cellWrapper}>
