@@ -1,57 +1,97 @@
 // src/services/StorageService.ts
+// Phase 4.7-1 fix: switched from expo-sqlite v14 "Next" API to legacy API.
+// Both openDatabaseAsync and openDatabaseSync in expo-sqlite v14 use
+// NativeDatabase — the new native module that is NOT present in standard
+// Expo Go. The expo-sqlite/legacy entry point exports the classic
+// openDatabase() which uses the original SQLite native module that ships
+// with Expo Go.
+//
+// Query helpers (dbAll / dbRun / dbFirst) wrap the legacy transactionAsync
+// pattern so callers remain identical to the previous version.
 
-import * as SQLite from 'expo-sqlite';
+import {
+  openDatabase,
+  type SQLiteDatabase,
+  type SQLStatementArg,
+  type ResultSet,
+} from 'expo-sqlite/legacy';
 import { CalendarEvent } from '../schemas/EventSchema';
 
-// ── Database handle ────────────────────────────────────────────────────────────
-// openDatabaseSync returns the same async query methods (execAsync, getAllAsync,
-// runAsync, getFirstAsync) as openDatabaseAsync, but opens synchronously.
-// This is required for standard Expo Go, which ships the classic SQLite native
-// module — the "Next" async API (openDatabaseAsync) throws "Unimplemented"
-// there at runtime.
-let db: SQLite.SQLiteDatabase | null = null;
+// ── DB handle ──────────────────────────────────────────────────────────────────
+
+let db: SQLiteDatabase | null = null;
 let schemaInitialized = false;
 
-function getDb(): SQLite.SQLiteDatabase {
+function getDb(): SQLiteDatabase {
   if (!db) {
-    db = SQLite.openDatabaseSync('calendar.db');
+    db = openDatabase('calendar.db');
   }
   return db;
 }
 
 async function ensureSchema(): Promise<void> {
   if (schemaInitialized) return;
-  await getDb().execAsync(`
-    CREATE TABLE IF NOT EXISTS events (
-      id TEXT PRIMARY KEY,
-      summary TEXT NOT NULL,
-      description TEXT,
-      start_date TEXT NOT NULL,
-      start_datetime TEXT,
-      end_date TEXT,
-      end_datetime TEXT,
-      status TEXT DEFAULT 'confirmed',
-      recurrence TEXT,
-      calendar_type TEXT DEFAULT 'hebrew',
-      hebrew_day INTEGER,
-      hebrew_month INTEGER,
-      hebrew_year INTEGER,
-      hebrew_month_name TEXT,
-      recurrence_type TEXT DEFAULT 'none',
-      category TEXT DEFAULT 'personal',
-      after_sunset INTEGER DEFAULT 0,
-      color_id TEXT,
-      created TEXT,
-      updated TEXT,
-      notification_scheduled INTEGER DEFAULT 0
+  await getDb().transactionAsync(async (txn) => {
+    await txn.executeSqlAsync(
+      `CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        summary TEXT NOT NULL,
+        description TEXT,
+        start_date TEXT NOT NULL,
+        start_datetime TEXT,
+        end_date TEXT,
+        end_datetime TEXT,
+        status TEXT DEFAULT 'confirmed',
+        recurrence TEXT,
+        calendar_type TEXT DEFAULT 'hebrew',
+        hebrew_day INTEGER,
+        hebrew_month INTEGER,
+        hebrew_year INTEGER,
+        hebrew_month_name TEXT,
+        recurrence_type TEXT DEFAULT 'none',
+        category TEXT DEFAULT 'personal',
+        after_sunset INTEGER DEFAULT 0,
+        color_id TEXT,
+        created TEXT,
+        updated TEXT,
+        notification_scheduled INTEGER DEFAULT 0
+      )`,
+      [],
     );
-    CREATE TABLE IF NOT EXISTS preferences (
-      key TEXT PRIMARY KEY,
-      value TEXT
+    await txn.executeSqlAsync(
+      `CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT)`,
+      [],
     );
-  `);
+  });
   schemaInitialized = true;
 }
+
+// ── Query helpers ──────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function dbAll<T = any>(sql: string, args: SQLStatementArg[]): Promise<T[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rows: any[] = [];
+  await getDb().transactionAsync(async (txn) => {
+    const rs: ResultSet = await txn.executeSqlAsync(sql, args);
+    rows = rs.rows;
+  }, true /* readOnly */);
+  return rows as T[];
+}
+
+async function dbRun(sql: string, args: SQLStatementArg[]): Promise<void> {
+  await getDb().transactionAsync(async (txn) => {
+    await txn.executeSqlAsync(sql, args);
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function dbFirst<T = any>(sql: string, args: SQLStatementArg[]): Promise<T | null> {
+  const rows = await dbAll<T>(sql, args);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+// ── StorageService ─────────────────────────────────────────────────────────────
 
 export class StorageService {
   // Called explicitly on app startup from _layout.tsx; also safe to skip —
@@ -64,9 +104,8 @@ export class StorageService {
 
   static async saveEvent(event: CalendarEvent): Promise<void> {
     await ensureSchema();
-    const database = getDb();
     const ext = event.hebrewExtensions;
-    await database.runAsync(
+    await dbRun(
       `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         event.id, event.summary, event.description ?? null,
@@ -81,38 +120,35 @@ export class StorageService {
         event.colorId ?? null,
         event.created, event.updated,
         ext.notificationScheduled ? 1 : 0,
-      ]
+      ],
     );
   }
 
   static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {
     await ensureSchema();
-    const database = getDb();
     const dateStr = date.toISOString().split('T')[0];
-    const rows = await database.getAllAsync<any>(
+    const rows = await dbAll(
       `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled'`,
-      [dateStr]
+      [dateStr],
     );
     return rows.map(StorageService.rowToEvent);
   }
 
   static async getEventsForHebrewDate(hebrewDay: number, hebrewMonth: number): Promise<CalendarEvent[]> {
     await ensureSchema();
-    const database = getDb();
-    const rows = await database.getAllAsync<any>(
+    const rows = await dbAll(
       `SELECT * FROM events WHERE hebrew_day = ? AND hebrew_month = ?
        AND calendar_type = 'hebrew' AND status != 'cancelled'`,
-      [hebrewDay, hebrewMonth]
+      [hebrewDay, hebrewMonth],
     );
     return rows.map(StorageService.rowToEvent);
   }
 
   static async deleteEvent(id: string): Promise<void> {
     await ensureSchema();
-    const database = getDb();
-    await database.runAsync(
+    await dbRun(
       `UPDATE events SET status = 'cancelled', updated = ? WHERE id = ?`,
-      [new Date().toISOString(), id]
+      [new Date().toISOString(), id],
     );
   }
 
@@ -126,10 +162,9 @@ export class StorageService {
    */
   static async getNotesInRange(startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
     await ensureSchema();
-    const database = getDb();
     const startStr = startDate.toISOString().split('T')[0];
     const endStr   = endDate.toISOString().split('T')[0];
-    const rows = await database.getAllAsync<any>(
+    const rows = await dbAll(
       `SELECT * FROM events
        WHERE start_date >= ?
          AND start_date <= ?
@@ -149,8 +184,7 @@ export class StorageService {
    */
   static async getAllRecurringNotes(): Promise<CalendarEvent[]> {
     await ensureSchema();
-    const database = getDb();
-    const rows = await database.getAllAsync<any>(
+    const rows = await dbAll(
       `SELECT * FROM events
        WHERE recurrence_type != 'none'
          AND status != 'cancelled'`,
@@ -163,24 +197,24 @@ export class StorageService {
 
   static async getPref(key: string, defaultValue: string): Promise<string> {
     await ensureSchema();
-    const database = getDb();
-    const row = await database.getFirstAsync<{ value: string }>(
-      `SELECT value FROM preferences WHERE key = ?`, [key]
+    const row = await dbFirst<{ value: string }>(
+      `SELECT value FROM preferences WHERE key = ?`,
+      [key],
     );
     return row?.value ?? defaultValue;
   }
 
   static async setPref(key: string, value: string): Promise<void> {
     await ensureSchema();
-    const database = getDb();
-    await database.runAsync(
+    await dbRun(
       `INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)`,
-      [key, value]
+      [key, value],
     );
   }
 
   // ── Row Mapper ────────────────────────────────────────────
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static rowToEvent(row: any): CalendarEvent {
     let recurrence: string[] | undefined;
     try {
@@ -212,7 +246,7 @@ export class StorageService {
         category: row.category,
         afterSunset: row.after_sunset === 1,
         notificationScheduled: row.notification_scheduled === 1,
-      }
+      },
     };
   }
 }
