@@ -356,10 +356,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // Week rows — flexDirection set inline based on mode
-  weekRow: {},
+  // Week rows — flexDirection set inline based on mode.
+  // Explicit height breaks the Yoga circular-height dependency that occurs
+  // when every cell is a cellWrapper (no emptyCell with explicit height to
+  // anchor the row). Without this, rows containing only DayCell children
+  // (weeks 2–5 of most months) collapse to ~8 px tall.
+  weekRow: { height: 110 }, // matches CELL_HEIGHT in DayCell
 
-  // Cell containers — flex: 1 distributes each cell to 1/7 of row width
+  // Cell containers — flex: 1 distributes each cell to 1/7 of row width.
+  // alignItems: 'stretch' (default on weekRow) makes cellWrapper fill the
+  // row height (110 px) so DayCell's flex:1 inside it expands correctly.
   cellWrapper: { flex: 1 },
-  emptyCell:   { flex: 1, height: 110 }, // matches CELL_HEIGHT in DayCell
+  emptyCell:   { flex: 1 }, // height comes from weekRow stretch
 });
