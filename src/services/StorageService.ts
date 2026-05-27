@@ -98,6 +98,47 @@ export class StorageService {
     );
   }
 
+  /**
+   * Returns non-recurring events whose start_date falls in the inclusive
+   * range [startDate, endDate]. Recurring events are excluded — they are
+   * fetched separately via getAllRecurringNotes and expanded by the
+   * expandRecurringNotes utility.
+   *
+   * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
+   */
+  static async getNotesInRange(startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
+    const db = await getDb();
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr   = endDate.toISOString().split('T')[0];
+    const rows = await db.getAllAsync<any>(
+      `SELECT * FROM events
+       WHERE start_date >= ?
+         AND start_date <= ?
+         AND recurrence_type = 'none'
+         AND status != 'cancelled'`,
+      [startStr, endStr],
+    );
+    return rows.map(StorageService.rowToEvent);
+  }
+
+  /**
+   * Returns ALL events with recurrence_type other than 'none', regardless
+   * of date. The caller (expandRecurringNotes utility) decides which
+   * instances fall within a given range.
+   *
+   * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
+   */
+  static async getAllRecurringNotes(): Promise<CalendarEvent[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>(
+      `SELECT * FROM events
+       WHERE recurrence_type != 'none'
+         AND status != 'cancelled'`,
+      [],
+    );
+    return rows.map(StorageService.rowToEvent);
+  }
+
   // ── Preferences ───────────────────────────────────────────
 
   static async getPref(key: string, defaultValue: string): Promise<string> {
