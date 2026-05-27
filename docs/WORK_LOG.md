@@ -6,6 +6,55 @@
 
 ---
 
+## 2026-05-27 — Session: EAS APK distribution setup — BLOCKED on quota until June 1
+
+**Phase:** Post-Phase-4.7 — APK distribution
+**Commits:** `6202f64` (EAS config), `c76cd86` (react-native-svg)
+**Status:** Code ready, EAS Free Tier quota exhausted until 2026-06-01
+
+### What got done
+
+- **EAS Build configuration committed** (`6202f64`):
+  - `eas.json`: switched `appVersionSource` `local → remote` (EAS owns versionCode server-side)
+  - Added `autoIncrement: true` to preview and production profiles
+  - Kept existing `base` profile with Node 20.18.1 pin
+  - Loosened `cli.version` to `>= 7.0.0`
+- **`react-native-svg@15.2.0` installed** (`c76cd86`):
+  - Missing peer dep of `lucide-react-native`, masked by Expo Go (which bundles it)
+  - First standalone APK (versionCode 2, build `bfde20ff`) installed but crashed on launch
+    — exactly the crash `expo doctor` had warned about. Confirmed at runtime on Galaxy S25 FE.
+  - After install: `npx expo-doctor` green (16/17, the one remaining is a pre-existing
+    non-fatal metro warning), typecheck green
+
+### Decisions made
+
+- **Free Tier quota burned by failed attempts.** Three versionCodes consumed (2 → finished
+  but crashes; 3 → upload aborted mid-transfer; 4 → quota-rejected at queue time).
+  Server-side `autoIncrement` counted all three. Next successful build will be **versionCode 5**.
+- **Wait for June 1 quota reset** over paid plan or local build. Decision rationale:
+  4-day wait is reasonable; local Android Studio setup is heavier than the gain;
+  Expo Pro at $19/mo isn't justified for a personal-use APK.
+- **`base` profile + Node 20.18.1 pin retained** — sound practice for reproducible EAS builds
+  vs. letting EAS pick a default Node.
+- **Keystore reused** — EAS detected existing keystore `qNriOh_dGk` from the older
+  project version. Means any historical installs of the previous Luchot can be
+  updated by future APKs without uninstall.
+
+### Open issues / blocked
+
+- **EAS Free Tier quota exhausted.** Resets 2026-06-01 (Mon). Block on APK distribution.
+- The crashing APK installed on test device (versionCode 2) should be uninstalled
+  before installing versionCode 5 (avoid confusion).
+
+### Next steps
+
+- **2026-06-01:** Run `eas build --platform android --profile preview`. Expected:
+  versionCode 5, build succeeds, APK downloads, installs cleanly, no crash on launch.
+- After APK validation, Phase 5 can begin per ROADMAP (notifications wiring is
+  next on the agenda).
+
+---
+
 ## 2026-05-27 — Phase 4.7 — Post-feedback fixes
 
 Six bugs from on-device Android testing of mvp-1.0.0 + Phase 4.6.

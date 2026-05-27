@@ -146,6 +146,15 @@ In Phase 3.7b-1 we integrated `@hebcal/learning@5.1.2`. Three schedules that app
 
 ---
 
+### Post-MVP distribution — APK build setup (in progress)
+
+EAS Build configured for Android preview (APK) distribution. First successful APK
+gated on Free Tier quota reset (2026-06-01). See WORK_LOG entry dated 2026-05-27.
+
+Once a clean APK installs and runs on test device, Phase 5 begins.
+
+---
+
 ## Phase 5 — Post-MVP *(ACTIVE — awaiting user feedback)*
 
 Phase 4 / MVP is complete. Phase 5 is the next phase. Work order will be
