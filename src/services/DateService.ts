@@ -131,12 +131,20 @@ function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningI
 
   if (!rawDisplay || !url) return undefined;
 
-  // Strip leading English prefix like "Daf Yomi: " or "Mishna Yomi: " —
-  // the Details screen already shows a Hebrew label on each row, so the
-  // bilingual prefix is redundant and compresses the Hebrew display text.
-  // Pattern: one or more ASCII letters/spaces followed by ":" + optional space.
-  const display = rawDisplay.replace(/^[A-Za-z][A-Za-z\s]*:\s*/, '').trim();
-  if (!display) return undefined; // guard against full-English edge case
+  // Strip bilingual boilerplate from the display string:
+  //   1. Leading prefix  "Daf Yomi: " / "Mishna Yomi: " etc.
+  //      Pattern: 1+ ASCII letters/spaces followed by ":" + optional space.
+  //   2. Trailing English book name "Psalms" / "I Kings" etc. that some
+  //      @hebcal/learning schedules append after the Hebrew citation.
+  //      Pattern: 1+ whitespace + 1+ ASCII letters/spaces at end of string.
+  // After both strips, reject if no Hebrew characters remain (U+0590–U+05FF)
+  // to guard against schedules that produce fully-English output.
+  const display = rawDisplay
+    .replace(/^[A-Za-z][A-Za-z\s]*:\s*/, '')        // leading "Daf Yomi: "
+    .replace(/\s+[A-Za-z][A-Za-z\s]*$/, '')          // trailing "Psalms", "I Kings"
+    .trim();
+  // Reject if empty or contains no Hebrew characters
+  if (!display || !/[֐-׿]/.test(display)) return undefined;
 
   return { display, url };
 }
