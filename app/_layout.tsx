@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StorageService } from '../src/services/StorageService';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
+import { useLocationStore } from '../src/providers/LocationProvider';
 import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
 
@@ -18,7 +19,10 @@ export default function RootLayout() {
   useEffect(() => {
     async function init() {
       await StorageService.init();
-      await useSettingsStore.getState().loadFromStorage();
+      await Promise.all([
+        useSettingsStore.getState().loadFromStorage(),
+        useLocationStore.getState().loadFromStorage(),
+      ]);
       const diaspora = useSettingsStore.getState().diaspora;
       dateService.setDiaspora(diaspora);
       useCalendarStore.getState().refreshMonth();
