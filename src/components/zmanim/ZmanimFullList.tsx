@@ -165,6 +165,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: radius.md,
     marginVertical: 1,
+    gap: 12,  // guarantees breathing room between label and time value
   },
   label: { fontSize: 15, fontWeight: '500', flex: 1 },
   time:  { fontSize: 15, fontWeight: '600' },
