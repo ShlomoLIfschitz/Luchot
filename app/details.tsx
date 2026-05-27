@@ -31,6 +31,7 @@ import {
   type LearningItem,
 } from '../src/services/DateService';
 import { radius } from '../src/constants/radius';
+import { useDatePicker } from '../src/hooks/useDatePicker';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,9 @@ export default function DetailsScreen() {
     () => dateService.getDayData(selectedDate),
     [selectedDate],
   );
+
+  // Date picker — Phase 4.4
+  const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
 
   // Swipe navigation between days — consistent with Day and Zmanim screens.
   const navigateDay = useCallback(
@@ -124,7 +128,7 @@ export default function DetailsScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader date={selectedDate} />
+        <ScreenHeader date={selectedDate} onDatePress={openPicker} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -155,6 +159,9 @@ export default function DetailsScreen() {
             ))
           )}
         </ScrollView>
+
+        {/* Date picker — Phase 4.4; rendered outside ScrollView */}
+        {picker}
       </View>
     </GestureDetector>
   );

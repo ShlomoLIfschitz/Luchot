@@ -16,6 +16,7 @@ import {
 } from '../src/services/DateService';
 import { radius } from '../src/constants/radius';
 import type { FirstDayOfWeek } from '../src/providers/SettingsProvider';
+import { useDatePicker } from '../src/hooks/useDatePicker';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,8 +39,12 @@ function getWeekStart(anchor: Date, firstDayOfWeek: FirstDayOfWeek): Date {
 export default function WeekScreen() {
   const colors = useThemeColors();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
+  const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
   const firstDayOfWeek = useSettingsStore((s) => s.firstDayOfWeek);
+
+  // Date picker — Phase 4.4
+  const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
 
   // Derive week start + end
   const { weekStart, weekEnd } = useMemo(() => {
@@ -93,7 +98,7 @@ export default function WeekScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader date={selectedDate} />
+      <ScreenHeader date={selectedDate} onDatePress={openPicker} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -138,6 +143,9 @@ export default function WeekScreen() {
         {/* WeekGrid — owns swipe gesture, QuickActionSheet, NoteEditor */}
         <WeekGrid mode={hebrewOnTop ? 'hebrew' : 'gregorian'} />
       </ScrollView>
+
+      {/* Date picker — Phase 4.4; rendered outside ScrollView */}
+      {picker}
     </View>
   );
 }
