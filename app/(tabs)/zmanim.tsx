@@ -1,26 +1,25 @@
 // app/(tabs)/zmanim.tsx
 // Phase 3.6 — Full Zmanim screen per docs/SCREENS.md.
-//
-// Location adaptation note (vs. original Phase 3.6 spec):
-//   LocationProvider exposes only latitude/longitude/setLocation — no
-//   human-readable city name field. Location indicator displays the
-//   hardcoded fallback 'ישראל'. Picker UI + real city name deferred to
-//   Phase 4 when a geocoding/city-name field is added to LocationProvider.
+// Phase 4.5 — Location chip now shows real city name + GPS indicator.
 
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { MapPin } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { MapPin, Navigation } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
+import { useLocationStore } from '../../src/providers/LocationProvider';
 import { ZmanimFullList } from '../../src/components/zmanim/ZmanimFullList';
 import { dateService, toHebrewNumeral, toHebrewYear } from '../../src/services/DateService';
 import type { ZmanimMethod } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
+import { findCityByKey } from '../../src/constants/cities';
+import { findNearestCity } from '../../src/utils/locationLookup';
 
 const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
   { value: 'GRA', label: 'גר״א' },
@@ -29,10 +28,22 @@ const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
 
 export default function ZmanimScreen() {
   const colors = useThemeColors();
+  const router = useRouter();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
 
   const zmanim = useZmanim(selectedDate);
+
+  // Location chip data
+  const { cityHebcalKey, latitude, longitude, source } = useLocationStore();
+  const currentCityName = useMemo(() => {
+    if (cityHebcalKey) {
+      const entry = findCityByKey(cityHebcalKey);
+      if (entry) return entry.nameHe;
+    }
+    const { city } = findNearestCity(latitude, longitude);
+    return city.nameHe;
+  }, [cityHebcalKey, latitude, longitude]);
 
   // Date picker — Phase 4.4
   const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
@@ -88,17 +99,20 @@ export default function ZmanimScreen() {
             </Text>
           </View>
 
-          {/* Location indicator — display only.
-              TODO Phase 4: wire to real city name once LocationProvider
-              exposes a human-readable name field (currently lat/lng only). */}
+          {/* Location chip — tappable; opens picker; shows GPS indicator when
+              source is 'gps' so users can see when auto-detected. */}
           <Pressable
-            disabled
+            onPress={() => router.push('/locationPicker' as any)}
             style={[styles.locationRow, { backgroundColor: colors.surfaceElevated }]}
+            accessibilityLabel="שנה מיקום"
           >
             <MapPin size={16} color={colors.textSecondary} />
             <Text style={[styles.locationText, { color: colors.textSecondary }]}>
-              ישראל
+              {currentCityName}
             </Text>
+            {source === 'gps' && (
+              <Navigation size={12} color={colors.textTertiary} />
+            )}
           </Pressable>
 
           {/* Shita segmented control — selecting persists via SettingsProvider */}

@@ -33,6 +33,7 @@ import {
   CalendarRange,
   Clock,
   Library,
+  MapPin,
   Settings as SettingsIcon,
   Info,
 } from 'lucide-react-native';
@@ -194,6 +195,11 @@ export function Drawer() {
               Icon={Library}
               label="פרטי לימוד"
               onPress={() => navigateTo('/details')}
+            />
+            <DrawerItem
+              Icon={MapPin}
+              label="מיקום"
+              onPress={() => navigateTo('/locationPicker')}
             />
 
             {/* Divider */}
