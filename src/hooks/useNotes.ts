@@ -18,7 +18,9 @@ export interface CalendarNote {
   gregorianDateStr: string | undefined;
 }
 
-function eventToNote(e: CalendarEvent): CalendarNote {
+// Exported so useDatesNotes (Phase 4.2-1) can reuse the same mapping
+// without duplicating logic. useNotes itself calls it internally too.
+export function eventToCalendarNote(e: CalendarEvent): CalendarNote {
   const cat = e.hebrewExtensions.category;
   const noteType: NoteType =
     cat === 'birthday' ? 'birthday' :
@@ -55,7 +57,7 @@ export function useNotes(date: Date | null) {
         seen.add(e.id);
         return true;
       });
-      setNotes(all.map(eventToNote));
+      setNotes(all.map(eventToCalendarNote));
     }
     load().catch(console.error);
   }, [date?.getTime(), refreshKey]);
