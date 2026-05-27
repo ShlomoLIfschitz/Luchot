@@ -79,9 +79,22 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
         <View style={[styles.candleBanner, { backgroundColor: colors.candle + '20', borderColor: colors.candle }]}>
           <Flame size={20} color={colors.candle} />
           <Text style={[styles.candleLabel, { color: colors.textPrimary }]}>הדלקת נרות</Text>
-          <Text style={[styles.candleTime, { color: colors.candle }]}>
-            {formatZmanTime(zmanim.candleLighting, use24h)}
-          </Text>
+          {/* Wrap time + optional offset hint in a column so the hint sits
+              directly below the time without disturbing the banner layout. */}
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.candleTime, { color: colors.candle }]}>
+              {formatZmanTime(zmanim.candleLighting, use24h)}
+            </Text>
+            {!!zmanim.candleLightingOffsetMinutes &&
+             zmanim.candleLightingOffsetMinutes !== 18 && (
+              <Text style={[styles.offsetHint, { color: colors.textTertiary }]}>
+                {`${zmanim.candleLightingOffsetMinutes} דקות לפני שקיעה`}
+                {zmanim.candleLightingCityNameHe
+                  ? ` (מנהג ${zmanim.candleLightingCityNameHe})`
+                  : ''}
+              </Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -183,5 +196,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     marginTop: 16,
+  },
+
+  // Phase 4.3 — shown below candle lighting time when offset is non-default
+  offsetHint: {
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'right',
   },
 });

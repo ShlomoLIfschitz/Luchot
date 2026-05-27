@@ -21,6 +21,11 @@ export function ZmanimList({ zmanim }: Props) {
     ['שקיעה', zmanim.shkia],
     ['צאת הכוכבים', zmanim.tzeitHakochavim],
   ];
+
+  const showOffsetHint =
+    !!zmanim.candleLightingOffsetMinutes &&
+    zmanim.candleLightingOffsetMinutes !== 18;
+
   return (
     <View style={styles.container}>
       <Text style={[styles.title, { color: colors.textTertiary }]}>זמנים</Text>
@@ -30,12 +35,33 @@ export function ZmanimList({ zmanim }: Props) {
           <Text style={{ color: colors.textPrimary }}>{formatZmanTime(d, use24h)}</Text>
         </View>
       ))}
+
+      {/* Candle lighting — shown on Fridays only (candleLighting is null on other days) */}
+      {zmanim.candleLighting && (
+        <View style={styles.row}>
+          <Text style={{ color: colors.textSecondary }}>הדלקת נרות</Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: colors.textPrimary }}>
+              {formatZmanTime(zmanim.candleLighting, use24h)}
+            </Text>
+            {showOffsetHint && (
+              <Text style={[styles.offsetHint, { color: colors.textTertiary }]}>
+                {`${zmanim.candleLightingOffsetMinutes} דקות לפני שקיעה`}
+                {zmanim.candleLightingCityNameHe
+                  ? ` (מנהג ${zmanim.candleLightingCityNameHe})`
+                  : ''}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { marginVertical: 12 },
-  title: { fontSize: 11, fontWeight: '600', marginBottom: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
+  container:  { marginVertical: 12 },
+  title:      { fontSize: 11, fontWeight: '600', marginBottom: 8 },
+  row:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: 4 },
+  offsetHint: { fontSize: 11, marginTop: 1, textAlign: 'right' },
 });
