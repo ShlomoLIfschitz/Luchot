@@ -1,6 +1,9 @@
 # Luchot — Roadmap
 
-> **Status snapshot:** On `main`, remote on GitHub. Phase 3.6 complete. Phases 3.1–3.6 done; 3.7 is the final Phase 3 task.
+> **Status snapshot — PHASE 3 COMPLETE (2026-05-27).**
+> All Phase 3 sub-phases done. Phase 4 (polish for MVP) is the active phase.
+>
+> ~~Phase 3.6 complete. Phases 3.1–3.6 done; 3.7 is the final Phase 3 task.~~
 
 This document is the dependency map and ordering plan for Luchot. Each phase lists what owns it, what it depends on, and what it unblocks. Full implementation detail lives in the per-task prompts written when the work is actually picked up — not here.
 
@@ -102,26 +105,32 @@ Goal: build the drawer that lives off the universal header. Contains: Week view 
 - **Depends on:** 3.4 (settings must leave the tabs first)
 - **Unblocks:** MVP
 
-#### Sub-phases status:
+#### Sub-phases status — ALL COMPLETE:
 - **3.7a-1** ✅ Drawer infrastructure + ScreenHeader (commits `0f90e39`–`5d3c54c`)
 - **3.7a-2** ✅ Settings relocation + SettingsProvider cleanup + QuickActionSheet wiring (commits `8a040b0`–`844f55a`)
 - **3.7b-1** ✅ @hebcal/learning integration — data layer (commits `847b7a5`–`1c249d5`)
 - **3.7b-2** ✅ LearningItem refactor + Details screen (commits `bd8ec1c`–`4018fb9`)
 - **3.7b-3** ✅ WeekGrid + Week screen (commits `d51db5b`–`7932310`)
-- **3.7c** 🔲 About + Tour + final polish — **NEXT**
+- **3.7c** ✅ About screen + ScreenHeader bilingual date (commits `592c452`–`495d6a0`)
+
+**Phase 3 closed 2026-05-27. Phase 4 (Polish for MVP) is now the active phase.**
 
 ---
 
-## Phase 4 — MVP polish *(post-Phase 3)*
+## Phase 4 — MVP polish *(ACTIVE — began 2026-05-27)*
 
-Light sketch — details to be filled in when we get there.
+Phase 3 is complete. Phase 4 closes the remaining gap to MVP.
 
-- Notifications wiring (NotificationService → event entities)
-- Settings polish: location picker UX, shita explanation
-- Accessibility pass: dynamic type, screen reader labels (RTL-aware)
-- Performance: month cache validation, scroll perf in Day screen hourly grid
-- Empty states and error boundaries
-- Onboarding tour (the "Tour" item in the hamburger)
+**Upcoming agenda (priority order):**
+
+1. **4-A — Learning schedules expansion** — see subsection below (requires @hebcal/core v6 upgrade)
+2. **Location picker UX** — replace GPS-only flow with city/manual entry; show city name in Zmanim header
+3. **Notifications wiring** — NotificationService → event entities (Omer reminders currently toggle-only)
+4. **hebrewOnTop + universal date header polish** — ScreenHeader date now shows; verify all edge cases (month boundaries, leap years)
+5. **Accessibility** — dynamic type, screen reader labels, RTL-aware focus order
+6. **Performance** — month cache validation on diaspora toggle, scroll perf in Day screen hourly grid
+7. **Empty states and error boundaries** — graceful handling for missing zmanim, network-dependent future features
+8. **Onboarding tour** — the "Tour" item to add to the hamburger drawer
 
 ### 4-A — Learning schedules expansion *(deferred from Phase 3.7b-1)*
 

@@ -6,6 +6,64 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 3.7c (About + ScreenHeader date display) — Phase 3 CLOSED
+
+**Phase:** Phase 3.7c — FINAL sub-phase of Phase 3
+**Commits:** `592c452` (ScreenHeader extension), `37883a2` (4 screens updated), `ec85e63` (About screen), `495d6a0` (Drawer About entry)
+**Duration:** ~1 session
+
+### What got done
+- **`src/components/common/ScreenHeader.tsx` extended** — added optional `date?: Date` prop. When provided, renders a compact two-line bilingual date in place of the title:
+  - Primary line: Hebrew (`ב׳ סיון תשפ״ו`) or Gregorian (`2 ביוני 2026`) — controlled by `hebrewOnTop` setting.
+  - Secondary line: the other calendar system.
+  - Falls back to `title` (static string) when no `date` provided — fully backward compatible.
+  - `dateService.getDayData(date)` used for Hebrew date info (month-cached, cheap).
+  - `useSettingsStore(s => s.hebrewOnTop)` wired — **`hebrewOnTop` toggle now has a visible effect for the first time.**
+- **4 screens updated** to pass `date={selectedDate}` to ScreenHeader:
+  - `app/(tabs)/day.tsx` — replaces bare `<ScreenHeader />` (previously no title).
+  - `app/(tabs)/zmanim.tsx` — replaces bare `<ScreenHeader />`.
+  - `app/details.tsx` — replaces `<ScreenHeader title="פרטי לימוד" />`.
+  - `app/week.tsx` — replaces `<ScreenHeader title="שבוע" />`.
+  - Body-level date displays retained — serve as visual anchors when scrolled to top.
+- **`app/about.tsx` created** — standalone screen at `/about`:
+  - App name ("לוחות"), tagline, version from `Constants.expoConfig?.version` (expo-constants SDK 46+ canonical accessor, with `manifest?.version` fallback).
+  - Description paragraph emphasizing offline/no-account/no-ads per VISION.md.
+  - Credits section: @hebcal/core+learning, kosher-zmanim, Sefaria, Lucide Icons — all tappable with external links.
+  - `ScreenHeader title="אודות"` — static title (no date; About is not date-aware).
+- **`src/components/drawer/Drawer.tsx`** — added `Info` import; added "אודות" DrawerItem after Settings (final item in drawer).
+- **`docs/ROADMAP.md`** — marked Phase 3.7c ✅, Phase 3 fully closed (2026-05-27), Phase 4 marked as active with priority agenda.
+- Typecheck green at every commit boundary.
+
+### Pre-flight discoveries
+- **expo-constants**: `~16.0.2` installed. `Constants.expoConfig?.version` is correct primary accessor since SDK 46+; `Constants.manifest?.version` deprecated but kept as fallback. App version in `app.json` is `"1.0.0"`.
+- **lucide `Info`**: confirmed present. All pre-flight icon checks passed.
+- **ScreenHeader structure change**: the old version used `flex: 1` on the `title` Text directly. New version uses a `centerContent` View wrapper with `flex: 1` + `alignItems: 'center'` to support the two-line date layout. Backward compatibility preserved — screens without `date` or `title` still render a clean header.
+
+### Decisions / deviations from spec
+- **About screen uses `overflow: 'hidden'` on cards** — the spec's example didn't include it, but it's needed to clip child content to `borderRadius` on Android. Added for consistency with Settings screen cards.
+- **`android_ripple` added to credit rows in About** — consistent with SettingRow in Settings screen.
+- **`padding: 16` moved inside `cardBody` style** — spec put it on the `card` style; separated to allow future card-with-no-internal-padding uses.
+
+### Phase 3 closure summary
+All Phase 3 sub-phases completed across multiple sessions:
+- 3.1 Token files (radius, overlay) • 3.2 DayCell rewrite • 3.3 MonthGrid mode prop
+- 3.4 Tab restructure • 3.5 Day screen • 3.6 Zmanim screen
+- 3.7a-1 Drawer infra • 3.7a-2 Settings relocation • 3.7b-1 @hebcal/learning
+- 3.7b-2 Details screen • 3.7b-3 Week view • 3.7c About + ScreenHeader date
+
+### Open items / blockers (Phase 4 backlog)
+1. **@hebcal/core v6 upgrade** — unlocks rambamThreeChapters, seferHaMitzvot, arukhHaShulchan. Non-trivial; dedicated Phase 4 task. See ROADMAP 4-A.
+2. **Location picker UX** — GPS-only currently; city/manual entry needed; city name in Zmanim header placeholder.
+3. **Notifications** — Omer reminder toggle exists but NotificationService not connected to events.
+4. **ScreenHeader date edge cases** — verify month boundaries, leap year display, very long month names.
+5. **Performance** — month cache on diaspora toggle; Day screen hourly grid scroll.
+6. **Onboarding tour** — "Tour" item not yet in drawer.
+
+### Next steps
+- Phase 4 begins. First task TBD by architect — likely location picker (most user-visible gap) or @hebcal/core v6 upgrade (unlocks content).
+
+---
+
 ## 2026-05-27 — Session: Phase 3.7b-3 (WeekGrid + Week screen)
 
 **Phase:** Phase 3.7b-3
