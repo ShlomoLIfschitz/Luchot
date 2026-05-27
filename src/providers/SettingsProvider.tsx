@@ -12,8 +12,11 @@
 
 import { create } from 'zustand';
 import { StorageService } from '../services/StorageService';
+import type { ZmanimMethod } from '../services/ZmanimService';
 
-export type ZmanimMethod = 'GRA' | 'MGA' | 'RABBANUT';
+// Re-export so existing consumers that import ZmanimMethod from SettingsProvider
+// continue to work without changes.
+export type { ZmanimMethod };
 export type DefaultCalendarType = 'hebrew' | 'gregorian';
 export type FirstDayOfWeek = 0 | 1; // 0=Sunday, 1=Monday
 
@@ -82,7 +85,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       firstDayOfWeek:      Number(firstDayOfWeek) as FirstDayOfWeek,
       defaultCalendarType: defaultCalendarType as DefaultCalendarType,
       diaspora:            diaspora === 'true',
-      zmanimMethod:        zmanimMethod as ZmanimMethod,
+      // Migrate stored 'RABBANUT' (removed in Phase 4.1) to 'GRA'.
+      // Also guards against any other unexpected stored value.
+      zmanimMethod:
+        zmanimMethod === 'GRA' || zmanimMethod === 'MGA'
+          ? (zmanimMethod as ZmanimMethod)
+          : 'GRA',
       omerReminders:       omerReminders === 'true',
       use24hTime:          use24hTime === 'true',
     });
