@@ -183,11 +183,14 @@ function LearningSection({
 }) {
   return (
     <View style={styles.section}>
+      {/* Title first, Icon second — with flexDirection:'row' (LTR), this
+          places the Hebrew title on the LEFT and the icon on the RIGHT,
+          which is the correct reading-start position for RTL Hebrew. */}
       <View style={styles.sectionHeader}>
-        <Icon size={18} color={colors.accent} />
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
           {title}
         </Text>
+        <Icon size={18} color={colors.accent} />
       </View>
 
       <View style={[styles.card, { borderColor: colors.border }]}>
