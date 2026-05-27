@@ -122,7 +122,9 @@ Goal: build the drawer that lives off the universal header. Contains: Week view 
 Phase 3 is complete. Phase 4 closes the remaining gap to MVP.
 
 **Completed in Phase 4:**
-- **4.1 — RABBANUT shita removal** ✅ (commits `3800eed`–`0370076` + docs) — `ZmanimMethod` narrowed to `'GRA' | 'MGA'`; ZmanimService is now single source of truth; SettingsProvider re-exports for backward compat; storage migration GRA/MGA/unknown → GRA; UI (settings + zmanim screens) updated.
+- **4.1 — RABBANUT shita removal** ✅ (commits `3800eed`–`0370076` + docs)
+- **4.2 — Notes-in-grids** ✅ (commits `aa57d57`–`c62f2eb`) — batch data layer (getNotesInRange, getAllRecurringNotes, expandRecurringNotes, useDatesNotes) + MonthGrid + WeekGrid wiring + useNotes Gregorian recurring fix
+- **4.3 — Per-city candle lighting** ✅ (commits `a6f96fc`–`bce6f26`) — candleLightingOffset utility; Jerusalem 40 min, Haifa 30 min, Safed 40 min; offset shown in Zmanim UI when non-default; ZmanimList now shows candle lighting on Day screen
 
 **Upcoming agenda (priority order):**
 
@@ -156,6 +158,8 @@ In Phase 3.7b-1 we integrated `@hebcal/learning@5.1.2`. Three schedules that app
 Even lighter sketch — these are ideas, not commitments.
 
 - **Rabbanut shita (proper implementation)** — Phase 4.1 removed the RABBANUT option because the old code was silently computing GRA instead. If Rabbanut zmanim are needed in a future phase, implement them correctly: Rabbanut zmanim are GRA-based but with Jerusalem-specific adjustments and varying candle-lighting times per city (e.g., Jerusalem 40 min, Tel Aviv 20 min). Requires the location picker (Phase 4) to be complete first.
+- **Expanded city candle-lighting list (20+ cities worldwide)** — Phase 4.3 encodes three Israeli cities. A fuller list (Tel Aviv, Beer Sheva, Eilat, Bnei Brak, Netanya, major Diaspora cities) would require the `SPECIAL_CITIES` array in `candleLightingOffset.ts` to grow or be replaced with a proper lookup table. Coordinate with the location picker UX work.
+- **Havdalah custom selection** — currently `tzeitHakochavim` (8.5° geometric twilight) via Hebcal default. Some communities use Rabbeinu Tam (72 min after sunset) or the 50-minute convention. A per-user or per-location Havdalah preference needs the same offset/city-minhag pattern used for candle lighting.
 - iCloud / Google sync (would lean on the Google Calendar–compatible schema)
 - Widgets (iOS home screen, Android launcher)
 - Multi-location support (e.g., for travelers)

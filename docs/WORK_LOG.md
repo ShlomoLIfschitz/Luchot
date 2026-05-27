@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 4.3 (Per-city candle lighting)
+
+**Phase:** Phase 4.3
+**Commits:** `a6f96fc` (utility + ZmanimService), `bce6f26` (UI components)
+**Duration:** ~¼ session
+
+### What got done
+
+- **`src/utils/candleLightingOffset.ts`** — new pure utility. `getCandleLightingOffset(lat, lng)` returns `{ minutes, cityName?, cityNameHe? }`. Encodes three special cities via bounding-box radius (no haversine): Jerusalem 40 min, Haifa 30 min, Safed 40 min, default 18 min everywhere else. Exports `DEFAULT_CANDLE_OFFSET_MINUTES = 18` and the `CandleLightingOffsetResult` interface.
+
+- **`src/services/ZmanimService.ts`** — two optional fields added to `ZmanimResult`:
+  - `candleLightingOffsetMinutes?: number` — the offset used (set only on Fridays)
+  - `candleLightingCityNameHe?: string` — Hebrew city name (absent for default 18-min)
+  Candle lighting calculation routes through `getCandleLightingOffset(latitude, longitude)` before computing the time. Hardcoded `18 * 60 * 1000` replaced with `clOffset * 60 * 1000`. `NULL_ZMANIM` unchanged (optional fields default to undefined).
+
+- **`src/components/zmanim/ZmanimFullList.tsx`** — `candleBanner` time text wrapped in a `View` column; `offsetHint` Text shown below it when `candleLightingOffsetMinutes !== 18`. New `offsetHint` style added to StyleSheet (fontSize 11, marginTop 2).
+
+- **`src/components/zmanim/ZmanimList.tsx`** — candle lighting row ADDED (it was entirely absent; Day screen showed nothing on Fridays). Row is conditional on `zmanim.candleLighting`. Offset hint shown below the time when non-default. Row style changed to `alignItems: 'flex-start'` so the two-line value cell doesn't mis-align the label.
+
+- Typecheck green throughout.
+
+### Decisions made
+
+- **`ZmanimList` gap discovered**: the spec assumed a candle lighting row existed in the compact list; it didn't. Adding it fills a real UX gap (Day screen was blank for candle lighting on Fridays) rather than causing duplication. The row is self-contained and only renders on Fridays via the `candleLighting` null check.
+- **Commits 1 + 2 combined**: utility and ZmanimService are tightly coupled (utility is created solely as ZmanimService's dependency). Keeping them in one commit reduces noise without losing reversal granularity.
+- **Bounding-box vs haversine**: adequate accuracy for city-vs-default at Israeli scale. A 0.04–0.06° box captures each city proper. Adjacent settlements intentionally excluded (they often follow their own minhag).
+
+### Open issues / blocked
+
+- None from Phase 4.3. Broader city list and Havdalah customs deferred to Phase 5+ (documented in ROADMAP).
+
+### Next steps
+- Continue Phase 4 agenda: 4-A learning schedules expansion, location picker UX, notifications wiring.
+
+---
+
 ## 2026-05-27 — Session: Phase 4.2-2 (Notes UI integration in grids) — Phase 4.2 COMPLETE
 
 **Phase:** Phase 4.2-2 — UI integration sub-phase of Phase 4.2
