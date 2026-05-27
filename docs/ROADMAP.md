@@ -121,6 +121,9 @@ Goal: build the drawer that lives off the universal header. Contains: Week view 
 
 Phase 3 is complete. Phase 4 closes the remaining gap to MVP.
 
+**Completed in Phase 4:**
+- **4.1 — RABBANUT shita removal** ✅ (commits `3800eed`–`0370076` + docs) — `ZmanimMethod` narrowed to `'GRA' | 'MGA'`; ZmanimService is now single source of truth; SettingsProvider re-exports for backward compat; storage migration GRA/MGA/unknown → GRA; UI (settings + zmanim screens) updated.
+
 **Upcoming agenda (priority order):**
 
 1. **4-A — Learning schedules expansion** — see subsection below (requires @hebcal/core v6 upgrade)
@@ -152,6 +155,7 @@ In Phase 3.7b-1 we integrated `@hebcal/learning@5.1.2`. Three schedules that app
 
 Even lighter sketch — these are ideas, not commitments.
 
+- **Rabbanut shita (proper implementation)** — Phase 4.1 removed the RABBANUT option because the old code was silently computing GRA instead. If Rabbanut zmanim are needed in a future phase, implement them correctly: Rabbanut zmanim are GRA-based but with Jerusalem-specific adjustments and varying candle-lighting times per city (e.g., Jerusalem 40 min, Tel Aviv 20 min). Requires the location picker (Phase 4) to be complete first.
 - iCloud / Google sync (would lean on the Google Calendar–compatible schema)
 - Widgets (iOS home screen, Android launcher)
 - Multi-location support (e.g., for travelers)

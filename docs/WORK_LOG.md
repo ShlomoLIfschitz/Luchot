@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 4.1 (RABBANUT shita removal)
+
+**Phase:** Phase 4.1 — first sub-phase of Phase 4 (MVP polish)
+**Commits:** `3800eed` (ZmanimService type), `2cabd66` (SettingsProvider import + migration), `a4f5407` (settings.tsx UI), `0370076` (zmanim.tsx segmented control), + this docs commit
+**Duration:** ~½ session (carried over from context boundary)
+
+### What got done
+- **`src/services/ZmanimService.ts`** — `ZmanimMethod` narrowed from `'GRA' | 'MGA' | 'RABBANUT'` to `'GRA' | 'MGA'`. This is now the single source of truth for the type.
+- **`src/providers/SettingsProvider.tsx`** — removed local duplicate `ZmanimMethod` type definition; added `import type { ZmanimMethod }` from ZmanimService + `export type { ZmanimMethod }` (backward-compatible re-export for existing consumers). Added storage migration: stored `'RABBANUT'` coerced to `'GRA'` on load; any unexpected stored value also falls through to `'GRA'`.
+- **`app/settings.tsx`** — `zmanimLabel` ternary simplified to `zmanimMethod === 'MGA' ? 'מג״א' : 'גר״א'`; PickerModal options reduced to GRA + MGA (RABBANUT row removed); `onSelect` cast narrowed to `'GRA' | 'MGA'`.
+- **`app/(tabs)/zmanim.tsx`** — `SHITA_OPTIONS` reduced to 2 entries; segmented control now renders 2 segments.
+- Final verification: `grep -rn "RABBANUT|rabbanut" src/ app/` returns zero live type references (only the migration comment in SettingsProvider).
+- Typecheck green after every commit.
+
+### Decisions made
+- RABBANUT was functionally identical to GRA in the old code (the plag calculation already used GRA math for RABBANUT). Removing it loses no calculation fidelity.
+- Storage migration is in-memory only on load; value is written back to storage next time the user changes their zmanim preference. Write-back-on-migration deferred (low priority optimization).
+- ZmanimService is now the canonical source of truth for `ZmanimMethod`; SettingsProvider re-exports for backward compatibility — no downstream consumers needed updating.
+
+### Open issues / blocked
+- None from Phase 4.1. Phase 4 roadmap items continue per priority list in ROADMAP.md.
+
+### Next steps
+- Phase 4 priority order: 4-A learning schedules expansion (requires @hebcal/core v6 upgrade — plan carefully), location picker UX, notifications wiring.
+
+---
+
 ## 2026-05-27 — Session: Phase 3.7c (About + ScreenHeader date display) — Phase 3 CLOSED
 
 **Phase:** Phase 3.7c — FINAL sub-phase of Phase 3
