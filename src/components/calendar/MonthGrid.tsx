@@ -2,12 +2,10 @@
 // Phase 3.4 — mode made required; useRouter wired; second-tap and viewDay
 // quick action now navigate to the Day tab.
 // Phase 3.7a-2 — addNote and addRecurring quick actions wired to NoteEditor.
+// Phase 4.2-2 — useDatesNotes wired; user notes now appear as tags.
 //
 // Known limitations (intentional, deferred to later phases):
-//   1. User notes do not appear as tags — buildDayTags receives empty
-//      userNotes array. Batching strategy for per-cell notes deferred
-//      to Phase 4.
-//   2. addNote and addRecurring both open NoteEditor with default state
+//   1. addNote and addRecurring both open NoteEditor with default state
 //      (noteType: 'note'). The user selects the specific type via the
 //      editor's type chips. A direct preset would require a defaultNoteType
 //      prop on NoteEditor; deferred to Phase 4 polish.
@@ -27,7 +25,9 @@ import { DayData, toHebrewNumeral, toHebrewYear } from '../../services/DateServi
 import { buildDayTags } from '../../utils/tagMapper';
 import { NoteEditor } from '../notes/NoteEditor';
 import { useNotes } from '../../hooks/useNotes';
+import { useDatesNotes } from '../../hooks/useDatesNotes';
 import { dateService } from '../../services/DateService';
+import { formatDateKey } from '../../utils/dateUtils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
     () => dateService.getDayData(editorDate).hebrewDate,
     [editorDate],
   );
-  const { saveNote } = useNotes(editorDate);
+  const { saveNote, refreshKey } = useNotes(editorDate);
 
   // ── Grid construction ──────────────────────────────────────────────────────
   // Prepend empty cells to align the first day of the month correctly.
@@ -88,6 +88,23 @@ export function MonthGrid({ mode }: MonthGridProps) {
     const empties = Array(offset).fill(null);
     return [...empties, ...monthData];
   }, [monthData, firstDayOfWeek]);
+
+  // ── Notes for the displayed month ─────────────────────────────────────────
+  // Pass the full calendar-month range to useDatesNotes. The grid may show
+  // fewer rows (short months) or more (long months with offset), but the
+  // range is always [first day .. last day] of monthData — no padding cells
+  // from adjacent months are rendered, so this is the exact set we need.
+  const gridStart = useMemo(
+    () => (monthData.length ? monthData[0].gregorianDate                         : new Date()),
+    [monthData],
+  );
+  const gridEnd = useMemo(
+    () => (monthData.length ? monthData[monthData.length - 1].gregorianDate : new Date()),
+    [monthData],
+  );
+  // refreshKey from useNotes bumps after saveNote / deleteNote, causing
+  // useDatesNotes to re-fetch and the grid to update immediately.
+  const notesByDate = useDatesNotes(gridStart, gridEnd, refreshKey);
 
   // ── Date helpers ───────────────────────────────────────────────────────────
   const isSameDay = useCallback((a: Date, b: Date) => {
@@ -158,8 +175,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
     }
   });
 
-  // ── Cell renderer ──────────────────────────────────────────────────────────
-  // User notes are passed as [] — see file-level "Known limitations" comment.
+  // ── Cell renderer ─────────────────────────────────────────────────────────
   const renderItem = useCallback(
     ({ item, index }: { item: DayData | null; index: number }) => {
       if (!item) {
@@ -170,7 +186,9 @@ export function MonthGrid({ mode }: MonthGridProps) {
       const isToday    = isSameDay(item.gregorianDate, today);
       const isSelected = isSameDay(item.gregorianDate, selectedDate);
       const isFriday   = item.gregorianDate.getDay() === 5;
-      const tags       = buildDayTags(item, []); // userNotes deferred to Phase 4
+      const dayKey     = formatDateKey(item.gregorianDate);
+      const dayNotes   = notesByDate.get(dayKey) ?? [];
+      const tags       = buildDayTags(item, dayNotes);
 
       return (
         <View style={styles.cellWrapper}>
@@ -189,7 +207,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
         </View>
       );
     },
-    [today, selectedDate, getLabels, isSameDay, handleDayPress, handleDayLongPress],
+    [today, selectedDate, getLabels, isSameDay, handleDayPress, handleDayLongPress, notesByDate],
   );
 
   // ── Month title computation ────────────────────────────────────────────────
