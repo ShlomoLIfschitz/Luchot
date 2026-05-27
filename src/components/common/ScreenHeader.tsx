@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, StatusBar } from 'react-native';
-import { Menu } from 'lucide-react-native';
+import { Menu, ChevronDown } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -24,9 +24,12 @@ import {
 interface ScreenHeaderProps {
   title?: string;
   date?: Date;  // When provided, replaces title with compact bilingual date
+  /** When provided alongside `date`, wraps the date area in a Pressable
+   *  and shows a ChevronDown hint — tapping opens the date picker. */
+  onDatePress?: () => void;
 }
 
-export function ScreenHeader({ title, date }: ScreenHeaderProps) {
+export function ScreenHeader({ title, date, onDatePress }: ScreenHeaderProps) {
   const colors = useThemeColors();
   const openDrawer = useDrawerStore((s) => s.open);
   const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
@@ -70,15 +73,35 @@ export function ScreenHeader({ title, date }: ScreenHeaderProps) {
 
       <View style={styles.centerContent}>
         {date ? (
-          // Bilingual date display — compact two-line stack
-          <>
-            <Text style={[styles.dateLineLarge, { color: colors.textPrimary }]}>
-              {primaryLine}
-            </Text>
-            <Text style={[styles.dateLineSmall, { color: colors.textSecondary }]}>
-              {secondaryLine}
-            </Text>
-          </>
+          // Bilingual date display — compact two-line stack.
+          // When onDatePress is provided, wrap in a Pressable with a ChevronDown
+          // affordance so the user knows the date is tappable.
+          onDatePress ? (
+            <Pressable
+              onPress={onDatePress}
+              hitSlop={8}
+              style={styles.datePressable}
+              accessibilityLabel="בחר תאריך"
+              accessibilityRole="button"
+            >
+              <Text style={[styles.dateLineLarge, { color: colors.textPrimary }]}>
+                {primaryLine}
+              </Text>
+              <Text style={[styles.dateLineSmall, { color: colors.textSecondary }]}>
+                {secondaryLine}
+              </Text>
+              <ChevronDown size={12} color={colors.textTertiary} style={styles.chevron} />
+            </Pressable>
+          ) : (
+            <>
+              <Text style={[styles.dateLineLarge, { color: colors.textPrimary }]}>
+                {primaryLine}
+              </Text>
+              <Text style={[styles.dateLineSmall, { color: colors.textSecondary }]}>
+                {secondaryLine}
+              </Text>
+            </>
+          )
         ) : title ? (
           // Plain title fallback (screens that don't pass a date)
           <Text style={[styles.title, { color: colors.textPrimary }]}>
@@ -128,4 +151,8 @@ const styles = StyleSheet.create({
   rightSpacer: {
     width: 32, // matches menuButton footprint (24px icon + 2×4px padding) for centred content
   },
+
+  // Phase 4.4 — tappable date area (only rendered when onDatePress is provided)
+  datePressable: { alignItems: 'center' },
+  chevron: { marginTop: 2 },
 });
