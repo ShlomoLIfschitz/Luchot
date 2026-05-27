@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-05-27 — Session: Phase 4.4 (Date picker)
+
+**Phase:** Phase 4.4
+**Commits:** `1afc06d` (install), `f645d27` (hook), `413ac36` (ScreenHeader), `d729721` (day+zmanim), `936344f` (details+week)
+**Duration:** ~¼ session
+
+### What got done
+
+- **`@react-native-community/datetimepicker@8.0.1`** installed via `npx expo install` (Expo SDK 51 compatible).
+
+- **`src/hooks/useDatePicker.tsx`** — new platform-aware hook returning `{ openPicker, picker }`:
+  - **iOS:** bottom-sheet Modal with a spinner `DateTimePicker` (locale `he`). Changes accumulate in `tempDate`; only committed to the parent's `onChange` when the user presses "אישור". "ביטול" and backdrop tap dismiss without change.
+  - **Android:** native calendar dialog mounted on demand. After selection or dismiss the component unmounts so the dialog doesn't re-open on the next render cycle.
+
+- **`src/components/common/ScreenHeader.tsx`** — added `onDatePress?: () => void` prop. When provided alongside `date`, wraps the bilingual date display in a `Pressable` with a 12 pt `ChevronDown` below it. Screens that don't pass `onDatePress` are unaffected.
+
+- **Four screens wired:**
+  - `app/(tabs)/day.tsx` — `useDatePicker(selectedDate, setSelectedDate)`; `onDatePress={openPicker}`; `{picker}` rendered outside ScrollView
+  - `app/(tabs)/zmanim.tsx` — same pattern
+  - `app/details.tsx` — same pattern
+  - `app/week.tsx` — same pattern; also added `setSelectedDate` subscription (was previously read-only for `selectedDate`)
+
+- Typecheck green throughout all 5 commits.
+
+### Decisions made
+
+- **`tempDate` accumulate-then-commit on iOS** (not immediate onChange): avoids thrashing `setSelectedDate` on every spinner tick, which would cause expensive per-frame rerenders in ZmanimService (which recomputes on date change).
+- **Backdrop tap = dismiss without change** (same as ביטול): consistent with iOS system sheet conventions.
+- **`picker` outside ScrollView**: Modal and native dialogs must not be inside ScrollView to avoid z-index/hit-test issues on Android.
+- **Android `visible` state drives mount/unmount** of the picker component: the standard approach — mounting triggers the native dialog, unmounting after selection avoids re-show on next render.
+
+### Open issues / blocked
+
+- None from Phase 4.4.
+
+### Next steps
+
+- Continue Phase 4 agenda per ROADMAP: Location picker UX, notifications, learning schedules expansion.
+
+---
+
 ## 2026-05-27 — Session: Phase 4.3 (Per-city candle lighting)
 
 **Phase:** Phase 4.3

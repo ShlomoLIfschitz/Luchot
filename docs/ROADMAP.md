@@ -125,6 +125,7 @@ Phase 3 is complete. Phase 4 closes the remaining gap to MVP.
 - **4.1 — RABBANUT shita removal** ✅ (commits `3800eed`–`0370076` + docs)
 - **4.2 — Notes-in-grids** ✅ (commits `aa57d57`–`c62f2eb`) — batch data layer (getNotesInRange, getAllRecurringNotes, expandRecurringNotes, useDatesNotes) + MonthGrid + WeekGrid wiring + useNotes Gregorian recurring fix
 - **4.3 — Per-city candle lighting** ✅ (commits `a6f96fc`–`bce6f26`) — candleLightingOffset utility; Jerusalem 40 min, Haifa 30 min, Safed 40 min; offset shown in Zmanim UI when non-default; ZmanimList now shows candle lighting on Day screen
+- **4.4 — Date picker** ✅ (commits `1afc06d`–`936344f`) — useDatePicker hook (iOS spinner modal + Android native dialog); ScreenHeader onDatePress + ChevronDown affordance; wired into Day, Zmanim, Details, Week screens
 
 **Upcoming agenda (priority order):**
 
