@@ -20,6 +20,7 @@ import { dateService, toHebrewNumeral, toHebrewYear } from '../../src/services/D
 import type { ZmanimMethod } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
+import { useDatePicker } from '../../src/hooks/useDatePicker';
 
 const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
   { value: 'GRA', label: 'גר״א' },
@@ -32,6 +33,10 @@ export default function ZmanimScreen() {
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
 
   const zmanim = useZmanim(selectedDate);
+
+  // Date picker — Phase 4.4
+  const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
+
   const zmanimMethod = useSettingsStore((s) => s.zmanimMethod);
   const setZmanimMethod = useSettingsStore((s) => s.setZmanimMethod);
 
@@ -68,7 +73,7 @@ export default function ZmanimScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader date={selectedDate} />
+        <ScreenHeader date={selectedDate} onDatePress={openPicker} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -126,6 +131,9 @@ export default function ZmanimScreen() {
           {/* Full zmanim list — all 14 times + candle/havdalah banners */}
           <ZmanimFullList zmanim={zmanim} preferredMethod={zmanimMethod} />
         </ScrollView>
+
+        {/* Date picker — Phase 4.4; rendered outside ScrollView */}
+        {picker}
       </View>
     </GestureDetector>
   );

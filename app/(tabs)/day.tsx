@@ -35,6 +35,7 @@ import {
 } from '../../src/services/DateService';
 import { radius } from '../../src/constants/radius';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
+import { useDatePicker } from '../../src/hooks/useDatePicker';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
 
@@ -50,6 +51,9 @@ export default function DayScreen() {
   );
 
   const zmanim = useZmanim(selectedDate);
+
+  // Date picker — Phase 4.4
+  const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
 
   // Notes for this day.
   const { notes, saveNote } = useNotes(selectedDate);
@@ -106,7 +110,7 @@ export default function DayScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader date={selectedDate} />
+        <ScreenHeader date={selectedDate} onDatePress={openPicker} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -258,6 +262,9 @@ export default function DayScreen() {
           onClose={closeNoteEditor}
           onSave={saveNote}
         />
+
+        {/* Date picker — Phase 4.4; rendered outside ScrollView */}
+        {picker}
       </View>
     </GestureDetector>
   );
