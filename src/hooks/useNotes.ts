@@ -4,6 +4,7 @@ import { StorageService } from '../services/StorageService';
 import { CalendarEvent, NoteCategory } from '../schemas/EventSchema';
 import { generateUUID } from '../utils/dateUtils';
 import type { HebrewDateInfo } from '../services/DateService';
+import { expandRecurringNotes } from '../utils/expandRecurringNotes';
 
 export type NoteType = 'note' | 'birthday' | 'yahrzeit' | 'anniversary';
 
@@ -47,17 +48,38 @@ export function useNotes(date: Date | null) {
     const d: Date = date;
     async function load() {
       const hdate = new HDate(d);
-      const [gregEvents, hebEvents] = await Promise.all([
+      const [gregEvents, hebEvents, recurringEvents] = await Promise.all([
         StorageService.getEventsForGregorianDate(d),
         StorageService.getEventsForHebrewDate(hdate.getDate(), hdate.getMonth()),
+        // Fetch all recurring notes so we can expand Gregorian recurring ones
+        // to this specific date. Hebrew recurring are already returned by
+        // getEventsForHebrewDate above; the id-keyed merge below deduplicates.
+        StorageService.getAllRecurringNotes(),
       ]);
+
+      // Primary path: dedup gregEvents + hebEvents (unchanged behaviour)
       const seen = new Set<string>();
-      const all = [...gregEvents, ...hebEvents].filter(e => {
+      const primary = [...gregEvents, ...hebEvents].filter(e => {
         if (seen.has(e.id)) return false;
         seen.add(e.id);
         return true;
       });
-      setNotes(all.map(eventToCalendarNote));
+      const existingNotes = primary.map(eventToCalendarNote);
+
+      // Secondary path: expand recurring notes to this day.
+      // Fixes Gregorian recurring notes (birthday/yahrzeit saved with
+      // calendarType: 'gregorian') which previously only fired on their
+      // original start_date and never on subsequent years.
+      const recurringNotes = recurringEvents.map(eventToCalendarNote);
+      const instances = expandRecurringNotes(recurringNotes, d, d);
+
+      // Merge by id — Hebrew recurring notes are already in existingNotes
+      // via getEventsForHebrewDate and are naturally deduplicated here.
+      const combinedById = new Map<string, CalendarNote>();
+      for (const n of existingNotes)       combinedById.set(n.id, n);
+      for (const inst of instances)        combinedById.set(inst.note.id, inst.note);
+
+      setNotes(Array.from(combinedById.values()));
     }
     load().catch(console.error);
   }, [date?.getTime(), refreshKey]);
