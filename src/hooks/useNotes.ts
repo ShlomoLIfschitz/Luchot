@@ -130,5 +130,5 @@ export function useNotes(date: Date | null) {
     setRefreshKey(k => k + 1);
   }, []);
 
-  return { notes, saveNote, deleteNote };
+  return { notes, saveNote, deleteNote, refreshKey };
 }
