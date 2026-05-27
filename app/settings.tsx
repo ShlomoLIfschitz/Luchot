@@ -23,7 +23,6 @@ import {
   CalendarDays,
   Clock,
   MapPin,
-  Bell,
 } from 'lucide-react-native';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
@@ -164,7 +163,7 @@ export default function SettingsScreen() {
   const colors = useThemeColors();
   const {
     hebrewOnTop, diaspora, use24hTime,
-    darkMode, zmanimMethod, firstDayOfWeek, omerReminders,
+    darkMode, zmanimMethod, firstDayOfWeek,
     toggleHebrewOnTop,
     setDarkMode, setZmanimMethod, setFirstDayOfWeek,
     setDiaspora: setSettingsDiaspora,
@@ -307,27 +306,6 @@ export default function SettingsScreen() {
             onPress={onUseDeviceLocation}
             right={
               <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-            }
-            isLast
-          />
-        </View>
-
-        {/* ── התראות ── */}
-        <SectionHeader title="התראות" colors={colors} />
-        <View style={[styles.card, { borderColor: colors.border }]}>
-          <SettingRow
-            Icon={Bell}
-            label="תזכורת ספירת העומר"
-            colors={colors}
-            right={
-              <Switch
-                value={omerReminders}
-                onValueChange={(v) => {
-                  useSettingsStore.setState({ omerReminders: v });
-                  useSettingsStore.getState().save('omerReminders', String(v));
-                }}
-                trackColor={trackColor}
-              />
             }
             isLast
           />
