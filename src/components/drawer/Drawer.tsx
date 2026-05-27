@@ -34,6 +34,7 @@ import {
   Clock,
   Library,
   Settings as SettingsIcon,
+  Info,
 } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -202,6 +203,12 @@ export function Drawer() {
               Icon={SettingsIcon}
               label="הגדרות"
               onPress={() => navigateTo('/settings')}
+            />
+            {/* NEW in 3.7c — final item */}
+            <DrawerItem
+              Icon={Info}
+              label="אודות"
+              onPress={() => navigateTo('/about')}
             />
           </View>
         </Animated.View>
