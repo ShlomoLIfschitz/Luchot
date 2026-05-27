@@ -192,8 +192,7 @@ export default function SettingsScreen() {
 
   const themeLabel =
     darkMode === 'system' ? 'לפי המכשיר' : darkMode === 'dark' ? 'כהה' : 'בהיר';
-  const zmanimLabel =
-    zmanimMethod === 'GRA' ? 'גר״א' : zmanimMethod === 'MGA' ? 'מג״א' : 'רבנות';
+  const zmanimLabel = zmanimMethod === 'MGA' ? 'מג״א' : 'גר״א';
 
   const trackColor = { false: colors.border, true: colors.accent };
 
@@ -354,12 +353,11 @@ export default function SettingsScreen() {
         visible={zmanimPicker}
         title="שיטת חישוב זמנים"
         options={[
-          { label: 'גר״א',  value: 'GRA' },
-          { label: 'מג״א',  value: 'MGA' },
-          { label: 'רבנות', value: 'RABBANUT' },
+          { label: 'גר״א', value: 'GRA' },
+          { label: 'מג״א', value: 'MGA' },
         ]}
         selected={zmanimMethod}
-        onSelect={(v) => setZmanimMethod(v as 'GRA' | 'MGA' | 'RABBANUT')}
+        onSelect={(v) => setZmanimMethod(v as 'GRA' | 'MGA')}
         onClose={() => setZmanimPicker(false)}
         colors={colors}
       />
