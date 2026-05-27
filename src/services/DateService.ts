@@ -257,6 +257,28 @@ export class DateService {
   }
 
   /**
+   * Convert a Hebrew calendar date (year/month/day) to its Gregorian
+   * equivalent.
+   *
+   * Returns null if the date is invalid for the given Hebrew year — e.g.,
+   * month 13 (Adar II) in a non-leap year, or a day out of range for
+   * that month. This cleanly handles "Feb 29 equivalents" in the Hebrew
+   * calendar without throwing.
+   *
+   * Used by expandRecurringNotes (Phase 4.2-1) to compute the Gregorian
+   * date that a Hebrew-anchored recurring note (birthday, yahrzeit,
+   * anniversary) falls on in any given year.
+   */
+  hebrewToGregorian(hebYear: number, hebMonth: number, hebDay: number): Date | null {
+    try {
+      const hd = new HDate(hebDay, hebMonth, hebYear);
+      return hd.greg();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get Hebrew date for "after sunset" — returns next Hebrew day
    */
   getAfterSunsetHebrewDate(date: Date): HebrewDateInfo {
