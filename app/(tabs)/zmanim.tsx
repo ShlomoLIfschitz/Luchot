@@ -22,9 +22,8 @@ import { radius } from '../../src/constants/radius';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 
 const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
-  { value: 'GRA',      label: 'גר״א' },
-  { value: 'MGA',      label: 'מג״א' },
-  { value: 'RABBANUT', label: 'רבנות' },
+  { value: 'GRA', label: 'גר״א' },
+  { value: 'MGA', label: 'מג״א' },
 ];
 
 export default function ZmanimScreen() {
