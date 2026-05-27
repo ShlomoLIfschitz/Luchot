@@ -294,17 +294,30 @@ const styles = StyleSheet.create({
     gap: 12,
     minHeight: 60,
   },
-  rowContent: { flex: 1 },
-  rowLabel:   { fontSize: 11, fontWeight: '500', marginBottom: 2 },
-  rowValue:   { fontSize: 15, fontWeight: '500' },
+  rowContent: {
+    flex: 1,
+    flexShrink: 1,  // yields space to button rather than compressing text
+  },
+  rowLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 2,
+    textAlign: 'right',  // Hebrew label anchors to right edge
+  },
+  rowValue: {
+    fontSize: 15,
+    fontWeight: '500',
+    textAlign: 'right',  // Hebrew value anchors to right edge
+  },
 
   linkBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,  // reduced: button stays compact
     paddingVertical: 6,
     borderRadius: radius.md,
+    flexShrink: 0,  // button keeps its natural size; text area yields instead
   },
   linkText: { fontSize: 12, fontWeight: '600' },
 });

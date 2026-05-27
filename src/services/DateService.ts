@@ -121,7 +121,7 @@ function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningI
   const event = DailyLearning.lookup(scheduleName, hd, il);
   if (!event) return undefined;
 
-  const display = event.render('he');
+  const rawDisplay = event.render('he');
   // url() may not exist on all schedule events; defensive check guards against
   // future schedule additions in @hebcal/learning that might not expose a URL.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,7 +129,14 @@ function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningI
     ? (event as any).url() as string
     : undefined;
 
-  if (!display || !url) return undefined;
+  if (!rawDisplay || !url) return undefined;
+
+  // Strip leading English prefix like "Daf Yomi: " or "Mishna Yomi: " —
+  // the Details screen already shows a Hebrew label on each row, so the
+  // bilingual prefix is redundant and compresses the Hebrew display text.
+  // Pattern: one or more ASCII letters/spaces followed by ":" + optional space.
+  const display = rawDisplay.replace(/^[A-Za-z][A-Za-z\s]*:\s*/, '').trim();
+  if (!display) return undefined; // guard against full-English edge case
 
   return { display, url };
 }
