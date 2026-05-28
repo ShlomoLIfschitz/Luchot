@@ -10,6 +10,7 @@ import { useCalendarStore } from '../src/providers/CalendarProvider';
 import { useLocationStore } from '../src/providers/LocationProvider';
 import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
+import { NotificationService } from '../src/services/NotificationService';
 
 export default function RootLayout() {
   const darkMode = useSettingsStore((s) => s.darkMode);
@@ -22,10 +23,12 @@ export default function RootLayout() {
       await Promise.all([
         useSettingsStore.getState().loadFromStorage(),
         useLocationStore.getState().loadFromStorage(),
+        NotificationService.init(),
       ]);
       const diaspora = useSettingsStore.getState().diaspora;
       dateService.setDiaspora(diaspora);
       useCalendarStore.getState().refreshMonth();
+      await NotificationService.ensureAnnualReminders();
     }
     init().catch(console.error);
   }, []);
