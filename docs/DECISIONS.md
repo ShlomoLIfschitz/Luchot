@@ -98,3 +98,23 @@
 - Implications: The reminder-to-export feature rides on the same NotificationService
   built for Omer/candle-lighting/event reminders. All notifications are local
   (expo-notifications scheduled locally), never push, never server-driven.
+
+## NotificationRecord schema includes renewal and recurrence fields (schema-only)
+- Date: 2026-05-28
+- Context: NotificationRecordSchema was being defined in Phase 5 Wave 1. The
+  user locked additional fields before the schema was finalized, to avoid a
+  future SQLite migration when renewal logic is eventually built.
+- Choice: `NotificationRecordSchema` includes `recurrence` (none/daily/weekly,
+  default 'none'), `renewalPolicy` (never/annual/september, default 'never'),
+  `lastConfirmedAt` (optional date), and `color` (optional token key from
+  DESIGN.md tag colors). These fields are SCHEMA-ONLY — no renewal logic is
+  implemented in Wave 1.
+- Alternatives considered: Add fields when logic is built — rejected; would
+  require a SQLite migration on real user data, which is high-risk.
+- Implications: When the renewal feature is built, it must respect this schema
+  contract. Renewal behavior: 'annual' fires one year after `createdAt` or
+  `lastConfirmedAt`; 'september' fires Sept 1 annually (school-year reset).
+  Both have a ~30-day grace period (recently-confirmed notifications not
+  re-prompted). Ignored prompts do NOT auto-cancel the notification. The
+  `color` field stores the token KEY (e.g. 'tagHoliday'), not a raw hex —
+  the UI layer resolves keys via `src/constants/colors.ts`.

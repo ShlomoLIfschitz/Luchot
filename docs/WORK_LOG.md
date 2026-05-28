@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-05-28 — Session: Phase 5 Wave 1 — NotificationService Foundation
+
+**Phase:** Phase 5, Wave 1
+**Commits:** `7341dfb` (NotificationService API), `3d76164` (NotificationSchema), `fa9ecae` (permission UI + settings)
+**Status:** Wave 1 complete. DoD passed (typecheck green, expo-doctor 16/17 — baseline).
+
+### What got done
+
+- **Schema added mid-session:** User locked `NotificationRecordSchema` fields before agent dispatch. Final schema includes 4 additional fields beyond the original spec: `recurrence` (enum: none/daily/weekly, default 'none'), `renewalPolicy` (enum: never/annual/september, default 'never'), `lastConfirmedAt` (optional date), `color` (optional token key enum from DESIGN.md tag colors). These fields are schema-only — no renewal logic implemented yet.
+
+- **`local-data-builder` → `src/services/NotificationService.ts`** (7341dfb):
+  - `init()` made async; Android notification channel setup added (default channel, HIGH importance, `#4A90D9` light color — justified hex use: Android native channel definition, not RN styling).
+  - 5 new methods: `getPermissionStatus()`, `scheduleLocalNotification({id, title, body, triggerDate, data?})`, `cancelNotification(id)`, `cancelAll()`, `getScheduled()`.
+  - All existing methods unchanged.
+
+- **`local-data-builder` → `src/schemas/NotificationSchema.ts`** (3d76164): New file. Exports `NotificationType`, `NotificationTagColor`, `NotificationRecurrence`, `NotificationRenewalPolicy` enums and `NotificationRecordSchema` Zod schema with inferred `NotificationRecord` type.
+
+- **`mobile-ui-builder` → `src/hooks/useNotificationPermission.ts`** (fa9ecae): New hook. Reads status on mount, prompts if undetermined, opens Settings app (`Linking.openSettings`) if denied. Returns `{status, isGranted, isDenied, isUndetermined, request, refresh}`. Note: `PermissionStatus` imported as type from `expo-modules-core` (re-export from `expo-notifications` is type-only; runtime comparisons use string literals).
+
+- **`mobile-ui-builder` → `app/settings.tsx`** (fa9ecae): Added "התראות" section after "זמנים". Bell icon row shows live permission status: `מופעל` / `לא הופעל` / `חסום — פתח הגדרות`. Tap calls `permission.request()` which branches on current status.
+
+- **Pre-flight finding:** `expo-notifications ~0.28.0` was already installed; `expo-notifications` plugin was already in `app.json`. No install step needed, no app.json changes required.
+
+- **Pre-flight finding:** `NotificationService.init()` is not called anywhere yet. It will need to be wired into `app/_layout.tsx` when the notification system is activated (Wave 2+).
+
+### Decisions made
+
+- `renewalPolicy`, `recurrence`, `lastConfirmedAt`, `color` fields added to schema proactively — architecture logged in DECISIONS.md (see "Notification renewal schema fields").
+- `zod` is a transitive dependency, not a direct one. Flagged by local-data-builder. Architect-level decision — carry forward to Phase 5 dep-policy review.
+
+### Open issues / blocked
+
+- `NotificationService.init()` is not called anywhere. Must be wired into `app/_layout.tsx` before notifications can fire. This is a Wave 2 task (out of Wave 1 scope).
+- Renewal logic (`renewalPolicy`, `lastConfirmedAt`) is schema-only — no implementation. Intentional; schema fields exist to avoid a future SQLite migration.
+
+### Next steps
+
+- Wave 2: wire `NotificationService.init()` into root layout; implement event reminder scheduling UI; Omer reminder settings toggle.
+- Dep-policy: decide whether `zod` should be an explicit direct dependency in `package.json`.
+- EAS build quota resets 2026-06-01 — first APK build available then.
+
+---
+
 ## 2026-05-27 — Session: EAS APK distribution setup — BLOCKED on quota until June 1
 
 **Phase:** Post-Phase-4.7 — APK distribution
