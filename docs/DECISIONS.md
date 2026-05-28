@@ -64,3 +64,37 @@
   to make v14 work — rejected; out of scope, heavier risk.
 - Implications: StorageService uses the legacy API. A future SDK upgrade (Phase 5+)
   may revisit this.
+
+## Google Calendar interoperability is one-way via .ics files (not live sync)
+- Date: 2026-05-28
+- Context: User wants Luchot events to reach Google Calendar and vice versa. True
+  two-way sync requires a backend, OAuth, and network calls — which would break the
+  "offline-first, no backend ever" decision.
+- Choice: One-way interoperability through .ics files, both directions. EXPORT writes
+  an .ics file and hands it to the Android share sheet (user picks Google Calendar /
+  Drive / email as the destination). IMPORT reads an .ics file the user opens with or
+  selects in Luchot, and adds the events to local SQLite. No network calls, no OAuth,
+  no background sync — Google is merely a share target / file source.
+- Alternatives considered: Two-way live sync (backend + OAuth) — rejected; breaks
+  offline-first, the core product identity. No interoperability at all — rejected;
+  user explicitly wants it.
+- Implications: This does NOT violate "no backend ever" — .ics is a file, not a
+  network call. The EventSchema is already Google-Calendar-compatible, so .ics
+  mapping is direct. Future two-way sync remains possible (add OAuth atop the existing
+  schema) but is a separate, explicitly-reopened decision if ever pursued.
+
+## Notifications and export are user-triggered, never autonomous background actions
+- Date: 2026-05-28
+- Context: A "remind me to export to Google" capability is wanted, but anything the
+  app does on its own on a timer (auto-export, background sync) would erode the
+  offline-first / no-background-network posture.
+- Choice: The app may REMIND the user to act (a local notification: "you have N new
+  events since last export — export now?"), but the user always performs the actual
+  export/import manually. The app reminds; the user executes. No data leaves the
+  device, and no file is written or shared, without an explicit user action.
+- Alternatives considered: Auto-export on a schedule — rejected; that's background
+  autonomous behavior. No reminders at all — rejected; loses the "don't forget to
+  sync" value the user wanted, which is cheap to add atop NotificationService.
+- Implications: The reminder-to-export feature rides on the same NotificationService
+  built for Omer/candle-lighting/event reminders. All notifications are local
+  (expo-notifications scheduled locally), never push, never server-driven.
