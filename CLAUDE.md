@@ -223,6 +223,8 @@ Example:
 > Contracts: extend `src/schemas/` with a `ReminderSchema`; reuse EventSchema fields where they overlap.
 > DoD: hook returns Zod-validated data, parameterized queries only, tsc green, works offline by definition."
 
+**Standing rule for any settings-related delegation:** When briefing `local-data-builder` to add or change a persisted setting, the brief MUST state that the new field has to be wired in BOTH `save()` AND `loadFromStorage()` in StorageService. This is the `use24hTime` persistence bug — a setting wired in only one place silently fails to persist across restarts. It is not obvious from reading the code. Always call it out explicitly.
+
 ---
 
 ### 📁 Project Structure
