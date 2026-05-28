@@ -1,10 +1,11 @@
 // src/services/NotificationService.ts
 
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { getZmanim } from './ZmanimService';
 
 export class NotificationService {
-  static init() {
+  static async init(): Promise<void> {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
@@ -12,6 +13,15 @@ export class NotificationService {
         shouldSetBadge: false,
       }),
     });
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Luchot',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#4A90D9',
+      });
+    }
   }
 
   static async requestPermissions(): Promise<boolean> {
@@ -78,5 +88,56 @@ export class NotificationService {
       trigger: { date: triggerDate },
     });
     return id;
+  }
+
+  /**
+   * Returns the current notification permission status without prompting the user.
+   */
+  static async getPermissionStatus(): Promise<Notifications.PermissionStatus> {
+    const result = await Notifications.getPermissionsAsync();
+    return result.status;
+  }
+
+  /**
+   * Schedules a single local notification at the given date.
+   * Returns the notification identifier (equals params.id).
+   */
+  static async scheduleLocalNotification(params: {
+    id: string;
+    title: string;
+    body: string;
+    triggerDate: Date;
+    data?: Record<string, unknown>;
+  }): Promise<string> {
+    return Notifications.scheduleNotificationAsync({
+      identifier: params.id,
+      content: {
+        title: params.title,
+        body: params.body,
+        data: params.data ? { ...params.data } : undefined,
+      },
+      trigger: { date: params.triggerDate },
+    });
+  }
+
+  /**
+   * Cancels a single scheduled notification by its identifier.
+   */
+  static async cancelNotification(id: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(id);
+  }
+
+  /**
+   * Cancels all scheduled notifications.
+   */
+  static async cancelAll(): Promise<void> {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  }
+
+  /**
+   * Returns all currently scheduled notifications.
+   */
+  static async getScheduled(): Promise<Notifications.NotificationRequest[]> {
+    return Notifications.getAllScheduledNotificationsAsync();
   }
 }
