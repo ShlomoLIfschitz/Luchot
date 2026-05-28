@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Modal, View, Text, TextInput, Pressable, StyleSheet,
+  Modal, View, Text, TextInput, Pressable, StyleSheet, Switch,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { radius } from '../../constants/radius';
@@ -11,6 +11,14 @@ import type { ThemeColors } from '../../hooks/useThemeColors';
 import type { NoteType, CalendarNote } from '../../hooks/useNotes';
 import type { HebrewDateInfo } from '../../services/DateService';
 import { toHebrewNumeral, toHebrewYear } from '../../services/DateService';
+
+const LEAD_TIME_OPTIONS: { label: string; minutes: number }[] = [
+  { label: 'בזמן האירוע', minutes: 0 },
+  { label: '10 דקות לפני', minutes: 10 },
+  { label: 'שעה לפני', minutes: 60 },
+  { label: 'יום לפני', minutes: 1440 },
+  { label: 'מותאם אישית', minutes: -1 },
+];
 
 const NOTE_TYPES: { type: NoteType; label: string; icon: string }[] = [
   { type: 'note',        label: 'הערה',      icon: '📝' },
@@ -33,6 +41,7 @@ interface Props {
     calendarType: 'hebrew' | 'gregorian';
     date: Date;
     hebrewDate: HebrewDateInfo;
+    reminderMinutes?: number | null;
   }) => void;
   onClose: () => void;
 }
@@ -41,19 +50,34 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const [summary, setSummary] = useState('');
   const [noteType, setNoteType] = useState<NoteType>('note');
   const [calendarType, setCalendarType] = useState<'hebrew' | 'gregorian'>('hebrew');
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderMinutes, setReminderMinutes] = useState<number>(0);
+  const [customMinutes, setCustomMinutes] = useState<string>('30');
 
   useEffect(() => {
     if (visible) {
       setSummary(note?.summary ?? '');
       setNoteType(note?.noteType ?? 'note');
       setCalendarType(note?.calendarType ?? 'hebrew');
+      const existingMinutes = note?.reminderMinutes ?? null;
+      setReminderEnabled(existingMinutes !== null);
+      setReminderMinutes(existingMinutes ?? 0);
+      setCustomMinutes(String(existingMinutes ?? 30));
     }
   }, [visible, note]);
 
   const handleSave = () => {
     const trimmed = summary.trim();
     if (!trimmed) return;
-    onSave({ id: note?.id, created: note?.created, summary: trimmed, noteType, calendarType, date, hebrewDate });
+    const finalReminderMinutes: number | null = (() => {
+      if (!reminderEnabled) return null;
+      if (reminderMinutes === -1) {
+        const parsed = parseInt(customMinutes, 10);
+        return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+      }
+      return reminderMinutes;
+    })();
+    onSave({ id: note?.id, created: note?.created, summary: trimmed, noteType, calendarType, date, hebrewDate, reminderMinutes: finalReminderMinutes });
     onClose();
   };
 
@@ -133,6 +157,66 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                   </>
                 )}
 
+                {/* ── תזכּר אותי ── */}
+                <View style={s.reminderToggleRow}>
+                  <Switch
+                    value={reminderEnabled}
+                    onValueChange={setReminderEnabled}
+                    trackColor={{ false: colors.border, true: colors.accent }}
+                  />
+                  <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                    תזכּר אותי
+                  </Text>
+                </View>
+
+                {reminderEnabled && (
+                  <>
+                    <View style={s.leadTimeRow}>
+                      {LEAD_TIME_OPTIONS.map(({ label, minutes }) => {
+                        const isCustom = minutes === -1;
+                        const active = isCustom
+                          ? reminderMinutes < 0 || !LEAD_TIME_OPTIONS.slice(0, -1).some(o => o.minutes === reminderMinutes)
+                          : reminderMinutes === minutes;
+                        return (
+                          <Pressable
+                            key={label}
+                            onPress={() => {
+                              if (isCustom) {
+                                setReminderMinutes(-1);
+                              } else {
+                                setReminderMinutes(minutes);
+                              }
+                            }}
+                            style={[
+                              s.leadChip,
+                              { borderColor: colors.border, backgroundColor: colors.background },
+                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                            ]}
+                          >
+                            <Text style={[s.leadChipLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                              {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {reminderMinutes === -1 && (
+                      <View style={s.customRow}>
+                        <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                          דקות לפני:
+                        </Text>
+                        <TextInput
+                          style={[s.customInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
+                          value={customMinutes}
+                          onChangeText={setCustomMinutes}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                        />
+                      </View>
+                    )}
+                  </>
+                )}
+
                 <View style={s.actions}>
                   <Pressable onPress={onClose} style={[s.btn, { borderColor: colors.border }]}>
                     <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
@@ -171,4 +255,41 @@ const s = StyleSheet.create({
   btn: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   btnSave: { borderWidth: 0 },
   btnText: { fontSize: 15, fontWeight: '600' },
+  reminderToggleRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  leadTimeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  leadChip: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  leadChipLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  customRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  customInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    width: 70,
+    fontSize: 14,
+    textAlign: 'center',
+  },
 });
