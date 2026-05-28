@@ -21,6 +21,7 @@ import { CalendarEvent } from '../schemas/EventSchema';
 
 let db: SQLiteDatabase | null = null;
 let schemaInitialized = false;
+let schemaV2Migrated = false;
 
 function getDb(): SQLiteDatabase {
   if (!db) {
@@ -62,6 +63,18 @@ async function ensureSchema(): Promise<void> {
       `CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT)`,
       [],
     );
+    // v2 migration: add reminder_minutes column (additive, safe on existing data)
+    if (!schemaV2Migrated) {
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN reminder_minutes INTEGER',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      schemaV2Migrated = true;
+    }
   });
   schemaInitialized = true;
 }
@@ -106,7 +119,7 @@ export class StorageService {
     await ensureSchema();
     const ext = event.hebrewExtensions;
     await dbRun(
-      `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         event.id, event.summary, event.description ?? null,
         event.start.date ?? null, event.start.dateTime ?? null,
@@ -120,6 +133,7 @@ export class StorageService {
         event.colorId ?? null,
         event.created, event.updated,
         ext.notificationScheduled ? 1 : 0,
+        event.reminders?.overrides?.[0]?.minutes ?? null,
       ],
     );
   }
@@ -247,6 +261,18 @@ export class StorageService {
         afterSunset: row.after_sunset === 1,
         notificationScheduled: row.notification_scheduled === 1,
       },
+      reminders: row.reminder_minutes != null
+        ? { useDefault: false, overrides: [{ method: 'popup' as const, minutes: row.reminder_minutes }] }
+        : { useDefault: false },
     };
+  }
+
+  static async getEventsWithReminders(): Promise<CalendarEvent[]> {
+    await ensureSchema();
+    const rows = await dbAll(
+      `SELECT * FROM events WHERE reminder_minutes IS NOT NULL AND status != 'cancelled'`,
+      [],
+    );
+    return rows.map(StorageService.rowToEvent);
   }
 }
