@@ -344,7 +344,7 @@ Specs:
 - Width: 80% of screen, max 320px
 - Background: surface
 - Overlay (rest of screen): rgba(0,0,0,0.45)
-- Slide direction: from right (RTL)
+- Slide direction: from left (hamburger is top-left; anchored left:0, initial translateX -drawerWidth)
 - Animation: 250ms ease-out
 - Item height: 48px
 - Item padding: lg (16px) horizontal
@@ -383,8 +383,9 @@ Specs:
 
 ### RTL Behavior
 
-All layouts use `flexDirection: 'row'` with `I18nManager.isRTL = true` for Hebrew users. Specific notes:
+**RTL layout (LOCKED — see DECISIONS.md):** Hebrew RTL rows use `flexDirection: 'row-reverse'` explicitly. Do NOT rely on `flexDirection: 'row'` auto-flipping via `I18nManager.isRTL`, and do NOT use CSS/transform mirroring (`scaleX: -1`) — both are banned (the `scaleX` hack breaks gesture events and accessibility). The first JSX child renders on the right; fix wrong icon/text order by swapping JSX child order, not by adding flips. Add explicit `gap` between a `flex: 1` Hebrew label and an adjacent value so they don't touch. Prefer explicit dimensions over Yoga inference for row heights.
 
+Additional notes:
 - **Text alignment:** `right` for Hebrew, `left` for Latin
 - **Icons:** Direction-sensitive icons (arrows, back) flip automatically
 - **Calendar grid:** Day-of-week order is RTL (שבת on left, ראשון on right)
@@ -524,7 +525,7 @@ lg: 16,    xl: 20,   xxl: 24,  xxxl: 32
 - טאב פעיל: accent, טאב לא פעיל: textTertiary
 
 **תפריט המבורגר:**
-- מחליק מימין (RTL)
+- מחליק משמאל (הכפתור ממוקם שמאל-עליון; anchored left:0)
 - רוחב 80% מהמסך, max 320px
 - overlay רגיל מאחור
 
@@ -542,7 +543,7 @@ lg: 16,    xl: 20,   xxl: 24,  xxxl: 32
 
 ### התנהגות RTL
 
-כל הפריסות משתמשות ב-`flexDirection: 'row'` עם `I18nManager.isRTL = true` למשתמשים בעברית.
+**RTL (נעול — ראה DECISIONS.md):** שורות RTL עבריות משתמשות ב-`flexDirection: 'row-reverse'` במפורש. אסור להסתמך על auto-flip של `flexDirection: 'row'` עם `I18nManager.isRTL`, ואסור להשתמש ב-`scaleX: -1` — שתי הגישות הישנות אסורות (גרמו לאשכול הבאגים של Phase 4.7). הילד הראשון ב-JSX נוחת מימין; לתקן סדר icon/text שגוי — מחליפים סדר JSX, לא מוסיפים flips. להוסיף `gap` מפורש בין label בעל `flex: 1` לערך סמוך. להעדיף ממדים מפורשים על הסקת Yoga.
 
 הערות עיקריות:
 - **יישור טקסט:** ימינה לעברית, שמאלה ללטינית
