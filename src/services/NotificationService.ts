@@ -2,7 +2,9 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { HDate } from '@hebcal/core';
 import { getZmanim } from './ZmanimService';
+import { StorageService } from './StorageService';
 
 export class NotificationService {
   static async init(): Promise<void> {
@@ -139,5 +141,72 @@ export class NotificationService {
    */
   static async getScheduled(): Promise<Notifications.NotificationRequest[]> {
     return Notifications.getAllScheduledNotificationsAsync();
+  }
+
+  /**
+   * Sweep-on-init model: on each app start, ensure the next occurrence of every
+   * recurring reminder is scheduled. No on-delivery rescheduling — this sweep
+   * fills any gap left by cancellation, timezone shifts, or first-run.
+   * Recurring event IDs are owned solely by this method; saveNote does NOT
+   * schedule recurring reminders to prevent double-schedule / stale-date collisions.
+   */
+  static async ensureAnnualReminders(): Promise<void> {
+    const events = await StorageService.getEventsWithReminders();
+    const recurring = events.filter(e =>
+      e.hebrewExtensions.recurrenceType === 'yearly_hebrew' ||
+      e.hebrewExtensions.recurrenceType === 'yearly_gregorian',
+    );
+
+    const scheduled = await NotificationService.getScheduled();
+    const scheduledIds = new Set(scheduled.map(n => n.identifier));
+
+    for (const event of recurring) {
+      const reminderMinutes = event.reminders?.overrides?.[0]?.minutes;
+      if (reminderMinutes == null) continue;
+
+      let occurrence: Date | undefined;
+
+      if (event.hebrewExtensions.recurrenceType === 'yearly_gregorian') {
+        const [, monthStr, dayStr] = (event.start.date ?? '').split('-');
+        const month = parseInt(monthStr, 10) - 1; // JS months are 0-indexed
+        const day = parseInt(dayStr, 10);
+        const now = new Date();
+        let candidate = new Date(now.getFullYear(), month, day);
+        if (candidate <= now) candidate = new Date(now.getFullYear() + 1, month, day);
+        occurrence = candidate;
+      } else {
+        // yearly_hebrew
+        const heb = event.hebrewExtensions.hebrewDate;
+        if (!heb) continue; // skip malformed events
+        const now = new Date();
+        const currentHYear = new HDate(now).getFullYear();
+        for (const tryYear of [currentHYear, currentHYear + 1]) {
+          try {
+            const hdate = new HDate(heb.day, heb.month, tryYear);
+            const greg = hdate.greg();
+            if (greg > now) { occurrence = greg; break; }
+          } catch { continue; }
+        }
+        if (!occurrence) continue; // skip if can't compute
+      }
+
+      const triggerDate = new Date(
+        occurrence.getFullYear(), occurrence.getMonth(), occurrence.getDate(),
+        9, 0, 0, 0, // 09:00 local
+      );
+      triggerDate.setMinutes(triggerDate.getMinutes() - reminderMinutes);
+
+      // Skip if trigger is in the past
+      if (triggerDate <= new Date()) continue;
+
+      if (!scheduledIds.has(event.id)) {
+        await NotificationService.scheduleLocalNotification({
+          id: event.id,
+          title: event.summary,
+          body: `תזכורת: ${event.summary}`,
+          triggerDate,
+        });
+      }
+    }
   }
 }
