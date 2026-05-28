@@ -131,6 +131,8 @@ When the Architect's prompt describes a feature, follow this order. Skip stages 
 
 If a sub-agent needs to modify a file outside its ownership, it must STOP and report to you. You then either re-delegate to the correct owner or ask the user.
 
+**Resolving `src/hooks/` ownership (the split isn't always obvious):** Classify by the hook's PRIMARY purpose. If it primarily reads/writes storage or computes business logic (e.g. `useZmanim`, `useNotes`), it belongs to `local-data-builder`. If it primarily manages display state or user interaction (e.g. `useDatePicker`, animation/gesture hooks), it belongs to `mobile-ui-builder`. A hook that calls a service only to format output for one screen is a UI hook. When still genuinely ambiguous, the orchestrator (Claude Code) decides and notes the call in WORK_LOG — do not let two agents both edit the same hook.
+
 ---
 
 ### ✅ Definition of Done (Release Gate — YOU run this, not sub-agents)
