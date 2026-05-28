@@ -1,7 +1,6 @@
-# CLAUDE.md — Operating Instructions for Claude Code
+# CLAUDE.md — Operating Instructions for Claude Code (Luchot)
 
 > This file tells Claude Code how to work on the Luchot project. Read it at the start of every session, before doing anything else.
-
 > קובץ זה מסביר לקלוד קוד איך לעבוד על פרויקט Luchot. קרא אותו בתחילת כל session, לפני כל פעולה אחרת.
 
 ---
@@ -12,56 +11,215 @@
 
 **Luchot** — A bilingual Hebrew/Gregorian calendar app for iOS and Android, built with React Native and Expo Router.
 
-- **Stack:** React Native 0.74, Expo SDK 51, TypeScript, Expo Router, Zustand, SQLite (expo-sqlite), @hebcal/core, kosher-zmanim
-- **Architecture:** Offline-first, no backend, no account. All data is local (SQLite). See `VISION.md`.
-- **Status:** In transition from v1 (partial implementation, parchment theme) to v2 (full redesign inspired by standard Israeli Hebrew calendar apps).
+- **Stack:** React Native 0.74.5, Expo SDK 51, TypeScript (strict), Expo Router, Zustand, SQLite (`expo-sqlite/legacy`), @hebcal/core (v5.x pinned), kosher-zmanim, react-native-svg, lucide-react-native
+- **Architecture:** Offline-first, no backend, no account, no network. All data is local (SQLite). See `VISION.md`.
+- **Status:** Post-MVP (`mvp-1.0.0` tagged). Phases 4.5–4.7 closed. APK distribution in progress (EAS Build, preview profile). Phase 5 backlog defined in ROADMAP.
 - **Language:** UI is Hebrew RTL with parallel Gregorian. Code comments and docs can be English.
 
 ---
 
 ### 🚨 Start-of-Session Checklist (DO THIS FIRST)
 
-Before touching any code, read the following files in this order:
+Before touching any code, read these files in order (all live under `docs/`):
 
-1. `VISION.md` — What Luchot is, who it's for, what it must never be
-2. `SCREENS.md` — The complete screen map, interactions, and navigation
-3. `DESIGN.md` — Color tokens, typography, spacing, component specs
-4. `WORK_LOG.md` — What was done in the previous session, what's open, what's blocked
-5. `ROADMAP.md` — Current phase, what to work on next
+1. `docs/VISION.md` — What Luchot is, who it's for, what it must never be
+2. `docs/SCREENS.md` — The complete screen map, interactions, and navigation
+3. `docs/DESIGN.md` — Color tokens, typography, spacing, component specs
+4. `docs/WORK_LOG.md` — What was done in the previous session, what's open, what's blocked
+5. `docs/ROADMAP.md` — Current phase, what to work on next
+6. `docs/DECISIONS.md` — Locked architectural decisions and their rationale (new — created alongside this update)
 
-**Do not skip step 4.** If `WORK_LOG.md` says "open issue: X", do not start something unrelated until X is resolved or explicitly deferred.
+**Do not skip steps 4 and 6.** If `WORK_LOG.md` says "open issue: X", do not start something unrelated until X is resolved or explicitly deferred. If `DECISIONS.md` locks a choice, do not revisit it unless the user explicitly reopens it.
 
 ---
 
-### 🤝 Working with the Architect Claude
+### 🧭 Orchestration Model — Two Layers of Planning
 
-There is **another Claude** running in a separate conversation. That Claude is the architect/planner. You are the executor.
+This project runs with a **two-layer orchestration model**. Understand your place in it.
 
-**Division of roles:**
-| Architect Claude (other conversation) | Claude Code (you) |
-|---|---|
-| Vision, design decisions, UX | Implementation, edits, builds |
-| Writes specs (VISION/SCREENS/DESIGN) | Reads specs and follows them |
-| Plans roadmap | Executes roadmap items |
-| Coordinates with user about direction | Reports technical findings to user |
+```
+User (orchestrator / bridge)
+   │
+   ├──> Architect Claude (separate chat) — meta-planner
+   │        • Receives your final reports (pasted by user)
+   │        • Writes long, precise, structured prompts
+   │        • Owns strategy, vision, cross-session context
+   │
+   └──> Claude Code (YOU) — sub-agent orchestrator
+            • Receives the Architect's prompt (pasted by user)
+            • Decomposes it and delegates to sub-agents
+            • Runs the Definition of Done gate
+            • Reports back up to the user → Architect
+                │
+                ├──> mobile-ui-builder    (UI, screens, RTL, components)
+                ├──> local-data-builder   (SQLite access, hooks, schemas)
+                ├──> database-architect   (schema, migrations on real devices)
+                └──> [test-engineer, security-auditor — dormant, see roster]
+```
 
-The user is the bridge. The user will send you specific prompts from the Architect. Follow them precisely. If a prompt is ambiguous or seems to conflict with the spec files, **stop and ask before proceeding** — do not improvise.
+**Your job (Claude Code):** You are the project-level orchestrator. The Architect's prompt is your task spec. You decompose it, delegate to the right sub-agents per the roster and ownership table below, integrate their output, run the DoD gate, and produce one consolidated report for the user to paste back to the Architect.
+
+**You do NOT write feature code directly when a sub-agent owns that area.** Your direct work is: planning, delegation, integration verification, running checks, and state-keeping (docs).
+
+---
+
+### 🤖 Active Sub-Agent Roster
+
+Sub-agents live in `~/.claude/agents/` (global). For **this project**, the active roster is:
+
+| Agent | Status | Owns |
+|---|---|---|
+| `mobile-ui-builder` | ✅ Active | `app/`, `src/components/`, `src/hooks/` (UI hooks), `src/navigation/`, mobile config (`app.json`*, `metro.config.js`, `babel.config.js`) |
+| `local-data-builder` | ✅ Active | `src/services/` (data access), `src/providers/` (Zustand stores), `src/schemas/`, data hooks |
+| `database-architect` | ✅ Active | SQLite schema definitions, migration/upgrade logic, `docs/SCHEMA.md` |
+| `test-engineer` | 💤 Dormant | `tests/`, `*.test.*` — **not active yet.** Activate only when the user decides to start writing tests (ROADMAP Phase 5+). Until then, do not invoke. |
+| `security-auditor` | 💤 Dormant | READ-ONLY. Profile: `mobile-local-only`. Low priority (no network attack surface). Invoke only for AsyncStorage hygiene / privacy review when explicitly asked. |
+
+> *`app.json` and `eas.json` are sensitive (see Do-Not list). `mobile-ui-builder` may READ them but must ask the user before any edit.*
+
+❌ **Not for this project:** `web-ui-builder`, `api-builder`, `baas-integrator` (Luchot has no web target, no custom backend, no BaaS).
+
+**Security profile:** `mobile-local-only`. No server-side checks. Focus areas if/when auditing: sensitive data never in AsyncStorage (it's plaintext), parameterized SQLite queries, privacy (no data leaves device), no accidental network calls.
 
 ---
 
 ### 🛑 Autonomy Rules (CRITICAL)
 
-The user has explicitly requested **approval before any task**.
+The user has explicitly requested **approval before any task** — this applies to YOU and to every sub-agent you dispatch.
 
-**This means:**
-- Before starting any code change, file creation, refactor, or non-trivial edit — ask the user
-- Acceptable to do without asking: reading files, running `npm run typecheck`, listing directories, searching for usages
-- Not acceptable without asking: editing files, creating files, deleting files, running `npm install`, modifying configs
+**Without asking, allowed:** reading files, `npm run typecheck`, listing directories, searching usages, planning a delegation.
+
+**Requires explicit user approval first:** editing files, creating files, deleting files, `npm install` / adding dependencies, modifying any config (`app.json`, `eas.json`, `metro.config.js`, `babel.config.js`, `tsconfig.json`), running `eas build`, dispatching a sub-agent to perform writes.
 
 **How to ask:**
-> "I'm about to do X (e.g., 'add BackHandler integration to RootLayout, ~10 lines'). Should I proceed?"
+> "Plan: delegate to `local-data-builder` → add `useReminders` hook + reminders table read layer (~2 files, ~80 lines). Then `mobile-ui-builder` for the settings toggle. Proceed?"
 
-Wait for explicit "yes" / "go" / "כן" before executing.
+State the delegation plan, the agents involved, and the rough scope. Wait for explicit "yes" / "go" / "כן" before executing.
+
+---
+
+### 🔁 Execution Sequence (per feature)
+
+When the Architect's prompt describes a feature, follow this order. Skip stages that don't apply.
+
+1. **Clarify** — If the prompt is ambiguous or conflicts with a spec file or a locked decision → STOP, report to user, don't improvise.
+2. **Log** — Note the task as in-progress (mention in your plan; full entry goes to WORK_LOG at close).
+3. **Schema layer** (if data model changes) → `database-architect`. Defines tables + **migration/upgrade logic that runs on app launch against real user data**. This is critical — there are real installs with real data.
+4. **Schema/types (Zod + TS)** → `local-data-builder` defines/updates `src/schemas/`.
+5. **Data layer** → `local-data-builder` — services, query helpers, hooks. Each result validated before reaching UI.
+6. **UI** → `mobile-ui-builder` — screens/components, consuming types from `src/schemas/`. May start in parallel with step 7 once schemas are locked.
+7. **Tests** → `test-engineer` — **dormant; skip unless activated.**
+8. **Security review** → `security-auditor` — dormant; skip unless explicitly requested.
+9. **Integration Gate** → YOU run the Definition of Done (below).
+10. **Close** → update WORK_LOG.md, ROADMAP.md (if shifted), DECISIONS.md (if a new architectural choice was made), then commit.
+
+> Stages 3–5 are sequential (data shape must settle before consumers build on it). Stage 6 can overlap stage 5 only after the schema is locked.
+
+---
+
+### 📦 Artifact Ownership (prevents collisions)
+
+| Owner | Owns (read + write) |
+|---|---|
+| `database-architect` | SQLite schema, migration/version logic, `docs/SCHEMA.md` |
+| `local-data-builder` | `src/services/`, `src/providers/`, `src/schemas/`, data hooks, `docs/API.md` (data-layer hook docs) |
+| `mobile-ui-builder` | `app/`, `src/components/`, `src/hooks/` (UI), `src/navigation/`, `src/constants/` (tokens — coordinate with DESIGN.md) |
+| `test-engineer` | `tests/`, `*.test.*` (dormant) |
+| `security-auditor` | READ-ONLY |
+| Claude Code (you, as orchestrator) | `docs/` (WORK_LOG, ROADMAP, DECISIONS), `CLAUDE.md` |
+| Sensitive (user approval each time) | `app.json`, `eas.json`, `package.json`, native config |
+
+If a sub-agent needs to modify a file outside its ownership, it must STOP and report to you. You then either re-delegate to the correct owner or ask the user.
+
+---
+
+### ✅ Definition of Done (Release Gate — YOU run this, not sub-agents)
+
+Before declaring ANY task complete, run via Bash and confirm exit code 0:
+
+```bash
+npm run typecheck      # tsc --noEmit — the contract validator. MUST pass.
+npm run lint           # if a lint script exists; skip if not configured
+npx expo-doctor        # MUST be 16/16. Catches what typecheck CANNOT: missing/
+                       # mismatched native peer deps. This is non-negotiable — it
+                       # runs every task, even when dependencies were not touched.
+# npm test             # ONLY when test-engineer is active (currently dormant)
+```
+
+**Why `expo-doctor` is mandatory in the DoD:** `tsc` validates TYPES, not the
+presence of native modules. In the 4.7→APK arc, `react-native-svg` was a missing
+peer dep of `lucide-react-native`. typecheck passed green (the types ship with the
+library), but the standalone APK crashed on first icon render because the native
+module wasn't installed. Expo Go had silently bundled its own copy, masking the gap.
+`expo-doctor`'s peer-dependency check is the ONLY gate in this list that catches this
+class of bug — the one most likely to pass every other check and still crash in
+production. Treat any failure as release-blocking.
+
+If a dependency was added or changed in the task, ALSO run:
+```bash
+npx expo install --check   # verifies installed versions match SDK 51; reports drift
+```
+Use `npx expo install <pkg>` (never `npm install <pkg>`) so the SDK-compatible
+version is chosen.
+
+For **data-layer / schema changes**, add manual verification:
+- Run the app with existing data present (upgrade scenario), confirm migration applies cleanly and no data loss.
+- Confirm queries return expected shapes (validation doesn't throw).
+
+For **anything touching the build** (rare; user-approved): the EAS preview build must pass `expo doctor` (16/16) before queuing — a missing peer dep that Expo Go masks will crash a standalone APK (this is exactly what happened in the 4.7→APK arc with `react-native-svg`).
+
+If any check fails: identify the owner from the ownership table, delegate the fix with the **exact error text**, re-run the failing check. Do not proceed until green.
+
+---
+
+### 📝 State Discipline (docs mapping)
+
+Luchot keeps its own doc set — **do not** introduce `PROGRESS.md` (that's a generic-template name). The mapping is:
+
+- **`WORK_LOG.md`** — session log (most-recent-first). The "what happened" record. Append at session close.
+- **`ROADMAP.md`** — phases and backlog. Update when a phase closes or priorities shift.
+- **`docs/DECISIONS.md`** — locked architectural decisions with rationale. Append whenever a non-trivial architectural choice is made. Format:
+  ```markdown
+  ## [Decision title]
+  - Date: YYYY-MM-DD
+  - Context: [why this came up]
+  - Choice: [what we picked]
+  - Alternatives considered: [what we rejected and why]
+  - Implications: [what this affects]
+  ```
+- **`docs/SCHEMA.md`** — human-readable DB schema (owned by `database-architect`).
+- **`docs/API.md`** — data-layer hook documentation (owned by `local-data-builder`; "API" here means the internal data hooks, since there is no network API).
+
+WORK_LOG entry format (unchanged):
+```markdown
+## [YYYY-MM-DD]
+### What was done
+- <bullets, including which sub-agent did what>
+### Decisions made
+- <decisions affecting future work; cross-reference DECISIONS.md if architectural>
+### Open issues / blocked
+- <in-progress or stuck>
+### Next steps
+- <next session>
+```
+
+---
+
+### 🤝 Delegation Protocol
+
+When dispatching a sub-agent, always provide four things:
+
+1. **Context** — relevant locked decisions (from DECISIONS.md) and current state (from WORK_LOG).
+2. **Task** — specific and bounded ("add `useReminders(date)` hook returning Zod-validated rows"), not vague ("work on reminders").
+3. **Contracts** — point to the exact schema/types in `src/schemas/` the agent must respect or produce.
+4. **DoD for this task** — what output proves it's done.
+
+Example:
+> "local-data-builder: implement the reminders read layer.
+> Context: offline-first, `expo-sqlite/legacy` API only (locked — see DECISIONS.md). EventSchema stays Google-Calendar-compatible.
+> Task: add `reminders` query helpers + `useReminders(date)` hook.
+> Contracts: extend `src/schemas/` with a `ReminderSchema`; reuse EventSchema fields where they overlap.
+> DoD: hook returns Zod-validated data, parameterized queries only, tsc green, works offline by definition."
 
 ---
 
@@ -69,7 +227,7 @@ Wait for explicit "yes" / "go" / "כן" before executing.
 
 ```
 luchot/
-├── app/                          # Expo Router screens (routes)
+├── app/                          # Expo Router screens (routes)  [mobile-ui-builder]
 │   ├── _layout.tsx               # Root layout, providers init
 │   └── (tabs)/                   # Tab navigator group
 │       ├── _layout.tsx           # Tab bar config
@@ -80,407 +238,166 @@ luchot/
 │       └── settings.tsx          # Settings (hamburger access)
 │
 ├── src/
-│   ├── components/
-│   │   ├── calendar/             # Month grid, day cell, day modal
-│   │   ├── notes/                # Note editor, note list
-│   │   ├── zmanim/               # Zmanim display
-│   │   └── ui/                   # Shared UI primitives (Tag, Button, etc.)
-│   │
-│   ├── constants/
-│   │   ├── colors.ts             # ⚠️ Color tokens from DESIGN.md
-│   │   ├── typography.ts         # Type scale
-│   │   ├── spacing.ts            # Spacing system
-│   │   └── config.ts             # App-wide constants
-│   │
-│   ├── hooks/                    # Custom hooks (useZmanim, useNotes, etc.)
-│   ├── providers/                # Zustand stores (Calendar, Settings, Location)
-│   ├── schemas/                  # TypeScript types (EventSchema, etc.)
-│   ├── services/                 # Business logic (DateService, ZmanimService, StorageService)
-│   └── utils/                    # Helpers (dateUtils, hebrewUtils)
+│   ├── components/               # [mobile-ui-builder]  calendar/ notes/ zmanim/ ui/
+│   ├── constants/                # [mobile-ui-builder]  colors.ts typography.ts spacing.ts config.ts  (mirror DESIGN.md)
+│   ├── hooks/                    # UI hooks [mobile-ui-builder]; data hooks [local-data-builder]
+│   ├── providers/                # [local-data-builder]  Zustand stores (Calendar, Settings, Location)
+│   ├── schemas/                  # [local-data-builder]  TS types + Zod (EventSchema, ...)
+│   ├── services/                 # [local-data-builder]  DateService, ZmanimService, StorageService
+│   └── utils/                    # helpers (dateUtils, hebrewUtils)
 │
-├── docs/                         # Architecture docs
-│   ├── VISION.md
-│   ├── SCREENS.md
-│   ├── DESIGN.md
-│   ├── ROADMAP.md
-│   └── WORK_LOG.md
-│
-├── CLAUDE.md                     # This file
-├── package.json
-└── ...
+├── docs/                         # [Claude Code orchestrator]  all .md docs live here
+│   ├── VISION.md  SCREENS.md  DESIGN.md      (stable specs)
+│   ├── ROADMAP.md  WORK_LOG.md               (living state)
+│   └── DECISIONS.md  SCHEMA.md  API.md       (DECISIONS new; SCHEMA/API as needed)
+├── CLAUDE.md                     # This file (project root)
+├── eas.json                      # ⚠️ sensitive — ask before edit
+├── app.json                      # ⚠️ sensitive — ask before edit
+└── package.json
 ```
 
 ---
 
 ### 💻 Coding Conventions
 
-#### File naming
-- Components: `PascalCase.tsx` (e.g., `DayCell.tsx`)
-- Hooks: `camelCase.ts` starting with `use` (e.g., `useZmanim.ts`)
-- Services: `PascalCase.ts` ending with `Service` (e.g., `DateService.ts`)
-- Utils: `camelCase.ts` (e.g., `dateUtils.ts`)
-- Constants/config: `camelCase.ts` (e.g., `colors.ts`)
+**File naming:** Components `PascalCase.tsx`; hooks `camelCase.ts` (`use…`); services `PascalCase.ts` (`…Service`); utils/constants `camelCase.ts`.
 
-#### Imports
-- Use absolute imports from `src/` when possible (e.g., `from 'src/hooks/useZmanim'`)
-- Group imports: React → external libs → internal → types
-- Avoid barrel files (`index.ts` re-exports) — direct imports are clearer
+**Imports:** absolute from `src/` when possible; group React → external → internal → types; no barrel files.
 
-#### TypeScript
-- Strict mode is on. `npm run typecheck` must pass before any commit.
-- Avoid `any`. If unavoidable, comment why.
-- Prefer `type` over `interface` for unions/intersections; `interface` for object shapes
-- Export types alongside the component/function that uses them
+**TypeScript:** strict on. `npm run typecheck` must pass before any commit. Avoid `any` (comment if unavoidable). `type` for unions/intersections, `interface` for object shapes.
 
-#### State management
-- **Zustand stores** for global state (calendar, settings, location)
-- **React hooks** (useState, useEffect) for local component state
-- **No Context API for now** — Zustand handles it cleanly
+**State:** Zustand for global (calendar, settings, location); React hooks for local; no Context API.
 
-#### Styling
-- Use `StyleSheet.create` (not inline styles)
-- Pull all colors, fonts, spacing from `src/constants/` (which mirrors `DESIGN.md`)
-- Avoid hardcoded values — if a number isn't in spacing tokens, ask if it should be added
+**Styling:** `StyleSheet.create`, never inline (locked — not NativeWind). All colors/fonts/spacing pulled from `src/constants/` (mirrors DESIGN.md). No rogue hex codes — if a value isn't a token, ask whether to add it.
 
-#### React Native specifics
-- Always test on Android (this is the primary target platform)
-- Respect RTL: use `flexDirection: 'row'` (auto-flips), `textAlign: 'right'` for Hebrew
-- Use `Pressable` over `TouchableOpacity` for new code
-- For lists: prefer `@shopify/flash-list` over `FlatList` for performance
+---
+
+### 🔄 RTL — Hebrew Right-to-Left (LOCKED, read carefully)
+
+This is the single highest-risk area in Luchot. **Every one of the six bugs fixed in Phase 4.7 was RTL/layout-related.** The rule:
+
+- **Use `flexDirection: 'row-reverse'` for Hebrew RTL rows. Do NOT rely on `flexDirection: 'row'` auto-flip, and do NOT use CSS transforms.** (This supersedes any older guidance that said "row auto-flips" — that approach caused the 4.7 bug cluster.)
+- For Hebrew reading order, the first child should land on the **right**. When an icon+text row reads wrong, the fix is usually swapping JSX child order, not adding flips.
+- `textAlign: 'right'` for Hebrew text.
+- The drawer slides from the **left** (hamburger is top-left). Anchor `left: 0`, initial `translateX = -drawerWidth`.
+- Hebrew text with `flex: 1` right-aligns to the container edge — add explicit `gap` between label and value so they don't touch (the Zmanim row bug).
+- When in doubt about a layout direction, mentally trace it on an Android device, and prefer explicit dimensions over Yoga inference (the MonthGrid `weekRow` height bug: an empty style let Yoga resolve row height to ~0; explicit `height` broke the cycle).
+
+---
+
+### ⚛️ React Native Specifics
+
+- **Primary target is Android.** Always reason about Android first; test there.
+- Use `Pressable` over `TouchableOpacity` for new code.
+- **Lists:** `@shopify/flash-list` is preferred for long scrolling lists. **Exception:** MonthGrid was deliberately rebuilt as a manual `View` grid (not a list) for mode-aware RTL/LTR control — do not "optimize" it back into a list.
+- Async UI handles 5 states: loading, error, empty, success, **offline** (offline is trivially "always available" here since data is local, but still show sensible empty/error states).
+- Touch targets ≥ 48dp. Use `SafeAreaView` / insets where it matters.
+- Platform-specific code via `Platform.OS` or `.android.tsx`/`.ios.tsx`, not runtime hacks.
 
 ---
 
 ### 🌳 Git Workflow
 
-#### Branches
-- **Work directly on `main`.** No feature branches.
-- Reasoning: solo project, no PRs, no code review. Branches would add overhead without benefit.
-
-#### Commits
-- **Commit at the end of each logical unit of work**, not at the end of session
-- A "logical unit" = one bug fix, one feature, one refactor — something that could be reverted independently
-- Examples of good commits:
-  - `fix: handle Android hardware back button in DayModal`
-  - `feat: add candle lighting time to Zmanim screen`
-  - `refactor: extract Tag component from DayCell`
-  - `chore: update color tokens to match DESIGN.md`
-- Examples of bad commits:
-  - `wip` (too vague)
-  - `lots of changes` (too broad)
-  - `fix typo + add feature + refactor` (mixed)
-
-#### Commit message format
-```
-<type>: <short summary>
-
-<optional body explaining what and why, not how>
-```
-Types: `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`
-
-#### Pushing
-- Push at the end of each session: `git push`
-- Never `--force` push
+- **Work directly on `main`.** No feature branches (solo project, no PRs).
+- **Commit per logical unit** (one fix / feature / refactor — independently revertable), not per session.
+- Message format: `<type>: <short summary>` + optional body (what & why, not how). Types: `feat fix refactor chore docs style test`.
+- ✅ `fix: handle Android hardware back button in DayModal`  ❌ `wip`, `lots of changes`, mixed commits.
+- Push at session end: `git push`. **Never** `--force`.
 
 ---
 
 ### 📝 End-of-Session Checklist
 
-Before ending any session, do these in order:
-
-1. **Run typecheck:**
-   ```bash
-   npm run typecheck
-   ```
-   If errors — fix them. Don't end a session with broken types.
-
-2. **Update `WORK_LOG.md`** with today's entry:
-   ```markdown
-   ## [YYYY-MM-DD]
-   ### What was done
-   - <bullet list of completed work>
-   ### Decisions made
-   - <any decisions that affect future work>
-   ### Open issues / blocked
-   - <anything left in-progress or stuck>
-   ### Next steps
-   - <what should happen next session>
-   ```
-
-3. **Update `ROADMAP.md`** if anything shifted (item completed, item added, priority changed)
-
-4. **Commit any uncommitted work:**
-   ```bash
-   git status                          # See what's pending
-   git add .
-   git commit -m "session: <date> - <summary>"
-   git push
-   ```
-
-5. **Tell the user**: "Session done. Pushed N commits. Open items: ..."
+1. `npm run typecheck` — fix any errors; never end with broken types.
+2. Update `WORK_LOG.md` (format above), noting which sub-agents did what.
+3. Update `ROADMAP.md` if anything shifted.
+4. Append to `docs/DECISIONS.md` if a new architectural choice was made.
+5. Commit uncommitted work (`git add . && git commit && git push`).
+6. Report to user: "Session done. Pushed N commits. Sub-agents used: … Open items: …"
 
 ---
 
 ### 🚫 Things You Must NOT Do
 
-- **Do not** modify files in `node_modules/` directly (use patches if needed)
-- **Do not** delete `kosher-zmanim-0.9.0.tgz` even though it's an orphan — confirm with user first
-- **Do not** add new dependencies without asking
-- **Do not** change the schema (`src/schemas/EventSchema.ts`) without architect approval — it's Google Calendar compatible by design
-- **Do not** modify `app.json` or `eas.json` without asking
-- **Do not** commit `.env` files or anything with secrets
-- **Do not** rewrite `DateService.ts`, `ZmanimService.ts`, or `StorageService.ts` wholesale — they are working and tested. Add to them; don't replace
-- **Do not** introduce a backend, API client, or analytics library — Luchot is offline-first by core principle (see VISION.md)
-- **Do not** use parchment colors, warm browns, or "Judaica" decorative elements — see DESIGN.md philosophy
+- **Do not** revisit locked decisions (see `docs/DECISIONS.md`) unless the user reopens them. The locked set: offline-first / no backend ever; `EventSchema.ts` stays Google-Calendar-compatible; 4 bottom tabs + hamburger drawer; `@hebcal/core` pinned to v5.x (v6 deferred to Phase 5); `flexDirection: 'row-reverse'` for Hebrew RTL; `expo-sqlite/legacy` import path (for Expo Go compatibility).
+- **Do not** modify `node_modules/` directly (use patches).
+- **Do not** delete `kosher-zmanim-0.9.0.tgz` (orphan) without confirming.
+- **Do not** add dependencies without asking. If a peer dep is missing, surface it (`npx expo install --check`) and ask — don't silently install.
+- **Do not** change `src/schemas/EventSchema.ts` without architect approval — Google Calendar compatible by design.
+- **Do not** modify `app.json` or `eas.json` without asking.
+- **Do not** commit `.env` or secrets.
+- **Do not** rewrite `DateService.ts`, `ZmanimService.ts`, or `StorageService.ts` wholesale — they work and are battle-tested. Add to them; don't replace.
+- **Do not** introduce a backend, API client, or analytics — offline-first by core principle.
+- **Do not** use parchment colors, warm browns, or "Judaica" decorative elements — see DESIGN.md.
+- **Do not** invoke `test-engineer` or `security-auditor` while they're dormant (see roster) unless the user activates them.
 
 ---
 
 ### ⚠️ Known Issues / Quirks
 
-- `kosher-zmanim` 0.9.x ships with extensionless ESM imports. The `scripts/patch-expo-sqlite-imports.cjs` postinstall script handles this for `expo-sqlite`. If you add new dependencies that have similar issues, you may need to patch them similarly.
-- `@gorhom/bottom-sheet` v4 does NOT handle Android hardware back button natively. Always wire it manually with `BackHandler` (see SCREENS.md > "Hardware Back Button" section).
-- `use24hTime` setting was previously not persisted across restarts. **This is the kind of bug to watch for** — when adding new settings, verify both `save()` AND `loadFromStorage()` reference it.
+- `kosher-zmanim` 0.9.x ships extensionless ESM imports. `scripts/patch-expo-sqlite-imports.cjs` (postinstall) handles `expo-sqlite`. Similar new deps may need similar patches.
+- SQLite uses the **`expo-sqlite/legacy`** entry point (classic v13 path: `openDatabase` + `transactionAsync`/`executeSqlAsync`). The non-legacy v14 API (`openDatabaseAsync`/`openDatabaseSync`) routes through a native module not present in Expo Go and will crash there. (Locked — DECISIONS.md.)
+- `react-native-svg` is a required peer dep of `lucide-react-native`. Expo Go bundles its own copy, which masks the dependency — but a standalone APK needs it installed explicitly, or it crashes on first icon render. `expo doctor` must be 16/16 before any EAS build.
+- `@gorhom/bottom-sheet` v4 does NOT handle the Android hardware back button. Always wire `BackHandler` manually (see SCREENS.md).
+- New settings must be referenced in **both** `save()` and `loadFromStorage()` (the `use24hTime` persistence bug). Watch for this whenever adding a setting.
 
 ---
 
-### 🧪 Testing & Verification
+### 🧪 Testing & Verification (current state)
 
-Currently no automated tests. For now, verification is:
+No automated tests yet — `test-engineer` is dormant. Verification is:
+1. `npm run typecheck` — must pass.
+2. Manual test on Android — describe what was tested in WORK_LOG.
+3. Visual check against DESIGN.md tokens (no rogue hex codes).
 
-1. `npm run typecheck` — must pass
-2. Manual test on Android device/emulator — describe what was tested in WORK_LOG
-3. Visual check that styling matches DESIGN.md tokens (no rogue hex codes)
-
-Adding Jest + RNTL is on the roadmap for Phase 2.
+Activating Jest + React Native Testing Library is a Phase 5 decision. When activated, flip `test-engineer` to active in the roster and add `npm test` to the DoD gate.
 
 ---
 
 ### 📞 When in Doubt
 
-If something is unclear:
-1. **Re-read** VISION.md, SCREENS.md, DESIGN.md
-2. **Search** WORK_LOG.md for prior decisions
-3. **Ask the user** — they coordinate with the Architect Claude and will get you a clear answer
+1. Re-read VISION.md, SCREENS.md, DESIGN.md.
+2. Search WORK_LOG.md and DECISIONS.md for prior decisions.
+3. Ask the user — they bridge to the Architect Claude.
 
 Never guess on design decisions. Never assume on architecture. Ask.
 
 ---
 
-## 🇮🇱 עברית
+## 🇮🇱 עברית — תקציר
 
-### סקירת הפרויקט
+> הקטע האנגלי למעלה הוא המקור המלא והמחייב. זהו תקציר עברי של מה שהשתנה והנקודות הקריטיות.
 
-**Luchot** — אפליקציית לוח שנה דו-לשונית עברי/לועזי ל-iOS ו-Android, בנויה ב-React Native ו-Expo Router.
+### מודל התזמור — שתי שכבות
+- **המשתמש** = מתזמר-על וגשר.
+- **הארכיטקט (Claude בצ'אט נפרד)** = מתכנן-על. מקבל את הדוחות שלך, כותב פרומפטים ארוכים ומדויקים, מחזיק אסטרטגיה והקשר חוצה-סשנים.
+- **קלוד קוד (אתה)** = מתזמר ברמת הפרויקט. מקבל את הפרומפט של הארכיטקט, מפרק אותו, **מנצח על ה-sub-agents**, מריץ את ה-DoD, ומחזיר דוח אחד מאוחד.
+- **אתה לא כותב קוד פיצ'ר ישירות** כשיש sub-agent שמחזיק בתחום. העבודה הישירה שלך: תכנון, האצלה, אימות אינטגרציה, הרצת בדיקות, ותחזוקת docs.
 
-- **Stack:** React Native 0.74, Expo SDK 51, TypeScript, Expo Router, Zustand, SQLite, @hebcal/core, kosher-zmanim
-- **ארכיטקטורה:** Offline-first, ללא backend, ללא חשבון. כל המידע מקומי (SQLite). ראה `VISION.md`
-- **סטטוס:** במעבר מ-v1 (מימוש חלקי, theme של parchment) ל-v2 (עיצוב מחודש בהשראת לוח עברי הסטנדרטי הישראלי)
-- **שפה:** ממשק עברי RTL עם לועזי במקביל. הערות קוד ותיעוד יכולים להיות באנגלית
+### רוסטר ה-sub-agents הפעילים
+- ✅ `mobile-ui-builder` — מסכים, רכיבים, RTL, ניווט
+- ✅ `local-data-builder` — SQLite, services, providers, schemas, hooks
+- ✅ `database-architect` — schema + migrations על מכשירים אמיתיים
+- 💤 `test-engineer` — רדום. להפעיל רק כשמחליטים להתחיל לכתוב tests (Phase 5).
+- 💤 `security-auditor` — רדום, read-only, profile `mobile-local-only`. עדיפות נמוכה (אין שטח התקפה רשתי).
+- ❌ לא בפרויקט: `web-ui-builder`, `api-builder`, `baas-integrator`.
 
----
+### כללי אוטונומיה
+אישור לפני **כל** משימה — חל גם עליך וגם על כל sub-agent שאתה שולח לכתוב. מותר בלי לשאול: קריאה, typecheck, חיפוש, תכנון. דורש אישור: כל כתיבה/יצירה/מחיקה, `npm install`, שינוי config, `eas build`, שיגור sub-agent לכתיבה. הצג תוכנית האצלה (אילו agents, איזה scope) וחכה ל"כן".
 
-### 🚨 רשימת בדיקה בתחילת Session
+### RTL — נעול וקריטי
+- **`flexDirection: 'row-reverse'`** ל-RTL עברי. **לא** להסתמך על auto-flip של `'row'`, ולא CSS transforms. (זה מבטל הנחיה ישנה — היא גרמה לאשכול הבאגים ב-4.7.)
+- ילד ראשון נוחת מימין. כששורת icon+text קוראת הפוך — מחליפים סדר JSX, לא מוסיפים flips.
+- drawer מהשמאל; `textAlign: 'right'` לעברית; `gap` מפורש בין label לערך; עדיף ממדים מפורשים על הסקת Yoga (באג ה-MonthGrid).
 
-לפני כל פעולה בקוד, קרא את הקבצים הבאים בסדר הזה:
+### docs
+WORK_LOG.md + ROADMAP.md ממשיכים כרגיל. **אין** PROGRESS.md. נוסף `docs/DECISIONS.md` להחלטות ארכיטקטוניות נעולות. `docs/SCHEMA.md` (database-architect) ו-`docs/API.md` (local-data-builder, = תיעוד hooks פנימיים) לפי הצורך.
 
-1. `VISION.md` — מה Luchot, למי, מה היא לעולם לא צריכה להיות
-2. `SCREENS.md` — מפת מסכים, אינטראקציות, ניווט
-3. `DESIGN.md` — צבעים, טיפוגרפיה, מרווחים, מפרטי רכיבים
-4. `WORK_LOG.md` — מה נעשה ב-session הקודם, מה פתוח, מה תקוע
-5. `ROADMAP.md` — שלב נוכחי, מה הבא בתור
+### החלטות נעולות (אל תפתח מחדש בלי בקשת המשתמש)
+offline-first ללא backend לעולם · EventSchema תואם Google Calendar · 4 טאבים + drawer · hebcal v5.x · `row-reverse` ל-RTL · `expo-sqlite/legacy`.
 
-**אל תדלג על שלב 4.** אם `WORK_LOG.md` רושם "open issue: X" — אל תתחיל משהו אחר עד ש-X נפתר או נדחה במפורש.
+### Definition of Done (אתה מריץ, לא ה-agents)
+`npm run typecheck` חייב לעבור. lint אם קיים. **`npx expo-doctor` חייב 16/16 בכל משימה** — זה תופס מה ש-typecheck לא: peer dependency חסר או לא תואם (בדיוק הבאג של `react-native-svg` ב-4.7 שעבר typecheck אבל קרס ב-APK). אם נגעו ב-deps — גם `npx expo install --check`. `npm test` רק כש-test-engineer פעיל (כרגע רדום). לשינויי data — אימות ידני של migration על data קיים. לבנייה — `expo doctor` כבר חלק מה-DoD.
 
----
-
-### 🤝 עבודה עם הארכיטקט (Claude אחר)
-
-יש **קלוד נוסף** ששרץ בשיחה נפרדת. הוא הארכיטקט / מתכנן. אתה המבצע.
-
-| הארכיטקט (שיחה אחרת) | קלוד קוד (אתה) |
-|---|---|
-| Vision, החלטות עיצוב, UX | מימוש, עריכות, בנייה |
-| כותב מפרטים (VISION/SCREENS/DESIGN) | קורא מפרטים ומבצע אותם |
-| מתכנן roadmap | מבצע פריטי roadmap |
-| מתאם עם המשתמש על כיוון | מדווח על ממצאים טכניים |
-
-המשתמש הוא הגשר. המשתמש ישלח לך פרומפטים ספציפיים מהארכיטקט. בצע אותם בדיוק. אם פרומפט עמום או נראה בסתירה לקבצי המפרט — **עצור ושאל לפני שתמשיך** — אל תאלתר.
-
----
-
-### 🛑 כללי אוטונומיה (קריטי)
-
-המשתמש ביקש במפורש **אישור לפני כל משימה**.
-
-**מה זה אומר:**
-- לפני כל שינוי קוד, יצירת קובץ, refactor, או עריכה לא טריוויאלית — שאל את המשתמש
-- בלי לשאול אפשר: לקרוא קבצים, להריץ `npm run typecheck`, לסרוק תיקיות, לחפש שימושים
-- לא בלי לשאול: עריכת קבצים, יצירת קבצים, מחיקת קבצים, `npm install`, שינוי config
-
-**איך לשאול:**
-> "אני עומד לעשות X (לדוגמה: 'הוספת BackHandler ל-RootLayout, כ-10 שורות'). להמשיך?"
-
-חכה ל"כן" / "go" / "yes" מפורש לפני שתבצע.
-
----
-
-### 📁 מבנה הפרויקט
-
-ראה הטבלה המלאה בקטע האנגלי למעלה. תיאור קצר:
-- `app/` — מסכי Expo Router (routes)
-- `src/components/` — קומפוננטות, מחולקות לפי תחום (calendar, notes, zmanim, ui)
-- `src/constants/` — tokens מ-DESIGN.md (colors, typography, spacing)
-- `src/hooks/` — hooks מותאמים
-- `src/providers/` — Zustand stores
-- `src/schemas/` — TypeScript types
-- `src/services/` — לוגיקה עסקית (DateService, ZmanimService, StorageService)
-- `src/utils/` — helpers
-- `docs/` — תיעוד ארכיטקטוני
-
----
-
-### 💻 מוסכמות קוד
-
-#### שמות קבצים
-- Components: `PascalCase.tsx` (למשל `DayCell.tsx`)
-- Hooks: `camelCase.ts` מתחיל ב-`use` (למשל `useZmanim.ts`)
-- Services: `PascalCase.ts` נגמר ב-`Service` (למשל `DateService.ts`)
-- Utils: `camelCase.ts`
-- Constants: `camelCase.ts`
-
-#### Imports
-- imports אבסולוטיים מ-`src/` כשניתן
-- קבץ: React → ספריות חיצוניות → פנימי → types
-- בלי barrel files (`index.ts` re-exports) — imports ישירים ברורים יותר
-
-#### TypeScript
-- Strict mode פעיל. `npm run typecheck` חייב לעבור לפני כל commit
-- הימנע מ-`any`. אם אין ברירה — כתוב הערה למה
-- העדף `type` ל-unions/intersections, `interface` לאובייקטים
-
-#### Styling
-- השתמש ב-`StyleSheet.create` (לא inline styles)
-- משוך צבעים, fonts, spacing מ-`src/constants/` (משקף את `DESIGN.md`)
-- הימנע מערכים hardcoded — אם מספר לא ב-tokens, שאל אם להוסיף
-
-#### React Native ספציפי
-- תמיד בדוק על Android (פלטפורמת היעד העיקרית)
-- כבד RTL: `flexDirection: 'row'` (מתהפך אוטומטית), `textAlign: 'right'` לעברית
-- השתמש ב-`Pressable` במקום `TouchableOpacity` לקוד חדש
-- לרשימות: העדף `@shopify/flash-list` על `FlatList` לביצועים
-
----
-
-### 🌳 Git Workflow
-
-#### Branches
-- **עובדים ישירות על `main`.** ללא feature branches
-- הסיבה: פרויקט יחיד, ללא PRs, ללא code review
-
-#### Commits
-- **commit בסוף כל יחידת עבודה הגיונית**, לא בסוף session
-- "יחידה הגיונית" = תיקון באג אחד, פיצ'ר אחד, refactor אחד — משהו שניתן ל-revert בנפרד
-
-#### דוגמאות
-✅ טוב:
-- `fix: handle Android hardware back button in DayModal`
-- `feat: add candle lighting time to Zmanim screen`
-- `refactor: extract Tag component from DayCell`
-
-❌ רע:
-- `wip` (עמום)
-- `lots of changes` (רחב מדי)
-- `fix typo + add feature + refactor` (מעורבב)
-
-#### פורמט הודעת commit
-```
-<type>: <תיאור קצר>
-
-<גוף אופציונלי — מה ולמה, לא איך>
-```
-Types: `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`
-
-#### Push
-- Push בסוף כל session: `git push`
-- **לעולם** לא `--force` push
-
----
-
-### 📝 רשימת בדיקה בסוף Session
-
-לפני סיום session, בצע בסדר:
-
-1. **Typecheck:**
-   ```bash
-   npm run typecheck
-   ```
-   אם יש שגיאות — תקן. אל תסיים session עם types שבורים
-
-2. **עדכן `WORK_LOG.md`** עם רשומה להיום:
-   ```markdown
-   ## [YYYY-MM-DD]
-   ### מה נעשה
-   - <bullet list>
-   ### החלטות שהתקבלו
-   - <כל החלטה שתשפיע על עבודה עתידית>
-   ### בעיות פתוחות / חסומות
-   - <כל מה שנשאר באמצע או תקוע>
-   ### צעדים הבאים
-   - <מה צריך לקרות ב-session הבא>
-   ```
-
-3. **עדכן `ROADMAP.md`** אם משהו השתנה
-
-4. **Commit כל מה שלא נשמר:**
-   ```bash
-   git status
-   git add .
-   git commit -m "session: <date> - <summary>"
-   git push
-   ```
-
-5. **דווח למשתמש:** "Session הסתיים. דחפתי N commits. פריטים פתוחים: ..."
-
----
-
-### 🚫 דברים שאסור לעשות
-
-- **לא** לשנות קבצים ב-`node_modules/` ישירות (השתמש ב-patches אם צריך)
-- **לא** למחוק `kosher-zmanim-0.9.0.tgz` למרות שהוא orphan — אשר עם המשתמש קודם
-- **לא** להוסיף dependencies בלי לשאול
-- **לא** לשנות את הסכמה (`EventSchema.ts`) בלי אישור הארכיטקט — היא תואמת Google Calendar בכוונה
-- **לא** לשנות `app.json` או `eas.json` בלי לשאול
-- **לא** לעשות commit לקבצי `.env` או משהו עם סודות
-- **לא** לכתוב מחדש את `DateService.ts`, `ZmanimService.ts`, `StorageService.ts` מההתחלה — הם עובדים ונבדקים. הוסף להם, אל תחליף
-- **לא** להוסיף backend, API client, או analytics — Luchot היא offline-first בעיקרון
-- **לא** להשתמש בצבעי parchment, חומים חמים, או אלמנטים דקורטיביים "יודאיים" — ראה DESIGN.md
-
----
-
-### ⚠️ בעיות ידועות
-
-- `kosher-zmanim` 0.9.x מגיע עם imports ESM ללא סיומות. ה-`scripts/patch-expo-sqlite-imports.cjs` postinstall מטפל ב-`expo-sqlite`. אם תוסיף dependencies עם בעיות דומות — אולי תצטרך לעשות patch דומה
-- `@gorhom/bottom-sheet` v4 **לא** מטפל בכפתור חזרה אנדרואיד באופן מובנה. תמיד חבר ידני עם `BackHandler`
-- `use24hTime` לא היה נשמר בין הפעלות. **זה סוג הבאג שכדאי לשים אליו לב** — כשמוסיפים הגדרה חדשה, ודא ש-`save()` וגם `loadFromStorage()` מפנים אליה
-
----
-
-### 🧪 בדיקה ואימות
-
-כרגע אין tests אוטומטיים. בינתיים, אימות הוא:
-
-1. `npm run typecheck` — חייב לעבור
-2. בדיקה ידנית על Android — תאר מה נבדק ב-WORK_LOG
-3. בדיקה ויזואלית שהסטיילינג תואם ל-DESIGN.md (בלי hex codes חופשיים)
-
-הוספת Jest + RNTL ב-roadmap לשלב 2.
-
----
-
-### 📞 כשבספק
-
-אם משהו לא ברור:
-1. **קרא שוב** את VISION.md, SCREENS.md, DESIGN.md
-2. **חפש** ב-WORK_LOG.md החלטות קודמות
-3. **שאל את המשתמש** — הוא מתאם עם הארכיטקט ויביא לך תשובה ברורה
-
-לעולם אל תנחש על החלטות עיצוב. לעולם אל תניח על ארכיטקטורה. שאל.
+### דברים שאסור (תוספות מעל הקיים)
+אל תפעיל agents רדומים. אל תתקין peer deps בשקט — הצף ושאל. שאר ה-do-nots בקטע האנגלי.
