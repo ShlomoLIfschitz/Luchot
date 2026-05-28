@@ -23,7 +23,9 @@ import {
   CalendarDays,
   Clock,
   MapPin,
+  Bell,
 } from 'lucide-react-native';
+import { useNotificationPermission } from '../src/hooks/useNotificationPermission';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
@@ -175,6 +177,8 @@ export default function SettingsScreen() {
   const calendarSetDiaspora = useCalendarStore((s) => s.setDiaspora);
   const { cityHebcalKey, latitude, longitude } = useLocationStore();
 
+  const permission = useNotificationPermission();
+
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
 
@@ -191,6 +195,12 @@ export default function SettingsScreen() {
   const themeLabel =
     darkMode === 'system' ? 'לפי המכשיר' : darkMode === 'dark' ? 'כהה' : 'בהיר';
   const zmanimLabel = zmanimMethod === 'MGA' ? 'מג״א' : 'גר״א';
+
+  const notificationLabel =
+    permission.status === null ? '...' :
+    permission.isGranted ? 'מופעל' :
+    permission.isDenied ? 'חסום — פתח הגדרות' :
+    'לא הופעל';
 
   const trackColor = { false: colors.border, true: colors.accent };
 
@@ -307,6 +317,26 @@ export default function SettingsScreen() {
               <>
                 <Text style={[styles.valueText, { color: colors.textSecondary }]}>
                   {currentCityName}
+                </Text>
+                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+              </>
+            }
+            isLast
+          />
+        </View>
+
+        {/* ── התראות ── */}
+        <SectionHeader title="התראות" colors={colors} />
+        <View style={[styles.card, { borderColor: colors.border }]}>
+          <SettingRow
+            Icon={Bell}
+            label="התראות"
+            colors={colors}
+            onPress={() => { void permission.request(); }}
+            right={
+              <>
+                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
+                  {notificationLabel}
                 </Text>
                 <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
               </>
