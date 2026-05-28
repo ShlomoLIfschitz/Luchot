@@ -118,3 +118,41 @@
   re-prompted). Ignored prompts do NOT auto-cancel the notification. The
   `color` field stores the token KEY (e.g. 'tagHoliday'), not a raw hex —
   the UI layer resolves keys via `src/constants/colors.ts`.
+
+## All-day reminder fire time = 09:00 local on event day minus reminderMinutes
+- Date: 2026-05-28
+- Context: Wave 2 added per-event reminders. Most Luchot events are all-day
+  (no start.dateTime, only start.date — birthdays, yahrzeits, anniversaries).
+  A concrete fire-time policy was required for all-day events, since
+  "minutes before" has no natural anchor without a clock time.
+- Choice: Fire at 09:00 local time on the event day, minus reminderMinutes.
+  "יום לפני" (1440 min) → 09:00 the previous day. Timed events (start.dateTime
+  present) use dateTime - reminderMinutes as usual. Both paths implemented in
+  useNotes.saveNote and NotificationService.ensureAnnualReminders.
+- Alternatives considered: midnight of event day (too early, disruptive);
+  user-configurable default time (deferred — adds a persisted setting, not
+  needed for Wave 2). 09:00 is a conventional morning alert time.
+- Implications: All future waves that schedule reminders (Omer, candle-lighting,
+  .ics export reminders) MUST use this policy for all-day events. Do not invent
+  a different hour per-feature.
+
+## Sweep-on-init scheduling model for recurring reminders
+- Date: 2026-05-28
+- Context: Recurring events (birthday/yahrzeit) need annual reminders. Two
+  approaches considered: (a) on-delivery rescheduling (app listens for
+  notification delivery and immediately schedules the next year), or (b)
+  sweep on each app startup that checks and fills any scheduling gap.
+- Choice: Sweep-on-init. On each app launch, NotificationService.ensureAnnualReminders()
+  fetches all events with reminder_minutes set and recurrenceType yearly_*,
+  computes the next future occurrence, and schedules it if not already in the
+  scheduled set. No on-delivery rescheduling is used.
+- Alternatives considered: On-delivery rescheduling — rejected; requires a
+  background notification handler that runs even when the app is closed, which
+  is fragile on Android and contradicts the "user-triggered" principle. Calendar
+  triggers (platform repeating) — rejected; expo-notifications annual repeat
+  support is inconsistent cross-platform.
+- Implications: The sweep must remain cheap (fetch + diff). A single event.id
+  can appear in the scheduled set at most once — saveNote never schedules
+  recurring events (it only persists reminder_minutes); ensureAnnualReminders
+  is the sole scheduler for yearly_* events. This prevents double-schedule and
+  stale-date collisions.

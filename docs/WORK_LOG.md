@@ -6,6 +6,68 @@
 
 ---
 
+## 2026-05-28 — Session: Phase 5 Wave 2 — Event Reminders + NotificationService Activation
+
+**Phase:** Phase 5, Wave 2
+**Commits:** `9b1e3e9` (zod direct dep), `98f92d6` (migration), `29c9c76` (ensureAnnualReminders), `3a809b2` (useNotes), `e44c662` (init wiring), `45b1881` (NoteEditor UI), `fcde9db` (Settings count)
+**Status:** Wave 2 complete. DoD passed (typecheck green, expo-doctor 16/17 baseline, expo install --check clean).
+
+### What got done
+
+- **STEP 0 (Claude Code):** zod added as a direct dependency via `npx expo install zod` (was previously only transitive). Verified with `expo install --check`.
+
+- **STEP 1–2 (local-data-builder → `src/services/StorageService.ts`):**
+  - `schemaV2Migrated` flag added. `ensureSchema()` now runs `ALTER TABLE events ADD COLUMN reminder_minutes INTEGER` inside try/catch — safe on fresh installs (succeeds) and existing installs (catches and ignores "column exists" error).
+  - `saveEvent()` extended to 22 columns — persists `event.reminders?.overrides?.[0]?.minutes ?? null` as `reminder_minutes`.
+  - `rowToEvent()` reconstructs `reminders` from `row.reminder_minutes` (null → `{ useDefault: false }`, non-null → `{ useDefault: false, overrides: [{ method: 'popup', minutes }] }`).
+  - New `getEventsWithReminders()`: parameterized SELECT for all non-cancelled events with reminder_minutes set.
+
+- **STEP 3 (local-data-builder → `src/services/NotificationService.ts`):**
+  - `ensureAnnualReminders()` added. Imports `HDate` from `@hebcal/core` and `StorageService`. On each init: fetches recurring events with reminders, computes next occurrence (Gregorian: same month/day year-walk; Hebrew: HDate.greg() for current/next Hebrew year), trigger = 09:00 local minus reminderMinutes, skips already-scheduled IDs, schedules gaps. Code comment documents the sweep-on-init contract.
+
+- **STEP 4 (local-data-builder → `src/hooks/useNotes.ts`):**
+  - `CalendarNote.reminderMinutes: number | null` field added (non-optional).
+  - `eventToCalendarNote()` extracts it from `event.reminders?.overrides?.[0]?.minutes ?? null`.
+  - `saveNote()` extended with `reminderMinutes?: number | null`. **KEY CORRECTION applied (per user):** one-time events (recurrenceType='none') → schedule immediately; recurring events (yearly_*) → persist reminder_minutes only, do NOT schedule here (owned by ensureAnnualReminders). `notificationScheduled: reminderMinutes != null` regardless of recurrence. `cancelNotification(id)` fires on edit (before save).
+  - `deleteNote()` now calls `NotificationService.cancelNotification(id)` before soft-delete.
+
+- **STEP 5 (mobile-ui-builder → `app/_layout.tsx`):**
+  - `NotificationService.init()` added to the `Promise.all` alongside loadFromStorage calls.
+  - `await NotificationService.ensureAnnualReminders()` added after the Promise.all resolves.
+
+- **STEP 6 (mobile-ui-builder → `src/components/notes/NoteEditor.tsx`):**
+  - "תזכּר אותי" section added between anchor-type chips and action buttons.
+  - Toggle row (`row-reverse` RTL): Hebrew label right, Switch left.
+  - Lead-time chips: בזמן האירוע / 10 דקות לפני / שעה לפני / יום לפני / מותאם אישית (custom TextInput, minutes).
+  - Pre-populates on edit from `note?.reminderMinutes`.
+  - `handleSave` computes `finalReminderMinutes` and passes to `onSave`.
+  - `onSave` prop type extended with `reminderMinutes?: number | null` (optional → all 4 call sites untouched and typecheck-clean: NoteList, day.tsx, WeekGrid, MonthGrid).
+
+- **STEP 6 (mobile-ui-builder → `app/settings.tsx`):**
+  - Scheduled count display row added to "התראות" section (display-only, NOT persisted).
+  - `NotificationService.getScheduled()` read in `useEffect` on mount.
+  - Displays "X התראות מתוזמנות" / "אין התראות מתוזמנות" / "..." while loading.
+
+### Decisions made
+
+- All-day reminder fire time locked: 09:00 local on event day minus reminderMinutes. Logged in DECISIONS.md.
+- Sweep-on-init scheduling model locked: ensureAnnualReminders is sole scheduler for yearly_* events; saveNote never schedules them. Logged in DECISIONS.md.
+- Rationale for one-time-only scheduling in saveNote (user correction): a single event.id must be owned by exactly one scheduler. Double-scheduling with a stale start date would cause duplicate/incorrect-time notifications for recurring events.
+
+### Open issues / blocked
+
+- **Behavioral notification testing deferred to APK.** In Expo Go, scheduled local notifications have usage limits and may not fire reliably. Typecheck passes and scheduling calls succeed, but end-to-end delivery verification requires the standalone APK (versionCode 5, after EAS quota resets 2026-06-01).
+- `NotificationService.init()` is now active in _layout.tsx — any existing Expo Go session will receive the Android notification channel setup and handler registration on next app start.
+
+### Next steps
+
+- Wave 3: Omer reminders settings toggle + candle-lighting.
+- Wave 4: .ics export/import.
+- APK build (versionCode 5): queue via EAS after June 1 quota reset. Run `eas build --platform android --profile preview`.
+- zod dep: now direct at `^3.25.76`.
+
+---
+
 ## 2026-05-28 — Session: Phase 5 Wave 1 — NotificationService Foundation
 
 **Phase:** Phase 5, Wave 1
