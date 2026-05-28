@@ -11,7 +11,7 @@
 //   - "עברית למעלה" toggle kept — field is live and will drive the
 //     universal date header in Phase 3.7c
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, Switch, StyleSheet, ScrollView, Pressable,
   Modal, TouchableWithoutFeedback,
@@ -26,6 +26,7 @@ import {
   Bell,
 } from 'lucide-react-native';
 import { useNotificationPermission } from '../src/hooks/useNotificationPermission';
+import { NotificationService } from '../src/services/NotificationService';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
@@ -178,6 +179,12 @@ export default function SettingsScreen() {
   const { cityHebcalKey, latitude, longitude } = useLocationStore();
 
   const permission = useNotificationPermission();
+
+  const [scheduledCount, setScheduledCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    NotificationService.getScheduled().then(n => setScheduledCount(n.length)).catch(() => setScheduledCount(0));
+  }, []);
 
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
@@ -341,6 +348,12 @@ export default function SettingsScreen() {
                 <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
               </>
             }
+          />
+          <SettingRow
+            Icon={Bell}
+            label={scheduledCount === null ? '...' : scheduledCount === 0 ? 'אין התראות מתוזמנות' : `${scheduledCount} התראות מתוזמנות`}
+            colors={colors}
+            right={<View />}
             isLast
           />
         </View>
