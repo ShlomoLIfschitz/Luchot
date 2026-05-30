@@ -6,6 +6,53 @@
 
 ---
 
+## 2026-05-30 — Session: Phase 5 Wave 3a — Omer Count Reminders
+
+**Phase:** Phase 5, Wave 3a
+**Commits:** `c00ddfa` (settings), `10ff880` (DateService helper), `eef7df0` (ensureOmerReminders + on-change wiring), `fcc3c08` (Settings UI + _layout init)
+**Status:** Wave 3a complete. DoD passed (typecheck green, expo-doctor 16/17 baseline — no new failures).
+
+### What got done
+
+- **STEP 1 (local-data-builder → `src/providers/SettingsProvider.tsx`):**
+  - `omerRemindersEnabled: boolean` (default false) and `omerReminderTime: string` (default "21:00") added.
+  - Both fields wired in ALL required locations: `SettingsState` interface, initializer, setters, `loadFromStorage` Promise.all, and `set({...})` call. The use24hTime persistence bug pattern explicitly satisfied.
+  - Setters at this stage: save-only (no `ensureOmerReminders` call yet — added in STEP 2).
+
+- **STEP 1a (local-data-builder → `src/services/DateService.ts`):**
+  - New exported function `getOmerForDate(date: Date): { day: number; text: string } | null`.
+  - Targeted single-day `HebrewCalendar.calendar({ omer: true })` call; finds the `OMER_COUNT` event; returns `{ day, text: ev.render('he') }` (full traditional Hebrew phrasing including weeks clause). Returns null cleanly outside the Omer period — verified by trace (Tishrei date: `.find()` returns undefined → null branch taken, no throw).
+  - No diaspora parameter (Omer timing universal). Does not touch the month cache.
+
+- **STEP 2 (local-data-builder → `src/services/NotificationService.ts` + `src/providers/SettingsProvider.tsx`):**
+  - Removed pre-Wave-1 dead methods `scheduleOmerReminders` (location-based, all-49-at-once, wrong approach) and `scheduleEventReminder` (superseded by `scheduleLocalNotification`). Removed now-unused `import { getZmanim } from './ZmanimService'`.
+  - Added `ensureOmerReminders(enabled: boolean, time: string): Promise<void>` — sweep-on-init model, rolling window of next 10 days, stable id namespace `omer-YYYYMMDD`, idempotent diff against `getScheduled()`, body text from `getOmerForDate(candidate).text` (full Hebrew phrasing). Disabled path cancels all `omer-` prefixed notifications.
+  - SettingsProvider setters updated: `setOmerRemindersEnabled` and `setOmerReminderTime` now call `void NotificationService.ensureOmerReminders(...)` with the new value + current other value after saving, so the schedule updates immediately on toggle/time change without requiring app restart.
+
+- **STEP 4 (mobile-ui-builder → `src/hooks/useTimePicker.tsx`, `app/settings.tsx`, `app/_layout.tsx`):**
+  - New `useTimePicker(value: string, onChange: (time: string) => void)` hook — same pattern as `useDatePicker`, `mode="time"`, iOS `locale="en-GB"` (forces 24h), Android `is24Hour={true}`. String↔Date helpers `timeStrToDate`/`dateToTimeStr`.
+  - Settings "התראות" section extended: Row A (Omer toggle, `flexDirection: 'row-reverse'`, label right / Switch left, min-height 48dp), Row B (time picker row, conditional on `omerRemindersEnabled`, taps open `useTimePicker` modal). `timePicker` node rendered outside ScrollView.
+  - `app/_layout.tsx`: `ensureOmerReminders(omerRemindersEnabled, omerReminderTime)` added immediately after `ensureAnnualReminders()`, reading values from `useSettingsStore.getState()` (post-loadFromStorage, values reflect persisted state).
+
+### Decisions made
+
+- Omer reminders use a fixed user-chosen fire time (default 21:00 local), settings-only — no DB row, no NotificationRecord written. First application of the sweep-on-init model to a computed (non-DB) entity. Logged in DECISIONS.md.
+- `getOmerForDate` added to DateService as the authoritative source for Omer day number + full Hebrew phrasing. NotificationService delegates to it; no Omer math reimplemented in the service layer.
+- Pre-Wave-1 dead methods removed in the same STEP 2 commit (no separate cleanup commit).
+
+### Open issues / blocked
+
+- Behavioral notification delivery testing deferred to the versionCode-5 APK (EAS quota resets 2026-06-01). Typecheck passes and scheduling calls are structurally correct.
+- `omerRemindersEnabled` defaults to false — users must opt in via Settings.
+
+### Next steps
+
+- Wave 3b: candle-lighting notifications (location/astronomical — different from fixed-time Omer; involves ZmanimService integration).
+- Wave 4: .ics export/import.
+- APK build (versionCode 5): queue via `eas build --platform android --profile preview` after June 1 quota reset.
+
+---
+
 ## 2026-05-28 — Session: Phase 5 Wave 2 — Event Reminders + NotificationService Activation
 
 **Phase:** Phase 5, Wave 2

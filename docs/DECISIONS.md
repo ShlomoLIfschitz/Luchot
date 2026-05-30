@@ -136,6 +136,29 @@
   .ics export reminders) MUST use this policy for all-day events. Do not invent
   a different hour per-feature.
 
+## Omer reminders: fixed user-chosen fire time, settings-only, no DB row
+
+- Date: 2026-05-30
+- Context: Wave 3a added daily Sefirat HaOmer reminders. Unlike Wave 2 event
+  reminders (each backed by an event row in SQLite with a NotificationRecord-style
+  ID), the Omer is a computed calendar entity — it exists automatically every spring
+  via DateService/hebcal, with no DB row to attach a reminder to.
+- Choice: The ONLY persisted state for Omer reminders is two user settings:
+  `omerRemindersEnabled` (boolean, default false) and `omerReminderTime` (string
+  "HH:mm", default "21:00"). No NotificationRecord is written. No DB schema change.
+  Fire time is fixed (user-chosen), NOT tied to tzeit or location — deliberately
+  location-independent. Scheduling uses the existing sweep-on-init model with a
+  rolling 10-day window and stable id namespace `omer-{YYYYMMDD}`.
+- Alternatives considered: Tzeit-based fire time (requires ZmanimService + location
+  per day, architecturally heavier — deferred to Wave 3b candle-lighting which needs
+  it anyway); writing a NotificationRecord row (no natural entity to attach it to —
+  adds schema complexity for no benefit).
+- Implications: This establishes the pattern for all computed-entity reminders
+  (non-DB, settings-only, sweep-on-init). Wave 3b candle-lighting notifications are
+  explicitly OUT of scope here and will use a different (location/astronomical) fire
+  time approach. Any future computed-entity reminder should follow this pattern unless
+  the architect explicitly reopens it.
+
 ## Sweep-on-init scheduling model for recurring reminders
 - Date: 2026-05-28
 - Context: Recurring events (birthday/yahrzeit) need annual reminders. Two

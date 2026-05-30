@@ -155,14 +155,26 @@ Once a clean APK installs and runs on test device, Phase 5 begins.
 
 ---
 
-## Phase 5 — Post-MVP *(ACTIVE — awaiting user feedback)*
+## Phase 5 — Post-MVP *(ACTIVE)*
 
-Phase 4 / MVP is complete. Phase 5 is the next phase. Work order will be
-determined by real user feedback — no sub-phases are committed yet.
+Phase 4 / MVP is complete. Phase 5 is in progress.
 
-**Backlog (priority to be confirmed by Architect after initial user testing):**
+### Wave 3a — Omer Count Reminders ✅ (2026-05-30)
+Daily "היום X לעומר" notification at user-chosen time (default 21:00). Toggle + time
+picker in Settings. Rolling-window sweep-on-init. Full Hebrew weeks phrasing via
+`DateService.getOmerForDate`. No DB row. Commits `c00ddfa`–`fcc3c08`.
 
-- **Notifications wiring** — `omerReminders` toggle was removed from MVP because it was never wired. Reintroduce with actual `NotificationService` → Expo Notifications → schedule Omer reminders, candle-lighting alerts. Requires notification permissions flow.
+### Wave 3b — Candle-lighting notifications *(next)*
+Location/astronomical fire time (before shkia per user's city offset). Different from
+Omer's fixed-time approach — involves ZmanimService integration. Scoped to this wave.
+
+### Wave 4 — .ics export/import
+Export Luchot events as .ics via Android share sheet. Import .ics files the user
+selects. No network, no OAuth. EventSchema is already Google-Calendar-compatible.
+
+**Remaining backlog (priority TBD):**
+
+- **Notifications wiring (candle-lighting)** — see Wave 3b above.
 - **Learning schedules expansion** — three schedules unavailable in @hebcal/learning@5.1.2: `rambamThreeChapters`, `seferHaMitzvot`, `arukhHaShulchan`. Requires upgrading @hebcal/core + @hebcal/learning from v5 → v6 (breaking API changes — dedicate a full session).
 - **Yerushalmi Yomi** — available in @hebcal/learning; add to DayData + Details screen.
 - **Per-hour notes** — time-anchored note entries in the Day screen's hourly schedule. EventSchema `start.dateTime` field exists (Google Calendar compat); just needs NoteEditor time picker + Day screen rendering.
