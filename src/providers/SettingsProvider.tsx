@@ -34,6 +34,10 @@ interface SettingsState {
   zmanimMethod: ZmanimMethod;
   use24hTime: boolean;
 
+  // Omer reminders
+  omerRemindersEnabled: boolean;
+  omerReminderTime: string;
+
   // Actions
   toggleHebrewOnTop: () => void;
   setDarkMode: (m: 'system' | 'light' | 'dark') => void;
@@ -41,6 +45,8 @@ interface SettingsState {
   setFirstDayOfWeek: (d: FirstDayOfWeek) => void;
   setDefaultCalendarType: (t: DefaultCalendarType) => void;
   setDiaspora: (v: boolean) => void;
+  setOmerRemindersEnabled: (v: boolean) => void;
+  setOmerReminderTime: (t: string) => void;
   loadFromStorage: () => Promise<void>;
   save: (key: string, value: string) => Promise<void>;
 }
@@ -53,6 +59,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   diaspora: false,
   zmanimMethod: 'GRA',
   use24hTime: true,
+  omerRemindersEnabled: false,
+  omerReminderTime: '21:00',
 
   toggleHebrewOnTop: () => { const v = !get().hebrewOnTop; set({ hebrewOnTop: v }); get().save('hebrewOnTop', String(v)); },
   setDarkMode:          (m) => { set({ darkMode: m });          get().save('darkMode', m); },
@@ -60,11 +68,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setFirstDayOfWeek:    (d) => { set({ firstDayOfWeek: d });    get().save('firstDayOfWeek', String(d)); },
   setDefaultCalendarType: (t) => { set({ defaultCalendarType: t }); get().save('defaultCalendarType', t); },
   setDiaspora:          (v) => { set({ diaspora: v });           get().save('diaspora', String(v)); },
+  setOmerRemindersEnabled: (v) => { set({ omerRemindersEnabled: v }); get().save('omerRemindersEnabled', String(v)); },
+  setOmerReminderTime:     (t) => { set({ omerReminderTime: t });     get().save('omerReminderTime', t); },
 
   loadFromStorage: async () => {
     const [
       hebrewOnTop, darkMode, firstDayOfWeek, defaultCalendarType,
       diaspora, zmanimMethod, use24hTime,
+      omerRemindersEnabled, omerReminderTime,
     ] = await Promise.all([
       StorageService.getPref('hebrewOnTop',          'true'),
       StorageService.getPref('darkMode',             'system'),
@@ -73,6 +84,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       StorageService.getPref('diaspora',             'false'),
       StorageService.getPref('zmanimMethod',         'GRA'),
       StorageService.getPref('use24hTime',           'true'),
+      StorageService.getPref('omerRemindersEnabled', 'false'),
+      StorageService.getPref('omerReminderTime',     '21:00'),
     ]);
     set({
       hebrewOnTop:         hebrewOnTop === 'true',
@@ -87,6 +100,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           ? (zmanimMethod as ZmanimMethod)
           : 'GRA',
       use24hTime:          use24hTime === 'true',
+      omerRemindersEnabled: omerRemindersEnabled === 'true',
+      omerReminderTime,
     });
   },
 
