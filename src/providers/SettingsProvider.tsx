@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import { StorageService } from '../services/StorageService';
+import { NotificationService } from '../services/NotificationService';
 import type { ZmanimMethod } from '../services/ZmanimService';
 
 // Re-export so existing consumers that import ZmanimMethod from SettingsProvider
@@ -68,8 +69,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setFirstDayOfWeek:    (d) => { set({ firstDayOfWeek: d });    get().save('firstDayOfWeek', String(d)); },
   setDefaultCalendarType: (t) => { set({ defaultCalendarType: t }); get().save('defaultCalendarType', t); },
   setDiaspora:          (v) => { set({ diaspora: v });           get().save('diaspora', String(v)); },
-  setOmerRemindersEnabled: (v) => { set({ omerRemindersEnabled: v }); get().save('omerRemindersEnabled', String(v)); },
-  setOmerReminderTime:     (t) => { set({ omerReminderTime: t });     get().save('omerReminderTime', t); },
+  setOmerRemindersEnabled: (v) => {
+    set({ omerRemindersEnabled: v });
+    get().save('omerRemindersEnabled', String(v));
+    void NotificationService.ensureOmerReminders(v, get().omerReminderTime);
+  },
+  setOmerReminderTime: (t) => {
+    set({ omerReminderTime: t });
+    get().save('omerReminderTime', t);
+    void NotificationService.ensureOmerReminders(get().omerRemindersEnabled, t);
+  },
 
   loadFromStorage: async () => {
     const [

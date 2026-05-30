@@ -3,8 +3,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { HDate } from '@hebcal/core';
-import { getZmanim } from './ZmanimService';
 import { StorageService } from './StorageService';
+import { getOmerForDate } from './DateService';
 
 export class NotificationService {
   static async init(): Promise<void> {
@@ -29,67 +29,6 @@ export class NotificationService {
   static async requestPermissions(): Promise<boolean> {
     const result = await Notifications.requestPermissionsAsync();
     return result.granted;
-  }
-
-  /**
-   * Schedule Sefirat HaOmer reminders for the entire Omer period
-   */
-  static async scheduleOmerReminders(
-    latitude: number,
-    longitude: number,
-    omerStartDate: Date,  // Night of Pesach (16 Nisan)
-  ): Promise<void> {
-    // Cancel existing omer notifications
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    for (const n of scheduled) {
-      if (n.content.data?.type === 'omer') {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
-      }
-    }
-
-    // Schedule 49 notifications, each at sunset of the relevant day
-    for (let day = 1; day <= 49; day++) {
-      const date = new Date(omerStartDate);
-      date.setDate(date.getDate() + day - 1);
-
-      const zmanim = getZmanim(date, latitude, longitude);
-      if (!zmanim.shkia) continue;
-
-      // 10 minutes after shkia
-      const notifTime = new Date(zmanim.shkia.getTime() + 10 * 60 * 1000);
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'ספירת העומר',
-          body: `הגיע זמן ספירת העומר — יום ${day} לעומר`,
-          data: { type: 'omer', day },
-        },
-        trigger: {
-          date: notifTime,
-        },
-      });
-    }
-  }
-
-  /**
-   * Schedule a reminder for a specific event
-   */
-  static async scheduleEventReminder(
-    eventId: string,
-    title: string,
-    date: Date,
-    minutesBefore = 30,
-  ): Promise<string> {
-    const triggerDate = new Date(date.getTime() - minutesBefore * 60 * 1000);
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body: `תזכורת: ${title}`,
-        data: { type: 'event', eventId },
-      },
-      trigger: { date: triggerDate },
-    });
-    return id;
   }
 
   /**
@@ -207,6 +146,60 @@ export class NotificationService {
           triggerDate,
         });
       }
+    }
+  }
+
+  /**
+   * Sweep-on-init model for Sefirat HaOmer reminders.
+   * Schedules omer notifications for the next 10 calendar days at the user-
+   * selected time. Idempotent — skips any id already in the scheduled set.
+   * When enabled=false, cancels all existing omer- notifications.
+   */
+  static async ensureOmerReminders(enabled: boolean, time: string): Promise<void> {
+    if (!enabled) {
+      const scheduled = await NotificationService.getScheduled();
+      for (const n of scheduled) {
+        if (n.identifier.startsWith('omer-')) {
+          await NotificationService.cancelNotification(n.identifier);
+        }
+      }
+      return;
+    }
+
+    const scheduled = await NotificationService.getScheduled();
+    const scheduledIds = new Set(scheduled.map(n => n.identifier));
+
+    const [hh, mm] = time.split(':').map(Number);
+
+    const now = new Date();
+    for (let offset = 0; offset < 10; offset++) {
+      const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+
+      const omerInfo = getOmerForDate(candidate);
+      if (!omerInfo) continue; // not in Omer period
+
+      const dateStr =
+        `${candidate.getFullYear()}` +
+        `${String(candidate.getMonth() + 1).padStart(2, '0')}` +
+        `${String(candidate.getDate()).padStart(2, '0')}`;
+      const id = `omer-${dateStr}`;
+
+      if (scheduledIds.has(id)) continue; // already scheduled — idempotent
+
+      const triggerDate = new Date(
+        candidate.getFullYear(), candidate.getMonth(), candidate.getDate(),
+        hh, mm, 0, 0,
+      );
+
+      if (triggerDate <= new Date()) continue; // in the past
+
+      await NotificationService.scheduleLocalNotification({
+        id,
+        title: 'ספירת העומר',
+        body: omerInfo.text,
+        triggerDate,
+        data: { type: 'omer', day: omerInfo.day },
+      });
     }
   }
 }
