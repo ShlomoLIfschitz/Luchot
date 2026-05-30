@@ -29,6 +29,8 @@ export default function RootLayout() {
       dateService.setDiaspora(diaspora);
       useCalendarStore.getState().refreshMonth();
       await NotificationService.ensureAnnualReminders();
+      const { omerRemindersEnabled, omerReminderTime } = useSettingsStore.getState();
+      await NotificationService.ensureOmerReminders(omerRemindersEnabled, omerReminderTime);
     }
     init().catch(console.error);
   }, []);

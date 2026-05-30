@@ -16,6 +16,7 @@ import {
   View, Text, Switch, StyleSheet, ScrollView, Pressable,
   Modal, TouchableWithoutFeedback,
 } from 'react-native';
+import { useTimePicker } from '../src/hooks/useTimePicker';
 import { useRouter } from 'expo-router';
 import {
   Moon,
@@ -172,6 +173,8 @@ export default function SettingsScreen() {
     toggleHebrewOnTop,
     setDarkMode, setZmanimMethod, setFirstDayOfWeek,
     setDiaspora: setSettingsDiaspora,
+    omerRemindersEnabled, omerReminderTime,
+    setOmerRemindersEnabled, setOmerReminderTime,
   } = useSettingsStore();
 
   const router = useRouter();
@@ -185,6 +188,11 @@ export default function SettingsScreen() {
   useEffect(() => {
     NotificationService.getScheduled().then(n => setScheduledCount(n.length)).catch(() => setScheduledCount(0));
   }, []);
+
+  const { openPicker: openTimePicker, picker: timePicker } = useTimePicker(
+    omerReminderTime,
+    setOmerReminderTime,
+  );
 
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
@@ -354,8 +362,54 @@ export default function SettingsScreen() {
             label={scheduledCount === null ? '...' : scheduledCount === 0 ? 'אין התראות מתוזמנות' : `${scheduledCount} התראות מתוזמנות`}
             colors={colors}
             right={<View />}
-            isLast
           />
+          {/* Row A — Omer reminder toggle (always visible) */}
+          <Pressable
+            android_ripple={{ color: colors.border }}
+            onPress={() => setOmerRemindersEnabled(!omerRemindersEnabled)}
+            style={[
+              omerRowStyles.row,
+              { backgroundColor: colors.surface },
+              omerRemindersEnabled && {
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: colors.border,
+              },
+            ]}
+            accessibilityLabel="תזכורת ספירת העומר"
+            accessibilityRole="switch"
+            accessibilityState={{ checked: omerRemindersEnabled }}
+          >
+            <Switch
+              value={omerRemindersEnabled}
+              onValueChange={setOmerRemindersEnabled}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surface}
+            />
+            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
+              תזכורת ספירת העומר
+            </Text>
+          </Pressable>
+          {/* Row B — Time picker (only when Omer reminders are enabled) */}
+          {omerRemindersEnabled && (
+            <Pressable
+              android_ripple={{ color: colors.border }}
+              onPress={openTimePicker}
+              style={[omerRowStyles.row, { backgroundColor: colors.surface }]}
+              accessibilityLabel={`זמן תזכורת: ${omerReminderTime}`}
+              accessibilityRole="button"
+              accessibilityHint="פתח בורר שעה"
+            >
+              <View style={omerRowStyles.right}>
+                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
+                  {omerReminderTime}
+                </Text>
+              </View>
+              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
+                זמן תזכורת
+              </Text>
+            </Pressable>
+          )}
         </View>
 
       </ScrollView>
@@ -386,6 +440,7 @@ export default function SettingsScreen() {
         onClose={() => setZmanimPicker(false)}
         colors={colors}
       />
+      {timePicker}
     </View>
   );
 }
@@ -401,4 +456,26 @@ const styles = StyleSheet.create({
   },
   valueText: { fontSize: 14 },
   chevron:   { fontSize: 22, marginLeft: 2 },
+});
+
+// RTL rows for the Omer section — explicit row-reverse per project RTL rule.
+const omerRowStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 14,
+    minHeight: 48,
+  },
+  label: {
+    flex: 1,
+    fontSize: 17,
+    textAlign: 'right',
+  },
+  right: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 2,
+  },
 });
