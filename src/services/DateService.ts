@@ -316,3 +316,26 @@ export class DateService {
 }
 
 export const dateService = new DateService();
+
+/**
+ * Returns the Omer count for the given Gregorian date, or null if the
+ * date falls outside the Omer period (16 Nisan – 5 Sivan).
+ *
+ * Uses a targeted single-day HebrewCalendar lookup. Does not touch the
+ * month cache and has no side effects on cached state.
+ */
+export function getOmerForDate(date: Date): { day: number; text: string } | null {
+  const events = HebrewCalendar.calendar({
+    start: date,
+    end: date,
+    isHebrewYear: false,
+    omer: true,
+  });
+  const omerEvent = events.find(ev => (ev.getFlags() & flags.OMER_COUNT) !== 0);
+  if (!omerEvent) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const day = (omerEvent as any).omer as number;
+  const text = omerEvent.render('he');
+  if (!day || !text) return null;
+  return { day, text };
+}
