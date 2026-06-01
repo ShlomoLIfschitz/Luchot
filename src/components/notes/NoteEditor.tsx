@@ -11,6 +11,7 @@ import type { ThemeColors } from '../../hooks/useThemeColors';
 import type { NoteType, CalendarNote } from '../../hooks/useNotes';
 import type { HebrewDateInfo } from '../../services/DateService';
 import { toHebrewNumeral, toHebrewYear } from '../../services/DateService';
+import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
 
 const LEAD_TIME_OPTIONS: { label: string; minutes: number }[] = [
   { label: 'בזמן האירוע', minutes: 0 },
@@ -27,6 +28,76 @@ const NOTE_TYPES: { type: NoteType; label: string; icon: string }[] = [
   { type: 'anniversary', label: 'יום שנה',   icon: '💍' },
 ];
 
+const DEFAULT_COLOR_FOR_TYPE: Record<NoteType, ColorTokenKey> = {
+  note:        'tagEvent',
+  birthday:    'tagPersonal',
+  yahrzeit:    'tagPersonal',
+  anniversary: 'tagPersonal',
+};
+
+interface ColorPickerRowProps {
+  noteType: NoteType;
+  colorId: string | null;
+  onChange: (key: string) => void;
+  colors: ThemeColors;
+}
+
+function ColorPickerRow({ noteType, colorId, onChange, colors }: ColorPickerRowProps) {
+  const effectiveKey: ColorTokenKey = (colorId as ColorTokenKey) ?? DEFAULT_COLOR_FOR_TYPE[noteType];
+  return (
+    <View style={cpStyles.row}>
+      <Text style={[cpStyles.label, { color: colors.textTertiary }]}>צבע</Text>
+      <View style={cpStyles.circles}>
+        {COLOR_OPTIONS.map((key) => {
+          const hexColor = (colors as Record<string, string>)[key] ?? '#888';
+          const isSelected = key === effectiveKey;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => onChange(key)}
+              style={[cpStyles.circle, { backgroundColor: hexColor }]}
+            >
+              {isSelected && <Text style={cpStyles.checkmark}>✓</Text>}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const cpStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  circles: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  circle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});
+
 interface Props {
   visible: boolean;
   note?: CalendarNote;
@@ -42,6 +113,7 @@ interface Props {
     date: Date;
     hebrewDate: HebrewDateInfo;
     reminderMinutes?: number | null;
+    colorId?: string | null;
   }) => void;
   onClose: () => void;
 }
@@ -53,6 +125,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState<number>(0);
   const [customMinutes, setCustomMinutes] = useState<string>('30');
+  const [colorId, setColorId] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -63,6 +136,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       setReminderEnabled(existingMinutes !== null);
       setReminderMinutes(existingMinutes ?? 0);
       setCustomMinutes(String(existingMinutes ?? 30));
+      setColorId(note?.colorId ?? null);
     }
   }, [visible, note]);
 
@@ -77,7 +151,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       }
       return reminderMinutes;
     })();
-    onSave({ id: note?.id, created: note?.created, summary: trimmed, noteType, calendarType, date, hebrewDate, reminderMinutes: finalReminderMinutes });
+    onSave({ id: note?.id, created: note?.created, summary: trimmed, noteType, calendarType, date, hebrewDate, reminderMinutes: finalReminderMinutes, colorId });
     onClose();
   };
 
@@ -130,6 +204,13 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                     );
                   })}
                 </View>
+
+                <ColorPickerRow
+                  noteType={noteType}
+                  colorId={colorId}
+                  onChange={setColorId}
+                  colors={colors}
+                />
 
                 {isRecurring && (
                   <>
