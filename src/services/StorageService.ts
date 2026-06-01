@@ -200,6 +200,19 @@ export class StorageService {
   }
 
   /**
+   * Returns ALL non-cancelled events, ordered by start_date ascending.
+   * Used by IcsExportService to generate the full .ics export.
+   */
+  static async getAllEvents(): Promise<CalendarEvent[]> {
+    await ensureSchema();
+    const rows = await dbAll(
+      `SELECT * FROM events WHERE status != 'cancelled' ORDER BY start_date ASC`,
+      [],
+    );
+    return rows.map(StorageService.rowToEvent);
+  }
+
+  /**
    * Returns ALL events with recurrence_type other than 'none', regardless
    * of date. The caller (expandRecurringNotes utility) decides which
    * instances fall within a given range.
