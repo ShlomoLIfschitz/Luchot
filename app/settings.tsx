@@ -11,11 +11,12 @@
 //   - "עברית למעלה" toggle kept — field is live and will drive the
 //     universal date header in Phase 3.7c
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, Switch, StyleSheet, ScrollView, Pressable,
-  Modal, TouchableWithoutFeedback,
+  Modal, TouchableWithoutFeedback, Alert,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { useTimePicker } from '../src/hooks/useTimePicker';
 import { useRouter } from 'expo-router';
 import {
@@ -36,7 +37,7 @@ import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { radius } from '../src/constants/radius';
 import { overlay } from '../src/constants/overlay';
 import { CITIES, findCityByKey } from '../src/constants/cities';
-import { findNearestCity } from '../src/utils/locationLookup';
+import { findNearestCity, findNearestCityKey } from '../src/utils/locationLookup';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
@@ -196,6 +197,8 @@ export default function SettingsScreen() {
     setOmerReminderTime,
   );
 
+  const pendingCandleLightingEnable = useRef(false);
+
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
   const [candleLightingCityPicker, setCandleLightingCityPicker] = useState(false);
@@ -221,6 +224,52 @@ export default function SettingsScreen() {
     'לא הופעל';
 
   const trackColor = { false: colors.border, true: colors.accent };
+
+  const resolveLocationToCity = async (): Promise<string | null> => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return null;
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+    return findNearestCityKey(pos.coords.latitude, pos.coords.longitude);
+  };
+
+  const handleCandleLightingToggle = async (newValue: boolean) => {
+    if (!newValue) {
+      setCandleLightingRemindersEnabled(false);
+      return;
+    }
+    if (candleLightingCity !== null) {
+      setCandleLightingRemindersEnabled(true);
+      return;
+    }
+    // No city yet — must resolve before enabling
+    Alert.alert(
+      'מיקום להדלקת נרות',
+      'להשתמש במיקום הנוכחי לחישוב זמן ההדלקה?',
+      [
+        {
+          text: 'בחר עיר ידנית',
+          onPress: () => {
+            pendingCandleLightingEnable.current = true;
+            setCandleLightingCityPicker(true);
+          },
+        },
+        {
+          text: 'השתמש במיקום',
+          onPress: async () => {
+            const key = await resolveLocationToCity();
+            if (key) {
+              setCandleLightingCity(key);
+              setCandleLightingRemindersEnabled(true);
+            } else {
+              // Permission denied or no city within threshold — fall to picker
+              pendingCandleLightingEnable.current = true;
+              setCandleLightingCityPicker(true);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -421,7 +470,7 @@ export default function SettingsScreen() {
           {/* Row A — Toggle (always visible) */}
           <Pressable
             android_ripple={{ color: colors.border }}
-            onPress={() => setCandleLightingRemindersEnabled(!candleLightingRemindersEnabled)}
+            onPress={() => { void handleCandleLightingToggle(!candleLightingRemindersEnabled); }}
             style={[
               omerRowStyles.row,
               { backgroundColor: colors.surface },
@@ -436,7 +485,7 @@ export default function SettingsScreen() {
           >
             <Switch
               value={candleLightingRemindersEnabled}
-              onValueChange={setCandleLightingRemindersEnabled}
+              onValueChange={(v) => { void handleCandleLightingToggle(v); }}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={colors.surface}
             />
@@ -490,12 +539,30 @@ export default function SettingsScreen() {
               accessibilityLabel={`עיר: ${findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}`}
               accessibilityRole="button"
             >
+              {/* LEFT side — update button (first in JSX = left in row-reverse) */}
+              {candleLightingCity !== null && (
+                <Pressable
+                  onPress={async () => {
+                    const key = await resolveLocationToCity();
+                    if (key) {
+                      setCandleLightingCity(key);
+                    } else {
+                      Alert.alert('שגיאה', 'לא ניתנה הרשאת מיקום');
+                    }
+                  }}
+                  style={[candleRowStyles.updateBtn, { backgroundColor: colors.accentLight }]}
+                >
+                  <Text style={[candleRowStyles.updateBtnText, { color: colors.accent }]}>עדכן</Text>
+                </Pressable>
+              )}
+              {/* Middle — chevron + current city value */}
               <View style={omerRowStyles.right}>
                 <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
                 <Text style={[styles.valueText, { color: colors.textSecondary }]}>
                   {findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
                 </Text>
               </View>
+              {/* RIGHT side — label (last in JSX = right in row-reverse) */}
               <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>עיר</Text>
             </Pressable>
           )}
@@ -535,7 +602,13 @@ export default function SettingsScreen() {
         title="עיר להדלקת נרות"
         options={CITIES.map((c) => ({ label: c.nameHe, value: c.hebcalKey }))}
         selected={candleLightingCity ?? ''}
-        onSelect={(v) => setCandleLightingCity(v)}
+        onSelect={(v) => {
+          setCandleLightingCity(v);
+          if (pendingCandleLightingEnable.current) {
+            setCandleLightingRemindersEnabled(true);
+            pendingCandleLightingEnable.current = false;
+          }
+        }}
         onClose={() => setCandleLightingCityPicker(false)}
         colors={colors}
       />
@@ -584,6 +657,8 @@ const candleRowStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  updateBtn:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  updateBtnText: { fontSize: 13, fontWeight: '600' },
 });
 
 // RTL rows for the Omer section — explicit row-reverse per project RTL rule.
