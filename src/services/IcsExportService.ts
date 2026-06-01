@@ -99,7 +99,7 @@ export async function exportCalendar(includeHebcal: boolean): Promise<void> {
     const hebEvents = HebrewCalendar.calendar({
       year: currentHYear,
       isHebrewYear: true,
-      sedrot: false,
+      sedrot: true,
       omer: false,
       shabbatMevarchim: false,
       noModern: false,
