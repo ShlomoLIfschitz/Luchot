@@ -110,6 +110,8 @@ export function Drawer() {
   // delta rather than treating e.translationX as an absolute position.
   // runOnJS is required because Zustand setters run on the JS thread,
   // not on the Reanimated worklet thread.
+  const triggerClose = () => { closeDrawer(); };
+
   const swipeGesture = Gesture.Pan()
     .onStart(() => {
       gestureStartX.value = translateX.value;
@@ -126,7 +128,7 @@ export function Drawer() {
         e.velocityX < -SWIPE_CLOSE_VELOCITY ||    // fast leftward flick
         e.translationX < -SWIPE_CLOSE_DISTANCE;   // dragged far enough left
       if (shouldClose) {
-        runOnJS(closeDrawer)();
+        runOnJS(triggerClose)();
       } else {
         // Snap back to open
         translateX.value = withTiming(0, { duration: ANIMATION_DURATION });
