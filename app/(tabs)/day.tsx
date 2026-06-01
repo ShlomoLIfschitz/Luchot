@@ -20,7 +20,7 @@ import {
   I18nManager,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { Plus } from 'lucide-react-native';
+import { Plus, CalendarArrowUp } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
@@ -34,6 +34,7 @@ import {
   type DayData,
 } from '../../src/services/DateService';
 import { radius } from '../../src/constants/radius';
+import { ExportModal } from '../../src/components/export/ExportModal';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
 
@@ -64,6 +65,8 @@ export default function DayScreen() {
 
   const openNoteEditor = useCallback(() => setEditorVisible(true), []);
   const closeNoteEditor = useCallback(() => setEditorVisible(false), []);
+
+  const [exportModalVisible, setExportModalVisible] = useState(false);
 
   // Day navigation — swipe left/right to move days
   const navigateDay = useCallback(
@@ -236,6 +239,19 @@ export default function DayScreen() {
           <View style={styles.bottomSpacer} />
         </ScrollView>
 
+        {/* Secondary export button — visually secondary to the main FAB */}
+        <Pressable
+          onPress={() => setExportModalVisible(true)}
+          style={[
+            styles.exportBtn,
+            { backgroundColor: colors.accentLight },
+            I18nManager.isRTL ? { left: 24 } : { right: 24 },
+          ]}
+          accessibilityLabel="ייצוא יומן"
+        >
+          <CalendarArrowUp color={colors.accent} size={18} />
+        </Pressable>
+
         {/* FAB — RTL-aware positioning via I18nManager */}
         <Pressable
           onPress={openNoteEditor}
@@ -261,6 +277,11 @@ export default function DayScreen() {
           colors={colors}
           onClose={closeNoteEditor}
           onSave={saveNote}
+        />
+
+        <ExportModal
+          visible={exportModalVisible}
+          onClose={() => setExportModalVisible(false)}
         />
 
         {/* Date picker — Phase 4.4; rendered outside ScrollView */}
@@ -381,6 +402,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   hourNoteText: { fontSize: 13, fontWeight: '500' },
+
+  // Secondary export button — floats above FAB; right/left set inline (RTL-aware)
+  exportBtn: {
+    position: 'absolute',
+    bottom: 90,
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+  },
 
   // FAB — right/left set inline via I18nManager (RTL-aware)
   fab: {

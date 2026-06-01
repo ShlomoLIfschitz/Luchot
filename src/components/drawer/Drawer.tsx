@@ -10,7 +10,7 @@
 //   translateX: -drawerWidth = closed (panel off-screen to the left)
 //   Swipe LEFT to close, swipe RIGHT (back) snaps to open.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ import Animated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import {
+  CalendarArrowUp,
   Calendar,
   BookOpenText,
   Sun,
@@ -45,6 +46,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { overlay } from '../../constants/overlay';
 import { radius } from '../../constants/radius';
 import { DrawerItem } from './DrawerItem';
+import { ExportModal } from '../export/ExportModal';
 
 const DRAWER_WIDTH_RATIO = 0.8;
 const DRAWER_MAX_WIDTH = 320;
@@ -99,6 +101,8 @@ export function Drawer() {
   const backdropAnimatedProps = useAnimatedProps<Pick<ViewProps, 'pointerEvents'>>(() => ({
     pointerEvents: backdropOpacity.value > 0 ? 'auto' : 'none',
   }));
+
+  const [exportModalVisible, setExportModalVisible] = useState(false);
 
   // All hooks have now been called unconditionally. Safe to return null here
   // if dimensions are not yet available (screenWidth === 0 on Android first render).
@@ -223,6 +227,14 @@ export function Drawer() {
               label="מיקום"
               onPress={() => navigateTo('/locationPicker')}
             />
+            <DrawerItem
+              Icon={CalendarArrowUp}
+              label="ייצוא יומן"
+              onPress={() => {
+                closeDrawer();
+                setTimeout(() => setExportModalVisible(true), 150);
+              }}
+            />
 
             {/* Divider */}
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -241,6 +253,10 @@ export function Drawer() {
           </View>
         </Animated.View>
       </GestureDetector>
+      <ExportModal
+        visible={exportModalVisible}
+        onClose={() => setExportModalVisible(false)}
+      />
     </>
   );
 }
