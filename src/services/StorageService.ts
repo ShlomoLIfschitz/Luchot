@@ -22,6 +22,7 @@ import { CalendarEvent } from '../schemas/EventSchema';
 let db: SQLiteDatabase | null = null;
 let schemaInitialized = false;
 let schemaV2Migrated = false;
+let schemaColorMigrated = false;
 
 function getDb(): SQLiteDatabase {
   if (!db) {
@@ -74,6 +75,15 @@ async function ensureSchema(): Promise<void> {
         // column already exists — no-op
       }
       schemaV2Migrated = true;
+    }
+    // v3 migration: add color_id column (additive, safe — already in CREATE TABLE for new installs)
+    if (!schemaColorMigrated) {
+      try {
+        await txn.executeSqlAsync('ALTER TABLE events ADD COLUMN color_id TEXT', []);
+      } catch {
+        // column already exists — no-op
+      }
+      schemaColorMigrated = true;
     }
   });
   schemaInitialized = true;
