@@ -73,11 +73,6 @@ export function Drawer() {
   // non-zero value (e.g. the drawer was mid-animation when the next gesture started).
   const gestureStartX = useSharedValue(0);
 
-  // Fix 1 (continued): all hooks must come before any early return.
-  // Shared values, animated styles, and gesture are all declared above.
-  // Return null here to skip rendering until dimensions are available.
-  if (screenWidth === 0) return null;
-
   useEffect(() => {
     if (isOpen) {
       translateX.value = withTiming(0, { duration: ANIMATION_DURATION });
@@ -104,6 +99,10 @@ export function Drawer() {
   const backdropAnimatedProps = useAnimatedProps<Pick<ViewProps, 'pointerEvents'>>(() => ({
     pointerEvents: backdropOpacity.value > 0 ? 'auto' : 'none',
   }));
+
+  // All hooks have now been called unconditionally. Safe to return null here
+  // if dimensions are not yet available (screenWidth === 0 on Android first render).
+  if (screenWidth === 0) return null;
 
   // Swipe-to-close: drag the panel to the LEFT (back toward the screen edge).
   // Fix 2: .onStart captures the current translateX so onUpdate applies a true
