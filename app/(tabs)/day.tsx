@@ -340,10 +340,10 @@ const styles = StyleSheet.create({
   },
 
   // Detail rows (Torah details)
-  detailRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
+  detailRow: { flexDirection: 'row-reverse', alignItems: 'center', marginVertical: 6 },
   detailFlex: { flex: 1 },
-  detailLabel: { fontSize: 11, fontWeight: '500', marginBottom: 2 },
-  detailValue: { fontSize: 16, fontWeight: '500' },
+  detailLabel: { fontSize: 11, fontWeight: '500', marginBottom: 2, textAlign: 'right' },
+  detailValue: { fontSize: 16, fontWeight: '500', textAlign: 'right' },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md },
   actionText: { fontSize: 13, fontWeight: '600' },
 
