@@ -10,7 +10,7 @@
 //   translateX: -drawerWidth = closed (panel off-screen to the left)
 //   Swipe LEFT to close, swipe RIGHT (back) snaps to open.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,11 @@ import {
   useWindowDimensions,
   StatusBar,
 } from 'react-native';
+import type { ViewProps } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedProps,
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
@@ -59,25 +61,30 @@ export function Drawer() {
   const isOpen = useDrawerStore((s) => s.isOpen);
   const closeDrawer = useDrawerStore((s) => s.close);
 
-  // translateX: 0 = open (visible at left edge), -drawerWidth = closed (off-screen left)
-  const translateX = useSharedValue(-drawerWidth);
+  // Fix 1: guard against screenWidth === 0 on Android first render.
+  // If screenWidth is 0, drawerWidth is 0 and -drawerWidth would be 0 (open).
+  // Use -1000 as a safe off-screen sentinel when dimensions are not yet known.
+  const translateX = useSharedValue(screenWidth > 0 ? -drawerWidth : -1000);
   const backdropOpacity = useSharedValue(0);
 
-  // backdropInteractive: lifted out of animated style to avoid Reanimated 3
-  // edge-case bugs with pointerEvents inside useAnimatedStyle across versions.
-  const [backdropInteractive, setBackdropInteractive] = useState(false);
+  // Fix 2: capture position at gesture start so onUpdate uses deltas from
+  // the actual starting point, not from zero. This prevents the "alternates
+  // sides" bug that occurs when a previous gesture left translateX at a
+  // non-zero value (e.g. the drawer was mid-animation when the next gesture started).
+  const gestureStartX = useSharedValue(0);
+
+  // Fix 1 (continued): all hooks must come before any early return.
+  // Shared values, animated styles, and gesture are all declared above.
+  // Return null here to skip rendering until dimensions are available.
+  if (screenWidth === 0) return null;
 
   useEffect(() => {
     if (isOpen) {
       translateX.value = withTiming(0, { duration: ANIMATION_DURATION });
       backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION });
-      setBackdropInteractive(true);
     } else {
       translateX.value = withTiming(-drawerWidth, { duration: ANIMATION_DURATION });
       backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION });
-      // Delay disabling interaction until the close animation finishes
-      const timer = setTimeout(() => setBackdropInteractive(false), ANIMATION_DURATION);
-      return () => clearTimeout(timer);
     }
   }, [isOpen, drawerWidth, translateX, backdropOpacity]);
 
@@ -89,15 +96,29 @@ export function Drawer() {
     opacity: backdropOpacity.value,
   }));
 
-  // Swipe-to-close: drag the panel to the LEFT (back toward the screen edge)
+  // Fix 3: replace state + setTimeout with useAnimatedProps so pointer-events
+  // toggle on the UI thread in sync with the animation. The old approach using
+  // setState + setTimeout was unreliable on real Android (batching differences
+  // vs Expo Go caused the backdrop to remain non-interactive after opening, or
+  // stay interactive after closing).
+  const backdropAnimatedProps = useAnimatedProps<Pick<ViewProps, 'pointerEvents'>>(() => ({
+    pointerEvents: backdropOpacity.value > 0 ? 'auto' : 'none',
+  }));
+
+  // Swipe-to-close: drag the panel to the LEFT (back toward the screen edge).
+  // Fix 2: .onStart captures the current translateX so onUpdate applies a true
+  // delta rather than treating e.translationX as an absolute position.
   // runOnJS is required because Zustand setters run on the JS thread,
   // not on the Reanimated worklet thread.
   const swipeGesture = Gesture.Pan()
+    .onStart(() => {
+      gestureStartX.value = translateX.value;
+    })
     .onUpdate((e) => {
-      // Only allow leftward drag (negative translationX = toward off-screen)
-      if (e.translationX < 0) {
-        translateX.value = e.translationX;
-        backdropOpacity.value = Math.max(0, 1 - Math.abs(e.translationX) / drawerWidth);
+      const newX = gestureStartX.value + e.translationX;
+      if (newX < 0) {
+        translateX.value = newX;
+        backdropOpacity.value = Math.max(0, 1 - Math.abs(newX) / drawerWidth);
       }
     })
     .onEnd((e) => {
@@ -128,19 +149,18 @@ export function Drawer() {
 
   return (
     <>
-      {/* Backdrop — tappable to close, non-interactive when drawer is closed */}
+      {/* Backdrop — tappable to close, non-interactive when drawer is closed.
+          Fix 3: pointerEvents driven by animatedProps (UI thread) instead of
+          React state + setTimeout (unreliable on real Android). */}
       <Animated.View
         style={[
           styles.backdrop,
           { backgroundColor: overlay.modal },
           animatedBackdropStyle,
         ]}
-        pointerEvents={backdropInteractive ? 'auto' : 'none'}
+        animatedProps={backdropAnimatedProps}
       >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={closeDrawer}
-        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeDrawer} />
       </Animated.View>
 
       {/* Drawer panel — anchored to left edge, slides in/out */}
