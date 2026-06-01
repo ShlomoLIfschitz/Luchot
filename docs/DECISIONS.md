@@ -205,3 +205,23 @@
   constraints. Do not reintroduce state-based pointerEvents gating, raw
   translationX absolute assignment in gesture onUpdate, or unconditional
   render before screenWidth resolves.
+
+## Candle-lighting reminders: computed fire time, not 09:00 all-day policy
+
+- Date: 2026-06-01
+- Context: Wave 3b-1 added candle-lighting reminders. The existing "All-day
+  reminder fire time = 09:00 local" decision applies only to events without an
+  intrinsic clock time (birthdays, yahrzeits). Candle-lighting has an intrinsic
+  time (shkia − city offset), so the 09:00 policy does not apply.
+- Choice: Candle-lighting notification fire time = candleLightingTime −
+  leadMinutes, where candleLightingTime = shkia − cityOffsetMinutes (computed
+  directly from ZmanimService.getZmanim().shkia, bypassing the Friday-only
+  ZmanimResult.candleLighting field). leadMinutes is user-chosen (5/10/15/30,
+  default 15).
+- Alternatives considered: 09:00 on erev day (wrong — misses the connection to
+  actual shkia time); using ZmanimResult.candleLighting directly (null for
+  non-Fridays — cannot be used for Yom Tov eves).
+- Implications: Any future zmanim-based reminder (havdalah alert, fast start/end)
+  must similarly compute a real timestamp, not use the 09:00 all-day policy.
+  The "All-day fire time = 09:00" decision remains valid for non-time-anchored
+  events only.
