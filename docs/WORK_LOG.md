@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-06-01 — Session: Phase 5 Wave 4a — Color Picker
+
+**Phase:** Phase 5, Wave 4a
+**Commits:** `7647654` (feat: SQLite color_id migration + save/load), `69619b5` (feat: resolveEventColor utility + CalendarNote colorId field), `7e01f9f` (feat: color picker in NoteEditor), `0330ac9` (feat: quick color dot in NoteList)
+**Status:** Wave 4a complete. DoD passed (typecheck green, expo-doctor 16/17 baseline).
+
+### What got done
+
+- **`StorageService.ts`** (database-architect): Added idempotent v3 migration guard — `ALTER TABLE events ADD COLUMN color_id TEXT` — following the same `schemaV2Migrated` try/catch pattern. Column was already in `CREATE TABLE` and save/load already handled it; guard is belt-and-suspenders for edge-case existing installs.
+- **`src/utils/colorResolver.ts`** (local-data-builder, new file): Pure utility. Exports `COLOR_OPTIONS` (5 token keys), `ColorTokenKey` type, and `resolveEventColor(noteType, colorId) → TagCategory`. Override logic: colorId token key wins; else inferred from note type (birthday/yahrzeit/anniversary → personal, note → event).
+- **`src/hooks/useNotes.ts`** (local-data-builder): `CalendarNote.colorId?: string | null` added. `eventToCalendarNote` reads `event.colorId`. `saveNote` params extended with optional `colorId`.
+- **`src/utils/tagMapper.ts`** (local-data-builder): `buildDayTags` now calls `resolveEventColor(note.noteType, note.colorId)` for the tag category — replaced hardcoded `'event'`/`'personal'`. Existing notes without colorId behave identically.
+- **`src/components/notes/NoteEditor.tsx`** (mobile-ui-builder): `ColorPickerRow` sub-component — 5 Pressable circles (24dp, row-reverse, gap 8), selected shows white ✓. Placed immediately below the type chip selector. `colorId` state (null = default, explicit key = override). Pre-populates on edit. Passed through `onSave`.
+- **`src/components/notes/NoteList.tsx`** (mobile-ui-builder): 16dp color dot as first child in note row (leftmost). Tapping opens a fade Modal with 5 circles (32dp). Selection calls `saveNote` immediately with new `colorId` and closes. Backdrop tap closes without saving.
+
+### Decisions made
+
+- None new (feature followed locked design spec).
+
+### Open issues / blocked
+
+- color_id column was already in CREATE TABLE (from original Google Calendar-compatible schema). No data migration concern for real users.
+- Bug A and Bug B from prior session remain unresolved (but were found to be non-existent in current code — pending re-test on next APK build).
+
+### Next steps
+
+- EAS build (versionCode 7) to test Wave 4a on real device. 13 builds remaining.
+- Bug A + Bug B re-test.
+
+---
+
 ## 2026-06-01 — Session: Phase 5 Drawer RTL fixes
 
 **Phase:** Phase 5 (maintenance)
