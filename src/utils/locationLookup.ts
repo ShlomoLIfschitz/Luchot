@@ -67,6 +67,31 @@ export function findNearestCity(
 }
 
 /**
+ * Returns the hebcalKey of the nearest city within thresholdDeg degrees
+ * (squared Euclidean lat/lng — sufficient for city-level resolution).
+ * Returns null if no city is within threshold.
+ * Distinct from findNearestCity which always returns a city + haversine distance.
+ */
+export function findNearestCityKey(
+  lat: number,
+  lng: number,
+  thresholdDeg = 2.0,
+): string | null {
+  let bestKey: string | null = null;
+  let bestDist = Infinity;
+  for (const city of CITIES) {
+    const coords = getCityCoordinates(city.hebcalKey);
+    if (!coords) continue;
+    const dist = (coords.lat - lat) ** 2 + (coords.lng - lng) ** 2;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestKey = city.hebcalKey;
+    }
+  }
+  return bestDist <= thresholdDeg ** 2 ? bestKey : null;
+}
+
+/**
  * Returns the lat/lng from Hebcal for the given city key.
  * Useful when the user picks a city from the list and we need
  * to update LocationProvider with actual coordinates.
