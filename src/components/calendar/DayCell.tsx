@@ -5,8 +5,8 @@
 
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Flame } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import CandleIcon from '../icons/CandleIcon';
 import { radius } from '../../constants/radius';
 
 // ── Cell height — per docs/DESIGN.md ──────────────────────────────────────────
@@ -114,7 +114,7 @@ function DayCellInner({
           {primaryLabel}
         </Text>
         {isFriday && (
-          <Flame size={12} color={colors.candle} />
+          <CandleIcon width={16} height={12} color={colors.candle} />
         )}
       </View>
 
