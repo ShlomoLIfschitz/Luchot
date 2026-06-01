@@ -156,7 +156,7 @@ function SettingRow({
 
 const rowStyles = StyleSheet.create({
   row: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row-reverse', alignItems: 'center',
     paddingVertical: 12, paddingHorizontal: 16, gap: 14, minHeight: 54,
   },
   label: { flex: 1, fontSize: 15, textAlign: 'right' },
