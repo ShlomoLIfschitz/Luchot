@@ -179,3 +179,29 @@
   recurring events (it only persists reminder_minutes); ensureAnnualReminders
   is the sole scheduler for yearly_* events. This prevents double-schedule and
   stale-date collisions.
+
+## Custom Drawer (Drawer.tsx): three implementation constraints
+
+- Date: 2026-06-01
+- Context: APK versionCode 5 (first standalone build) revealed three bugs
+  masked by Expo Go: drawer opened on entry (drawerWidth=0 race), left/right
+  alternation on repeated open/close (raw translationX used as absolute
+  position), and backdrop tap-to-dismiss unreliable (setState+setTimeout
+  timing differed in standalone vs Expo Go JS batching).
+- Choice: Three constraints now locked in Drawer.tsx:
+  (1) Render deferred until screenWidth > 0 (return null guard); translateX
+  shared value initialized to -1000 sentinel when width not yet resolved.
+  (2) Swipe gesture is delta-based: gestureStartX shared value captures
+  translateX.value at onStart; onUpdate applies gestureStartX + e.translationX
+  as the new position (not raw e.translationX from zero).
+  (3) Backdrop pointer-events controlled via Reanimated useAnimatedProps keyed
+  on backdropOpacity.value — not React state + setTimeout. This runs on the
+  UI thread in lockstep with the opacity animation.
+- Alternatives considered: React state + setTimeout (rejected — unreliable
+  on real Android); React ref for gestureStartX (rejected — refs are not
+  accessible on the UI thread in Reanimated gesture callbacks, shared values
+  are).
+- Implications: Any future edit to Drawer.tsx must preserve these three
+  constraints. Do not reintroduce state-based pointerEvents gating, raw
+  translationX absolute assignment in gesture onUpdate, or unconditional
+  render before screenWidth resolves.
