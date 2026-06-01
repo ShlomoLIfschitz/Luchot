@@ -4,7 +4,8 @@
 
 import type { DayData } from '../services/DateService';
 import type { CalendarNote } from '../hooks/useNotes';
-import type { DayCellTag, TagCategory } from '../components/calendar/DayCell';
+import type { DayCellTag } from '../components/calendar/DayCell';
+import { resolveEventColor } from './colorResolver';
 
 /**
  * Maps a DayData (holidays, Rosh Chodesh, Omer) and a list of user
@@ -49,17 +50,10 @@ export function buildDayTags(
     tags.push({ category: 'special', label: `יום ${dayData.omerDay} לעומר` });
   }
 
-  // 4 & 5. User notes — mapped by noteType to TagCategory
-  const noteCategoryMap: Record<CalendarNote['noteType'], TagCategory> = {
-    note:        'event',
-    birthday:    'personal',
-    yahrzeit:    'personal',
-    anniversary: 'personal',
-  };
-
+  // 4 & 5. User notes — category resolved via colorId override or type default
   for (const note of userNotes) {
     tags.push({
-      category: noteCategoryMap[note.noteType],
+      category: resolveEventColor(note.noteType, note.colorId),
       label: note.summary,
     });
   }
