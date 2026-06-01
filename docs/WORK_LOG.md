@@ -6,6 +6,91 @@
 
 ---
 
+## 2026-06-01 — Session: Phase 5 Drawer RTL fixes
+
+**Phase:** Phase 5 (maintenance)
+**Commits:** `0d936f6` (fix: Drawer RTL stability — drawerWidth guard, delta gesture, animatedProps backdrop), `b6afe3e` (fix: Drawer gesture onEnd worklet crash), `53e0687` (fix: move Drawer early return after all hook declarations)
+**Status:** Complete. DoD passed (typecheck green, expo-doctor 16/17 baseline).
+
+### What got done
+
+- drawerWidth guard: render deferred until screenWidth > 0 (return null); translateX initialized to -1000 sentinel.
+- Delta-based gesture: gestureStartX shared value captures translateX.value at onStart; onUpdate applies gestureStartX + e.translationX (not raw translationX from zero). Fixes left/right alternation on repeat open/close.
+- animatedProps backdrop: pointer-events controlled via Reanimated useAnimatedProps keyed on backdropOpacity.value — not React state + setTimeout. Eliminated unreliable tap-to-dismiss on real Android.
+- Drawer gesture crash: runOnJS(closeDrawer) → runOnJS(triggerClose) to avoid Reanimated worklet serialization of Zustand store action.
+- Rules of Hooks fix: early return (screenWidth===0 guard) moved after all hook declarations; guard now renders null via JSX conditional, not early return.
+- RTL layout: Day screen study items — flexDirection row-reverse, textAlign right on label+value. Settings rows — flexDirection row-reverse on rowStyles.row.
+
+### Decisions made
+
+- Two new entries added to DECISIONS.md: runOnJS worklet pattern (triggerClose wrapper) and hooks-before-return rule for Drawer.tsx.
+
+### Open issues / blocked
+
+- dark/light theme persistence not persisted across restarts (Bug A).
+- User-created event indicators missing from month day cells (Bug B).
+
+### Next steps
+
+- Bug A + Bug B fixes.
+
+---
+
+## 2026-06-01 — Session: Phase 5 Wave 3b-2 — Geolocation city resolution
+
+**Phase:** Phase 5, Wave 3b-2
+**Commits:** `6246e73` (feat: findNearestCityKey utility in locationLookup.ts), `61ce318` (feat: geolocation city resolution in candle-lighting Settings)
+**Status:** Wave 3b-2 complete. DoD passed (typecheck green, expo-doctor 16/17 baseline).
+
+### What got done
+
+- `findNearestCityKey` utility: takes `{latitude, longitude}`, iterates the curated city list from `@hebcal/cities`, returns the key of the geographically nearest city (Haversine distance).
+- Geolocation Alert flow in Settings: "עדכן לפי מיקום" button requests `expo-location` permission, calls `getCurrentPositionAsync`, runs `findNearestCityKey`, updates LocationProvider city — all with loading state and error handling.
+- `app.json` already had `expo-location` config from Phase 4.5; no new native changes required.
+- Agents: `local-data-builder` (findNearestCityKey), `mobile-ui-builder` (Settings UI).
+
+### Decisions made
+
+- None new.
+
+### Open issues / blocked
+
+- Bug A + Bug B (see Drawer RTL session entry above).
+
+### Next steps
+
+- Drawer RTL stability fixes (committed same session). Then Bug A + Bug B.
+
+---
+
+## 2026-06-01 — Session: Phase 5 Wave 3b-1 — Candle-lighting reminders
+
+**Phase:** Phase 5, Wave 3b-1
+**Commits:** `aa87609` (feat: candleLighting fields in SettingsProvider + ensureCandleLightingReminders in NotificationService), `563077c` (fix: settings row RTL direction — row-reverse for Hebrew layout), `6984f87` (fix: RTL layout for daily study items in Day screen)
+**Status:** Wave 3b-1 complete. DoD passed (typecheck green, expo-doctor 16/17 baseline).
+
+### What got done
+
+- **SettingsProvider:** three new fields — `candleLightingRemindersEnabled` (bool, default false), `candleLightingLeadMinutes` (number, default 15), `candleLightingCity` (string | null, default null). All wired in `SettingsState`, initializer, setters, `loadFromStorage`, and `save()` — the settings-persistence-gotcha explicitly satisfied.
+- **`NotificationService.ensureCandleLightingReminders()`:** sweep-on-init over next 30 days, identifies erev Shabbat + erev Yom Tov, computes fire time as shkia − cityOffsetMinutes − leadMinutes via `ZmanimService.getZmanim()`, stable id namespace `candle-YYYYMMDD`, idempotent diff.
+- **Settings UI:** candle-lighting section with toggle, lead-time chips (5/10/15/30 min), city picker (scrollable list from curated city set). Alert flow for first-enable with no city set.
+- **`_layout.tsx`:** `ensureCandleLightingReminders()` added to init sweep after `ensureOmerReminders`.
+- Agents: `local-data-builder` (SettingsProvider, NotificationService), `mobile-ui-builder` (Settings UI, _layout wiring).
+
+### Decisions made
+
+- Candle-lighting fire time = computed (shkia − cityOffset − leadMinutes), NOT the 09:00 all-day policy. Logged in DECISIONS.md (see "Candle-lighting reminders: computed fire time").
+
+### Open issues / blocked
+
+- None from Wave 3b-1.
+
+### Next steps
+
+- Wave 3b-2: geolocation city resolution.
+
+---
+
 ## 2026-05-30 — Session: Phase 5 Wave 3a — Omer Count Reminders
 
 **Phase:** Phase 5, Wave 3a

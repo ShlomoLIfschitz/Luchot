@@ -225,3 +225,38 @@
   must similarly compute a real timestamp, not use the 09:00 all-day policy.
   The "All-day fire time = 09:00" decision remains valid for non-time-anchored
   events only.
+
+## Reanimated worklet callbacks must never call Zustand store actions directly
+- Date: 2026-06-01
+- Context: Drawer.tsx onEnd worklet called closeDrawer() (a Zustand action)
+  via runOnJS(closeDrawer). On real Android APK this caused a worklet
+  serialization crash — Zustand actions are not serializable across the
+  Reanimated worklet/JS boundary.
+- Choice: Wrap Zustand actions in a plain local JS function before passing
+  to runOnJS(). Pattern: const triggerClose = () => closeDrawer(); then
+  runOnJS(triggerClose)(). The wrapper is a plain closure, not a store
+  method, so Reanimated can serialize it safely.
+- Alternatives considered: passing store actions directly (rejected —
+  crashes on Android); using refs to hold the action (rejected — refs
+  in worklets require extra Reanimated wiring).
+- Implications: Any future Reanimated gesture handler or worklet that needs
+  to trigger app state changes must use this triggerClose pattern. Do not
+  pass Zustand actions, context callbacks, or non-serializable functions
+  directly to runOnJS().
+
+## Drawer.tsx: all hook calls must appear before any early return
+- Date: 2026-06-01
+- Context: The screenWidth===0 guard was implemented as an early return
+  before hook declarations, violating React Rules of Hooks and causing
+  a runtime error on cold start.
+- Choice: All useState, useRef, useSharedValue, useAnimatedStyle,
+  useAnimatedProps, and useEffect calls are placed unconditionally at the
+  top of the component. The screenWidth guard renders null via a JSX
+  conditional at the bottom of the render path (if (!screenWidth) return null
+  placed after all hooks), not via an early return before them.
+- Alternatives considered: early return before hooks (rejected — Rules of
+  Hooks violation, runtime crash).
+- Implications: Any future conditional render in Drawer.tsx must follow
+  this pattern. This complements the three Drawer constraints locked on the
+  same date (see "Custom Drawer (Drawer.tsx): three implementation
+  constraints").

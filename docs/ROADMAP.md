@@ -1,7 +1,8 @@
 # Luchot — Roadmap
 
-> **Status snapshot — PHASE 3 COMPLETE (2026-05-27).**
-> All Phase 3 sub-phases done. Phase 4 (polish for MVP) is the active phase.
+> **Status snapshot — Phase 5 Wave 3b complete (2026-06-01).**
+> Wave 3b-1 (candle-lighting reminders) and Wave 3b-2 (geolocation city resolution) both done.
+> Active work: Bug fixes (A — theme persistence, B — event indicators in day cells).
 >
 > ~~Phase 3.6 complete. Phases 3.1–3.6 done; 3.7 is the final Phase 3 task.~~
 
@@ -164,9 +165,18 @@ Daily "היום X לעומר" notification at user-chosen time (default 21:00). 
 picker in Settings. Rolling-window sweep-on-init. Full Hebrew weeks phrasing via
 `DateService.getOmerForDate`. No DB row. Commits `c00ddfa`–`fcc3c08`.
 
-### Wave 3b — Candle-lighting notifications *(next)*
-Location/astronomical fire time (before shkia per user's city offset). Different from
-Omer's fixed-time approach — involves ZmanimService integration. Scoped to this wave.
+### Wave 3b-1 — Candle-lighting notifications ✅ (commits `aa87609`–`6984f87`)
+SettingsProvider: three new fields (candleLightingRemindersEnabled, candleLightingLeadMinutes,
+candleLightingCity). NotificationService.ensureCandleLightingReminders(): sweep-on-init,
+30-day window, fire time = shkia − cityOffset − leadMinutes. Settings UI: toggle + lead-time
+chips + city picker. _layout.tsx wired.
+
+### Wave 3b-2 — Geolocation city resolution ✅ (commits `6246e73`–`61ce318`)
+findNearestCityKey utility (Haversine to nearest curated city). Geolocation Alert flow in
+Settings candle-lighting section: requests expo-location permission, resolves city key,
+updates LocationProvider.
+
+### Bug fixes (active) — A: theme persistence · B: event indicators in day cells
 
 ### Wave 4 — .ics export/import
 Export Luchot events as .ics via Android share sheet. Import .ics files the user
