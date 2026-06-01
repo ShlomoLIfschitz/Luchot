@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-06-01 — Session: Phase 5 Wave 4b — .ics Export
+
+**Phase:** Phase 5, Wave 4b
+**Commits:** `776f26a` (feat: IcsExportService — build and share .ics file), `56f12aa` (feat: ExportModal + drawer and day screen entry points)
+**Status:** Wave 4b complete. DoD passed (typecheck green, expo-doctor 16/17 baseline).
+
+### What got done
+
+- **`expo-file-system@~17.0.1` + `expo-sharing@~12.0.1`** installed via `npx expo install` (SDK 51 compatible). Neither was previously in the project.
+- **`StorageService.getAllEvents()`** (database-architect/local-data-builder): returns all non-cancelled events ordered by `start_date ASC`. Used by IcsExportService.
+- **`src/services/IcsExportService.ts`** (local-data-builder, new): `exportCalendar(includeHebcal)` builds RFC 5545 iCal string (personal events always + optional hebcal holidays/Rosh Chodesh for current Hebrew year), writes to `FileSystem.cacheDirectory`, shares via `Sharing.shareAsync`. Hebrew-language errors thrown for UI display.
+- **`src/components/export/ExportModal.tsx`** (mobile-ui-builder, new): fade Modal with RTL layout. Checkbox "כלול חגים, שבתות וראשי חודשים" (default off). ActivityIndicator while exporting. Error → `Alert.alert`. Loading blocks dismiss.
+- **`src/components/drawer/Drawer.tsx`** (mobile-ui-builder): `CalendarArrowUp` "ייצוא יומן" DrawerItem before settings divider. ExportModal rendered at JSX root with 150ms open delay after drawer close.
+- **`app/(tabs)/day.tsx`** (mobile-ui-builder): secondary 40dp export FAB at `bottom: 90` (above main FAB). Same RTL-aware `I18nManager.isRTL` positioning pattern.
+
+### Decisions made
+
+- `sedrot: false` in hebcal flags (per spec). Shabbat events require `sedrot: true` to appear; with current flags, only holidays and Rosh Chodesh categories are generated. Documented as future enhancement.
+- `expo-sharing` + `expo-file-system` installed as new direct deps — authorized by session goal.
+
+### Open issues / blocked
+
+- Shabbat events in hebcal export require `sedrot: true`; current flags omit them. Low priority — holidays + Rosh Chodesh cover the main need.
+
+### Next steps
+
+- EAS build (versionCode 7) to test export on real device.
+- Remaining Phase 5 backlog per ROADMAP.
+
+---
+
 ## 2026-06-01 — Session: Phase 5 Wave 4a — Color Picker
 
 **Phase:** Phase 5, Wave 4a
