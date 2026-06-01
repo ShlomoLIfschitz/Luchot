@@ -35,7 +35,7 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { radius } from '../src/constants/radius';
 import { overlay } from '../src/constants/overlay';
-import { findCityByKey } from '../src/constants/cities';
+import { CITIES, findCityByKey } from '../src/constants/cities';
 import { findNearestCity } from '../src/utils/locationLookup';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
@@ -175,6 +175,8 @@ export default function SettingsScreen() {
     setDiaspora: setSettingsDiaspora,
     omerRemindersEnabled, omerReminderTime,
     setOmerRemindersEnabled, setOmerReminderTime,
+    candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
+    setCandleLightingRemindersEnabled, setCandleLightingLeadMinutes, setCandleLightingCity,
   } = useSettingsStore();
 
   const router = useRouter();
@@ -196,6 +198,7 @@ export default function SettingsScreen() {
 
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
+  const [candleLightingCityPicker, setCandleLightingCityPicker] = useState(false);
 
   // Derive current city name for display in the location row
   const currentCityName = useMemo(() => {
@@ -412,6 +415,92 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* ── הדלקת נרות ── */}
+        <SectionHeader title="הדלקת נרות" colors={colors} />
+        <View style={[styles.card, { borderColor: colors.border }]}>
+          {/* Row A — Toggle (always visible) */}
+          <Pressable
+            android_ripple={{ color: colors.border }}
+            onPress={() => setCandleLightingRemindersEnabled(!candleLightingRemindersEnabled)}
+            style={[
+              omerRowStyles.row,
+              { backgroundColor: colors.surface },
+              candleLightingRemindersEnabled && {
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: colors.border,
+              },
+            ]}
+            accessibilityLabel="התראות הדלקת נרות"
+            accessibilityRole="switch"
+            accessibilityState={{ checked: candleLightingRemindersEnabled }}
+          >
+            <Switch
+              value={candleLightingRemindersEnabled}
+              onValueChange={setCandleLightingRemindersEnabled}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surface}
+            />
+            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
+              התראות הדלקת נרות
+            </Text>
+          </Pressable>
+
+          {/* Row B — Lead-time chips (only when enabled) */}
+          {candleLightingRemindersEnabled && (
+            <View
+              style={[
+                candleRowStyles.chipsRow,
+                { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+              ]}
+            >
+              <Text style={[candleRowStyles.chipsLabel, { color: colors.textPrimary }]}>זמן מראש</Text>
+              <View style={candleRowStyles.chips}>
+                {[5, 10, 15, 30].map((min) => {
+                  const selected = candleLightingLeadMinutes === min;
+                  return (
+                    <Pressable
+                      key={min}
+                      onPress={() => setCandleLightingLeadMinutes(min)}
+                      style={[
+                        candleRowStyles.chip,
+                        { backgroundColor: selected ? colors.accent : colors.surfaceElevated },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          candleRowStyles.chipText,
+                          { color: selected ? colors.textInverse : colors.textSecondary },
+                        ]}
+                      >
+                        {min}′
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Row C — City picker (only when enabled) */}
+          {candleLightingRemindersEnabled && (
+            <Pressable
+              android_ripple={{ color: colors.border }}
+              onPress={() => setCandleLightingCityPicker(true)}
+              style={[omerRowStyles.row, { backgroundColor: colors.surface }]}
+              accessibilityLabel={`עיר: ${findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}`}
+              accessibilityRole="button"
+            >
+              <View style={omerRowStyles.right}>
+                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
+                  {findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
+                </Text>
+              </View>
+              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>עיר</Text>
+            </Pressable>
+          )}
+        </View>
+
       </ScrollView>
 
       {/* Pickers rendered outside ScrollView so they overlay the full screen */}
@@ -441,6 +530,15 @@ export default function SettingsScreen() {
         colors={colors}
       />
       {timePicker}
+      <PickerModal
+        visible={candleLightingCityPicker}
+        title="עיר להדלקת נרות"
+        options={CITIES.map((c) => ({ label: c.nameHe, value: c.hebcalKey }))}
+        selected={candleLightingCity ?? ''}
+        onSelect={(v) => setCandleLightingCity(v)}
+        onClose={() => setCandleLightingCityPicker(false)}
+        colors={colors}
+      />
     </View>
   );
 }
@@ -456,6 +554,36 @@ const styles = StyleSheet.create({
   },
   valueText: { fontSize: 14 },
   chevron:   { fontSize: 22, marginLeft: 2 },
+});
+
+// RTL chip row for the candle-lighting lead-time selector.
+const candleRowStyles = StyleSheet.create({
+  chipsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+    minHeight: 48,
+  },
+  chipsLabel: {
+    flex: 1,
+    fontSize: 15,
+    textAlign: 'right',
+  },
+  chips: {
+    flexDirection: 'row-reverse',
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
 
 // RTL rows for the Omer section — explicit row-reverse per project RTL rule.

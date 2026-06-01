@@ -31,6 +31,13 @@ export default function RootLayout() {
       await NotificationService.ensureAnnualReminders();
       const { omerRemindersEnabled, omerReminderTime } = useSettingsStore.getState();
       await NotificationService.ensureOmerReminders(omerRemindersEnabled, omerReminderTime);
+      const { candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity } =
+        useSettingsStore.getState();
+      await NotificationService.ensureCandleLightingReminders(
+        candleLightingRemindersEnabled,
+        candleLightingLeadMinutes,
+        candleLightingCity,
+      );
     }
     init().catch(console.error);
   }, []);
