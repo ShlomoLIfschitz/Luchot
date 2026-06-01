@@ -39,6 +39,11 @@ interface SettingsState {
   omerRemindersEnabled: boolean;
   omerReminderTime: string;
 
+  // Candle-lighting reminders
+  candleLightingRemindersEnabled: boolean;
+  candleLightingLeadMinutes: number;
+  candleLightingCity: string | null;
+
   // Actions
   toggleHebrewOnTop: () => void;
   setDarkMode: (m: 'system' | 'light' | 'dark') => void;
@@ -48,6 +53,9 @@ interface SettingsState {
   setDiaspora: (v: boolean) => void;
   setOmerRemindersEnabled: (v: boolean) => void;
   setOmerReminderTime: (t: string) => void;
+  setCandleLightingRemindersEnabled: (v: boolean) => void;
+  setCandleLightingLeadMinutes: (m: number) => void;
+  setCandleLightingCity: (c: string | null) => void;
   loadFromStorage: () => Promise<void>;
   save: (key: string, value: string) => Promise<void>;
 }
@@ -62,6 +70,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   use24hTime: true,
   omerRemindersEnabled: false,
   omerReminderTime: '21:00',
+  candleLightingRemindersEnabled: false,
+  candleLightingLeadMinutes: 15,
+  candleLightingCity: null,
 
   toggleHebrewOnTop: () => { const v = !get().hebrewOnTop; set({ hebrewOnTop: v }); get().save('hebrewOnTop', String(v)); },
   setDarkMode:          (m) => { set({ darkMode: m });          get().save('darkMode', m); },
@@ -79,22 +90,44 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     get().save('omerReminderTime', t);
     void NotificationService.ensureOmerReminders(get().omerRemindersEnabled, t);
   },
+  setCandleLightingRemindersEnabled: (v) => {
+    set({ candleLightingRemindersEnabled: v });
+    get().save('candleLightingRemindersEnabled', String(v));
+    const { candleLightingLeadMinutes, candleLightingCity } = get();
+    void NotificationService.ensureCandleLightingReminders(v, candleLightingLeadMinutes, candleLightingCity);
+  },
+  setCandleLightingLeadMinutes: (m) => {
+    set({ candleLightingLeadMinutes: m });
+    get().save('candleLightingLeadMinutes', String(m));
+    const { candleLightingRemindersEnabled, candleLightingCity } = get();
+    void NotificationService.ensureCandleLightingReminders(candleLightingRemindersEnabled, m, candleLightingCity);
+  },
+  setCandleLightingCity: (c) => {
+    set({ candleLightingCity: c });
+    get().save('candleLightingCity', c ?? '');
+    const { candleLightingRemindersEnabled, candleLightingLeadMinutes } = get();
+    void NotificationService.ensureCandleLightingReminders(candleLightingRemindersEnabled, candleLightingLeadMinutes, c);
+  },
 
   loadFromStorage: async () => {
     const [
       hebrewOnTop, darkMode, firstDayOfWeek, defaultCalendarType,
       diaspora, zmanimMethod, use24hTime,
       omerRemindersEnabled, omerReminderTime,
+      candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
     ] = await Promise.all([
-      StorageService.getPref('hebrewOnTop',          'true'),
-      StorageService.getPref('darkMode',             'system'),
-      StorageService.getPref('firstDayOfWeek',       '0'),
-      StorageService.getPref('defaultCalendarType',  'hebrew'),
-      StorageService.getPref('diaspora',             'false'),
-      StorageService.getPref('zmanimMethod',         'GRA'),
-      StorageService.getPref('use24hTime',           'true'),
-      StorageService.getPref('omerRemindersEnabled', 'false'),
-      StorageService.getPref('omerReminderTime',     '21:00'),
+      StorageService.getPref('hebrewOnTop',                   'true'),
+      StorageService.getPref('darkMode',                      'system'),
+      StorageService.getPref('firstDayOfWeek',                '0'),
+      StorageService.getPref('defaultCalendarType',           'hebrew'),
+      StorageService.getPref('diaspora',                      'false'),
+      StorageService.getPref('zmanimMethod',                  'GRA'),
+      StorageService.getPref('use24hTime',                    'true'),
+      StorageService.getPref('omerRemindersEnabled',          'false'),
+      StorageService.getPref('omerReminderTime',              '21:00'),
+      StorageService.getPref('candleLightingRemindersEnabled', 'false'),
+      StorageService.getPref('candleLightingLeadMinutes',     '15'),
+      StorageService.getPref('candleLightingCity',            ''),
     ]);
     set({
       hebrewOnTop:         hebrewOnTop === 'true',
@@ -111,6 +144,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       use24hTime:          use24hTime === 'true',
       omerRemindersEnabled: omerRemindersEnabled === 'true',
       omerReminderTime,
+      candleLightingRemindersEnabled: candleLightingRemindersEnabled === 'true',
+      candleLightingLeadMinutes: parseInt(candleLightingLeadMinutes, 10) || 15,
+      candleLightingCity: candleLightingCity || null,
     });
   },
 

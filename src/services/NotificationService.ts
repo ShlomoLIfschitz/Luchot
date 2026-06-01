@@ -2,9 +2,33 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { HDate } from '@hebcal/core';
+import { HDate, HebrewCalendar, flags } from '@hebcal/core';
+import '@hebcal/cities';
 import { StorageService } from './StorageService';
 import { getOmerForDate } from './DateService';
+import { getZmanim } from './ZmanimService';
+import { getCandleLightingOffset } from '../utils/candleLightingOffset';
+import { getCityCoordinates, findCityByKey } from '../utils/locationLookup';
+
+/**
+ * Returns true if `date` is erev Yom Tov Rishon (first-day eve).
+ * Logic: tomorrow has the CHAG flag AND today does NOT.
+ * This correctly excludes Yom Tov Sheni eves (the day before Sheni is Rishon,
+ * which IS CHAG, so the "today NOT CHAG" condition fails).
+ */
+function checkErevYomTovRishon(date: Date, il: boolean): boolean {
+  const todayHD = new HDate(date);
+  const tomorrowDate = new Date(date);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowHD = new HDate(tomorrowDate);
+
+  const todayEvents = HebrewCalendar.calendar({ start: todayHD, end: todayHD, il });
+  const tomorrowEvents = HebrewCalendar.calendar({ start: tomorrowHD, end: tomorrowHD, il });
+
+  const todayIsChag = todayEvents.some(ev => Boolean(ev.getFlags() & flags.CHAG));
+  const tomorrowIsChag = tomorrowEvents.some(ev => Boolean(ev.getFlags() & flags.CHAG));
+  return tomorrowIsChag && !todayIsChag;
+}
 
 export class NotificationService {
   static async init(): Promise<void> {
@@ -200,6 +224,74 @@ export class NotificationService {
         triggerDate,
         data: { type: 'omer', day: omerInfo.day },
       });
+    }
+  }
+
+  /**
+   * Sweep-on-init model for candle-lighting reminders.
+   * Cancels all candle-* notifications first (handles city/lead-time changes),
+   * then sweeps 13 weeks (91 days) scheduling Shabbat + Yom Tov Rishon eves.
+   * Fire time: candle-lighting timestamp (shkia − city offset) − leadMinutes.
+   * Max 64 notifications (iOS limit).
+   */
+  static async ensureCandleLightingReminders(
+    enabled: boolean,
+    leadMinutes: number,
+    city: string | null,
+  ): Promise<void> {
+    // 1. Always cancel all candle-* first (city or lead-time change requires full reset)
+    const scheduled = await NotificationService.getScheduled();
+    for (const n of scheduled) {
+      if (n.identifier.startsWith('candle-')) {
+        await NotificationService.cancelNotification(n.identifier);
+      }
+    }
+    if (!enabled || !city) return;
+
+    // 2. Resolve city → coordinates + metadata
+    const coords = getCityCoordinates(city);
+    if (!coords) return; // unknown key — defensive
+    const { lat, lng } = coords;
+    const cityEntry = findCityByKey(city);
+    const cityNameHe = cityEntry?.nameHe ?? city;
+    const il = cityEntry?.country === 'IL';
+
+    // 3. City-specific candle-lighting offset (Jerusalem 40 min, Haifa 30, Safed 40, others 18)
+    const clOffsetMinutes = getCandleLightingOffset(lat, lng).minutes;
+
+    // 4. Sweep 91 days (13 weeks rolling window)
+    const now = new Date();
+    let count = 0;
+    for (let dayOffset = 0; dayOffset < 91 && count < 64; dayOffset++) {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
+
+      const isErevShabbat = date.getDay() === 5; // Friday
+      const isErevYomTov = checkErevYomTovRishon(date, il);
+      if (!isErevShabbat && !isErevYomTov) continue;
+
+      // Get shkia for this date via ZmanimService (works any day of week)
+      const zmanim = getZmanim(date, lat, lng);
+      if (!zmanim.shkia) continue;
+
+      // Compute candle-lighting time (bypass ZmanimResult.candleLighting which is Friday-only)
+      const candleLightingTime = new Date(zmanim.shkia.getTime() - clOffsetMinutes * 60_000);
+      const fireDate = new Date(candleLightingTime.getTime() - leadMinutes * 60_000);
+      if (fireDate <= now) continue; // already past
+
+      const dateStr = date.toISOString().slice(0, 10); // YYYY-MM-DD
+      const hhmm = candleLightingTime.toLocaleTimeString('he-IL', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+
+      await NotificationService.scheduleLocalNotification({
+        id: `candle-${dateStr}`,
+        title: 'הדלקת נרות',
+        body: `${cityNameHe}, ${hhmm}`,
+        triggerDate: fireDate,
+      });
+      count++;
     }
   }
 }
