@@ -66,6 +66,9 @@ function PickerModal({
                   style={pickerStyles.option}
                   onPress={() => { onSelect(opt.value); onClose(); }}
                 >
+                  <Text style={[pickerStyles.optionLabel, { color: colors.textPrimary }]}>
+                    {opt.label}
+                  </Text>
                   <View style={[
                     pickerStyles.radio,
                     { borderColor: colors.accent },
@@ -75,9 +78,6 @@ function PickerModal({
                       <View style={[pickerStyles.radioDot, { backgroundColor: colors.textInverse }]} />
                     )}
                   </View>
-                  <Text style={[pickerStyles.optionLabel, { color: colors.textPrimary }]}>
-                    {opt.label}
-                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -92,10 +92,10 @@ const pickerStyles = StyleSheet.create({
   overlay:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
   sheet:       { width: 280, borderRadius: radius.xl, padding: 22, elevation: 10 },
   title:       { fontSize: 16, fontWeight: '700', marginBottom: 14, textAlign: 'right' },
-  option:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 11 },
+  option:      { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 11 },
   radio: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 2,
-    marginLeft: 12, justifyContent: 'center', alignItems: 'center',
+    marginRight: 12, justifyContent: 'center', alignItems: 'center',
   },
   radioDot:    { width: 10, height: 10, borderRadius: 5 },
   optionLabel: { flex: 1, fontSize: 15, textAlign: 'right' },
@@ -431,15 +431,15 @@ export default function SettingsScreen() {
             accessibilityRole="switch"
             accessibilityState={{ checked: omerRemindersEnabled }}
           >
+            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
+              תזכורת ספירת העומר
+            </Text>
             <Switch
               value={omerRemindersEnabled}
               onValueChange={setOmerRemindersEnabled}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={colors.surface}
             />
-            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
-              תזכורת ספירת העומר
-            </Text>
           </Pressable>
           {/* Row B — Time picker (only when Omer reminders are enabled) */}
           {omerRemindersEnabled && (
@@ -451,15 +451,15 @@ export default function SettingsScreen() {
               accessibilityRole="button"
               accessibilityHint="פתח בורר שעה"
             >
+              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
+                זמן תזכורת
+              </Text>
               <View style={omerRowStyles.right}>
                 <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
                 <Text style={[styles.valueText, { color: colors.textSecondary }]}>
                   {omerReminderTime}
                 </Text>
               </View>
-              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
-                זמן תזכורת
-              </Text>
             </Pressable>
           )}
         </View>
@@ -483,15 +483,15 @@ export default function SettingsScreen() {
             accessibilityRole="switch"
             accessibilityState={{ checked: candleLightingRemindersEnabled }}
           >
+            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
+              התראות הדלקת נרות
+            </Text>
             <Switch
               value={candleLightingRemindersEnabled}
               onValueChange={(v) => { void handleCandleLightingToggle(v); }}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={colors.surface}
             />
-            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
-              התראות הדלקת נרות
-            </Text>
           </Pressable>
 
           {/* Row B — Lead-time chips (only when enabled) */}
@@ -539,7 +539,16 @@ export default function SettingsScreen() {
               accessibilityLabel={`עיר: ${findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}`}
               accessibilityRole="button"
             >
-              {/* LEFT side — update button (first in JSX = left in row-reverse) */}
+              {/* RIGHT side — label (first in JSX = right in row-reverse) */}
+              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>עיר</Text>
+              {/* Middle — chevron + current city value */}
+              <View style={omerRowStyles.right}>
+                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
+                  {findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
+                </Text>
+              </View>
+              {/* LEFT side — update button (last in JSX = left in row-reverse) */}
               {candleLightingCity !== null && (
                 <Pressable
                   onPress={async () => {
@@ -555,15 +564,6 @@ export default function SettingsScreen() {
                   <Text style={[candleRowStyles.updateBtnText, { color: colors.accent }]}>עדכן</Text>
                 </Pressable>
               )}
-              {/* Middle — chevron + current city value */}
-              <View style={omerRowStyles.right}>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
-                </Text>
-              </View>
-              {/* RIGHT side — label (last in JSX = right in row-reverse) */}
-              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>עיר</Text>
             </Pressable>
           )}
         </View>
