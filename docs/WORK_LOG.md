@@ -6,6 +6,39 @@
 
 ---
 
+## 2026-06-02 — Session: Phase 5 — Four bug fixes
+
+**Phase:** Phase 5 (maintenance)
+**Commits:** `d56470f` (fix: drawer starts closed on cold start), `8769ddf` (fix: Settings RTL — correct JSX child order), `d0c5cfd` (fix: global notesVersion in Zustand), `4fded59` (fix: remove export button from Day screen)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline).
+
+### What got done
+
+- **Fix 1 — Drawer cold start:** Added `if (drawerWidth === 0) return;` guard as the first line of the `useEffect` in `src/components/drawer/Drawer.tsx`. Root cause: on first render with `screenWidth = 0`, `drawerWidth = 0`, and the closed-branch computed `withTiming(-0) = withTiming(0)` — the fully open position — before the panel was even mounted. Drawer would flash open then close as dimensions resolved.
+
+- **Fix 2 — Settings RTL:** Corrected JSX child order in `app/settings.tsx` for five sections. Per DECISIONS.md, first child in `row-reverse` lands on the RIGHT. Omer toggle (A), Omer time row (B), candle-lighting toggle (C), candle-lighting city row (D) all had label and control reversed. PickerModal option rows (E) changed to `row-reverse` + label first/radio last + `marginLeft` → `marginRight` on radio. `SettingRow` (standard rows) was already correct and untouched.
+
+- **Fix 3 — Global event refresh:** Added `notesVersion: number` and `incrementNotesVersion()` to `CalendarProvider` (Zustand). Updated `useNotes.ts` to replace the local `useState(0)` `refreshKey` with `notesVersion` from the store; `setRefreshKey(k => k + 1)` replaced with `incrementNotesVersion()`. Return value aliased as `refreshKey: notesVersion` for zero-diff callers. MonthGrid and Day screen wiring unchanged — both already consumed `refreshKey` from `useNotes` which now carries the global counter. Any save/delete anywhere now causes both Month cells and Day screen to re-fetch.
+
+- **Fix 4 — Export button removed from Day screen:** Removed the secondary 40dp export FAB, its `exportModalVisible` state, its `ExportModal` instance, and `exportBtn` style from `app/(tabs)/day.tsx`. Also removed the `CalendarArrowUp` and `ExportModal` imports. The drawer entry point ("ייצוא יומן" DrawerItem in `Drawer.tsx`) is the sole export entry point going forward.
+
+### Decisions made
+
+- None new (all fixes follow existing locked decisions and conventions).
+
+### Open issues / blocked
+
+- Bug A (dark/light theme persistence across restarts) remains open — not addressed in this session.
+- EAS build (versionCode 7) needed to verify all four fixes on a real Android device.
+
+### Next steps
+
+- EAS build versionCode 7 to test on device.
+- Bug A: theme persistence fix.
+- Remaining Phase 5 backlog per ROADMAP.
+
+---
+
 ## 2026-06-01 — Session: Phase 5 Wave 4b — .ics Export
 
 **Phase:** Phase 5, Wave 4b
