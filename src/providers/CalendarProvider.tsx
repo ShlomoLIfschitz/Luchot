@@ -13,6 +13,7 @@ interface CalendarState {
   currentYear: number;
   monthData: DayData[];
   diaspora: boolean;
+  notesVersion: number;
 
   setViewMode: (mode: ViewMode) => void;
   setSelectedDate: (date: Date) => void;
@@ -20,6 +21,7 @@ interface CalendarState {
   navigateToMonth: (year: number, month: number) => void;
   setDiaspora: (value: boolean) => void;
   refreshMonth: () => void;
+  incrementNotesVersion: () => void;
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
@@ -30,6 +32,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   currentYear: new Date().getFullYear(),
   monthData: [],
   diaspora: false,
+  notesVersion: 0,
 
   setViewMode: (mode) => set({ viewMode: mode }),
 
@@ -60,4 +63,6 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     const monthData = dateService.getMonthData(currentYear, currentMonth);
     set({ monthData });
   },
+
+  incrementNotesVersion: () => set((s) => ({ notesVersion: s.notesVersion + 1 })),
 }));

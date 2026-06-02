@@ -6,6 +6,7 @@ import { CalendarEvent, NoteCategory } from '../schemas/EventSchema';
 import { generateUUID } from '../utils/dateUtils';
 import type { HebrewDateInfo } from '../services/DateService';
 import { expandRecurringNotes } from '../utils/expandRecurringNotes';
+import { useCalendarStore } from '../providers/CalendarProvider';
 
 export type NoteType = 'note' | 'birthday' | 'yahrzeit' | 'anniversary';
 
@@ -46,7 +47,8 @@ export function eventToCalendarNote(e: CalendarEvent): CalendarNote {
 
 export function useNotes(date: Date | null) {
   const [notes, setNotes] = useState<CalendarNote[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const notesVersion = useCalendarStore((s) => s.notesVersion);
+  const incrementNotesVersion = useCalendarStore((s) => s.incrementNotesVersion);
 
   useEffect(() => {
     if (!date) { setNotes([]); return; }
@@ -87,7 +89,7 @@ export function useNotes(date: Date | null) {
       setNotes(Array.from(combinedById.values()));
     }
     load().catch(console.error);
-  }, [date?.getTime(), refreshKey]);
+  }, [date?.getTime(), notesVersion]);
 
   const saveNote = useCallback(async (params: {
     id?: string;
@@ -172,14 +174,14 @@ export function useNotes(date: Date | null) {
       // For recurring events: do nothing here. ensureAnnualReminders handles them on next init.
     }
 
-    setRefreshKey(k => k + 1);
+    incrementNotesVersion();
   }, []);
 
   const deleteNote = useCallback(async (id: string) => {
     await NotificationService.cancelNotification(id);
     await StorageService.deleteEvent(id);
-    setRefreshKey(k => k + 1);
+    incrementNotesVersion();
   }, []);
 
-  return { notes, saveNote, deleteNote, refreshKey };
+  return { notes, saveNote, deleteNote, refreshKey: notesVersion };
 }
