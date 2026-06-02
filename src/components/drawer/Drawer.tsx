@@ -76,6 +76,7 @@ export function Drawer() {
   const gestureStartX = useSharedValue(0);
 
   useEffect(() => {
+    if (drawerWidth === 0) return;
     if (isOpen) {
       translateX.value = withTiming(0, { duration: ANIMATION_DURATION });
       backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION });
