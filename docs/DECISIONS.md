@@ -260,3 +260,25 @@
   this pattern. This complements the three Drawer constraints locked on the
   same date (see "Custom Drawer (Drawer.tsx): three implementation
   constraints").
+
+## OTA update strategy: expo-updates with EAS Update
+- Date: 2026-06-02
+- Context: JS-only fixes (bug patches, copy, minor UI tweaks) do not
+  require a full EAS build — OTA delivery via expo-updates saves build
+  quota and puts fixes in users' hands immediately on next app launch.
+- Choice: expo-updates 0.25.28 (SDK 51 compatible) installed. OTA URL
+  set to https://u.expo.dev/73dcf406-9cd1-4bec-a83c-cde688268f4a in
+  app.json. runtimeVersion policy: sdkVersion (the update bundle must
+  match the SDK of the installed build). Channel "preview" mapped to
+  the preview EAS build profile; channel "production" mapped to the
+  production profile. checkAutomatically: ON_LOAD.
+- Workflow: JS-only fixes → eas update --branch preview --message "..."
+  (or --branch production for release). Native changes (new packages,
+  app.json modifications, new permissions, native config) → full
+  eas build --profile preview (or production).
+- Alternatives considered: none — this was the planned approach from
+  the project roadmap.
+- Implications: expo-updates is a native module; it must be present in
+  the next EAS build before any OTA push will work. The first OTA-ready
+  build is versionCode 7 (next scheduled build). Do not push eas update
+  against earlier builds — they lack the native module.

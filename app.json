@@ -25,6 +25,14 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
+    "updates": {
+      "url": "https://u.expo.dev/73dcf406-9cd1-4bec-a83c-cde688268f4a",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "plugins": [
       "expo-router",
       [

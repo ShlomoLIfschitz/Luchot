@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-06-02 — Session: expo-updates + EAS Update configuration
+
+**Phase:** Phase 5 (infrastructure)
+**Commits:** (see below)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline).
+
+### What got done
+
+- **`expo-updates@0.25.28`** installed via `npx expo install` (SDK 51 compatible). Native module — requires the next EAS build before OTA delivery is active.
+- **`app.json`** updated with `"updates"` block (URL, `fallbackToCacheTimeout: 0`, `checkAutomatically: ON_LOAD`) and `"runtimeVersion": { "policy": "sdkVersion" }`.
+- **`eas.json`** updated: `"channel": "preview"` added to `preview` profile, `"channel": "production"` added to `production` profile. `base` profile (shared config, not a build target) left unchanged.
+- No runtime code changes — expo-updates operates via the native layer automatically on app launch.
+
+### Decisions made
+
+- OTA update strategy locked in DECISIONS.md: JS-only fixes → `eas update --branch preview`, native changes → full `eas build`.
+
+### Open issues / blocked
+
+- OTA delivery will not work until the next full EAS build (versionCode 7) includes the expo-updates native module. Do not push `eas update` against earlier APKs.
+- Bug A (dark/light theme persistence) remains open.
+
+### Next steps
+
+- Queue EAS build versionCode 7 (includes expo-updates + all Wave 4b + bug-fix commits).
+- After that build is installed, JS-only fixes can be pushed via `eas update --branch preview --message "..."`.
+
+---
+
 ## 2026-06-02 — Session: Phase 5 — Four bug fixes
 
 **Phase:** Phase 5 (maintenance)
