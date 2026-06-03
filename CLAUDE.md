@@ -351,6 +351,7 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 - `react-native-svg` is a required peer dep of `lucide-react-native`. Expo Go bundles its own copy, which masks the dependency — but a standalone APK needs it installed explicitly, or it crashes on first icon render. `expo doctor` must show no new failures beyond baseline (16/17) before any EAS build.
 - `@gorhom/bottom-sheet` v4 does NOT handle the Android hardware back button. Always wire `BackHandler` manually (see SCREENS.md).
 - New settings must be referenced in **both** `save()` and `loadFromStorage()` (the `use24hTime` persistence bug). Watch for this whenever adding a setting.
+- All SQLite access is serialized through `runExclusive` (single-flight queue) in StorageService. `expo-sqlite/legacy` deadlocks if two `transactionAsync` calls overlap on the one shared connection — the gate makes overlap impossible, so callers may use `Promise.all` / fire-and-forget freely. Do not bypass it. (Locked — DECISIONS.md, 2026-06-03.)
 
 ---
 

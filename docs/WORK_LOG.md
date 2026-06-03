@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-06-03 — Session: SQLite single-flight transaction queue (persistence root-cause fix)
+
+**Phase:** Phase 5 (maintenance / bug fix)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline).
+
+### What got done
+
+- **Root cause found** (orchestrator, code trace): nothing persisted across restarts because `expo-sqlite/legacy` deadlocks when two `transactionAsync` calls overlap on the one shared connection. `_layout.tsx` ran `settings.loadFromStorage` + `location.loadFromStorage` + `NotificationService.init` concurrently via `Promise.all` (each issuing its own transaction). The first deadlock wedged the shared connection, blocking every later read/write — so settings reverted to defaults (rendered via the 3s `forceReady` fallback) and events never persisted. The prior "batch prefs" fix only de-concurrented reads *within* one function; it didn't address overlap *across* providers.
+- **Grep confirmed the bug was not startup-only:** the same overlapping-transaction pattern lives in `useNotes.ts` (`Promise.all` of 3 reads), `useDatesNotes.ts` (`Promise.all` of 2 reads), and `LocationProvider.tsx` (fire-and-forget `setPref` calls).
+- **Fix (local-data-builder → `src/services/StorageService.ts` only):** added a module-level single-flight gate `runExclusive` + `txnTail` promise chain. `dbAll` and `dbRun` now run their `transactionAsync` body through `runExclusive`. `ensureSchema` deduped + serialized via a cached `schemaReady` promise (schema body moved to `doCreateSchema`). All public method signatures, SQL, and other files unchanged. The gate makes overlap impossible, so the existing `Promise.all` / fire-and-forget call sites become safe with zero changes.
+
+### Decisions made
+
+- Locked in DECISIONS.md (2026-06-03): "All SQLite access serialized through a single-flight queue in StorageService." Added matching one-line note to CLAUDE.md Known Issues / Quirks.
+
+### Open issues / blocked
+
+- Verification was code-level + typecheck + expo-doctor only. Device verification (theme persists across kill/reopen; events survive restart; day + month views don't hang) pending on the standalone build receiving this OTA.
+- Still requires the versionCode 7+ build (expo-updates native module) to receive the OTA — consistent with the 2026-06-02 OTA note.
+
+### Next steps
+
+- Confirm persistence on-device after the OTA lands on a versionCode 7+ build.
+
+---
+
 ## 2026-06-02 — Session: expo-updates + EAS Update configuration
 
 **Phase:** Phase 5 (infrastructure)

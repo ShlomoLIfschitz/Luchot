@@ -31,7 +31,19 @@ function getDb(): SQLiteDatabase {
   return db;
 }
 
-async function ensureSchema(): Promise<void> {
+// All transactions run single-file on the one shared connection.
+// expo-sqlite/legacy deadlocks if two transactionAsync calls overlap
+// (confirmed, standalone Android). This gate makes overlap impossible,
+// so callers may use Promise.all / fire-and-forget freely.
+let txnTail: Promise<unknown> = Promise.resolve();
+
+function runExclusive<T>(work: () => Promise<T>): Promise<T> {
+  const result = txnTail.then(work, work);                 // run regardless of prior outcome
+  txnTail = result.then(() => undefined, () => undefined); // one failure can't break the chain
+  return result;
+}
+
+async function doCreateSchema(): Promise<void> {
   if (schemaInitialized) return;
   await getDb().transactionAsync(async (txn) => {
     await txn.executeSqlAsync(
@@ -89,6 +101,12 @@ async function ensureSchema(): Promise<void> {
   schemaInitialized = true;
 }
 
+let schemaReady: Promise<void> | null = null;
+function ensureSchema(): Promise<void> {
+  if (!schemaReady) schemaReady = runExclusive(doCreateSchema);
+  return schemaReady;
+}
+
 // ── Query helpers ──────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,16 +117,20 @@ async function dbAll<T = any>(sql: string, args: SQLStatementArg[]): Promise<T[]
   // (read-only) variant hangs and never resolves on the standalone Android
   // build, deadlocking every read. Plain read-write transactions (the same
   // path schema creation and writes use) work reliably, so all reads use them.
-  await getDb().transactionAsync(async (txn) => {
-    const rs: ResultSet = await txn.executeSqlAsync(sql, args);
-    rows = rs.rows;
+  await runExclusive(async () => {
+    await getDb().transactionAsync(async (txn) => {
+      const rs: ResultSet = await txn.executeSqlAsync(sql, args);
+      rows = rs.rows;
+    });
   });
   return rows as T[];
 }
 
 async function dbRun(sql: string, args: SQLStatementArg[]): Promise<void> {
-  await getDb().transactionAsync(async (txn) => {
-    await txn.executeSqlAsync(sql, args);
+  await runExclusive(async () => {
+    await getDb().transactionAsync(async (txn) => {
+      await txn.executeSqlAsync(sql, args);
+    });
   });
 }
 

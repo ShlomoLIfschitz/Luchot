@@ -282,3 +282,24 @@
   the next EAS build before any OTA push will work. The first OTA-ready
   build is versionCode 7 (next scheduled build). Do not push eas update
   against earlier builds — they lack the native module.
+
+## All SQLite access serialized through a single-flight queue in StorageService
+- Date: 2026-06-03
+- Context: Settings reverted and events failed to persist on the standalone
+  Android build. Root cause: expo-sqlite/legacy deadlocks when two
+  transactionAsync calls overlap on the one shared connection. The Promise.all
+  in _layout.tsx (settings + location + notification loads), plus useNotes,
+  useDatesNotes, and fire-and-forget setPref calls in LocationProvider, all
+  issued overlapping transactions. A deadlocked transaction wedges the shared
+  connection, blocking every later read and write for the session.
+- Choice: StorageService routes every transactionAsync through a module-level
+  promise-chain gate (runExclusive). Transactions run strictly one-at-a-time.
+  ensureSchema is deduped via a cached promise. Callers may use Promise.all and
+  fire-and-forget freely — the data layer guarantees single-flight.
+- Alternatives considered: sequential awaits in _layout.tsx only (band-aid —
+  leaves useNotes/useDatesNotes broken); per-call transaction merging
+  (whack-a-mole); multiple connections / WAL (not reliable in legacy/Expo Go);
+  non-legacy API (violates locked expo-sqlite/legacy decision).
+- Implications: the readOnly-hang and concurrent-transaction footguns are now
+  contained in one place. The 3s forceReady fallback in _layout.tsx stays as a
+  safety net. No public StorageService signatures change.
