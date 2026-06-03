@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, I18nManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -11,6 +11,11 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
 import { NotificationService } from '../src/services/NotificationService';
+
+if (I18nManager.isRTL) {
+  I18nManager.allowRTL(false);
+  I18nManager.forceRTL(false);
+}
 
 export default function RootLayout() {
   const darkMode = useSettingsStore((s) => s.darkMode);
