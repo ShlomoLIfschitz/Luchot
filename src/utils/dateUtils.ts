@@ -12,13 +12,11 @@ export function generateUUID(): string {
 }
 
 /**
- * Formats a Date as "YYYY-MM-DD" using UTC components.
- *
- * Matches the date-string format stored in the `start_date` column of
- * the events table (StorageService uses `toISOString().split('T')[0]`
- * for all writes). All date-key comparisons in this codebase must use
- * this function to stay consistent with stored values.
+ * Formats a Date as "YYYY-MM-DD" using LOCAL date components.
+ * All date writes and reads in this codebase must go through this
+ * function to avoid UTC/local off-by-one errors.
  */
 export function formatDateKey(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
 }

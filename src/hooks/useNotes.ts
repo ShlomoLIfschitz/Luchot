@@ -3,7 +3,7 @@ import { HDate } from '@hebcal/core';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import { CalendarEvent, NoteCategory } from '../schemas/EventSchema';
-import { generateUUID } from '../utils/dateUtils';
+import { generateUUID, formatDateKey } from '../utils/dateUtils';
 import type { HebrewDateInfo } from '../services/DateService';
 import { expandRecurringNotes } from '../utils/expandRecurringNotes';
 import { useCalendarStore } from '../providers/CalendarProvider';
@@ -103,7 +103,7 @@ export function useNotes(date: Date | null) {
     colorId?: string | null;
   }) => {
     const now = new Date().toISOString();
-    const dateStr = params.date.toISOString().split('T')[0];
+    const dateStr = formatDateKey(params.date);
     const recurring = params.noteType !== 'note';
     const recurrenceType = !recurring ? 'none' :
       params.calendarType === 'hebrew' ? 'yearly_hebrew' : 'yearly_gregorian';

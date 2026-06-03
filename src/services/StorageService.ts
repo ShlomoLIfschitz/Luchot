@@ -16,6 +16,7 @@ import {
   type ResultSet,
 } from 'expo-sqlite/legacy';
 import { CalendarEvent } from '../schemas/EventSchema';
+import { formatDateKey } from '../utils/dateUtils';
 
 // ── DB handle ──────────────────────────────────────────────────────────────────
 
@@ -176,7 +177,7 @@ export class StorageService {
 
   static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {
     await ensureSchema();
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateKey(date);
     const rows = await dbAll(
       `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled'`,
       [dateStr],
@@ -212,8 +213,8 @@ export class StorageService {
    */
   static async getNotesInRange(startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
     await ensureSchema();
-    const startStr = startDate.toISOString().split('T')[0];
-    const endStr   = endDate.toISOString().split('T')[0];
+    const startStr = formatDateKey(startDate);
+    const endStr   = formatDateKey(endDate);
     const rows = await dbAll(
       `SELECT * FROM events
        WHERE start_date >= ?
