@@ -95,10 +95,14 @@ async function ensureSchema(): Promise<void> {
 async function dbAll<T = any>(sql: string, args: SQLStatementArg[]): Promise<T[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rows: any[] = [];
+  // NOTE: no readOnly flag. The expo-sqlite/legacy `transactionAsync(cb, true)`
+  // (read-only) variant hangs and never resolves on the standalone Android
+  // build, deadlocking every read. Plain read-write transactions (the same
+  // path schema creation and writes use) work reliably, so all reads use them.
   await getDb().transactionAsync(async (txn) => {
     const rs: ResultSet = await txn.executeSqlAsync(sql, args);
     rows = rs.rows;
-  }, true /* readOnly */);
+  });
   return rows as T[];
 }
 
@@ -247,6 +251,24 @@ export class StorageService {
       `INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)`,
       [key, value],
     );
+  }
+
+  /**
+   * Batch-reads ALL preferences in a SINGLE transaction. Replaces the prior
+   * pattern of one getPref() per key via Promise.all, which launched many
+   * concurrent transactionAsync calls at startup and deadlocked the
+   * expo-sqlite/legacy driver on standalone Android. Callers apply their own
+   * per-key defaults against the returned map.
+   */
+  static async getAllPrefs(): Promise<Record<string, string>> {
+    await ensureSchema();
+    const rows = await dbAll<{ key: string; value: string }>(
+      `SELECT key, value FROM preferences`,
+      [],
+    );
+    const out: Record<string, string> = {};
+    for (const r of rows) out[r.key] = r.value;
+    return out;
   }
 
   // ── Row Mapper ────────────────────────────────────────────

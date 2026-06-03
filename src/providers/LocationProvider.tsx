@@ -89,12 +89,12 @@ export const useLocationStore = create<LocationState>((set) => ({
 
   // ── Startup rehydration ──────────────────────────────────────────────────
   loadFromStorage: async () => {
-    const [latStr, lngStr, cityKey, sourceStr] = await Promise.all([
-      StorageService.getPref('location_lat',    ''),
-      StorageService.getPref('location_lng',    ''),
-      StorageService.getPref('location_city',   ''),
-      StorageService.getPref('location_source', 'default'),
-    ]);
+    // Single batched read (one transaction) — see StorageService.getAllPrefs.
+    const p = await StorageService.getAllPrefs();
+    const latStr    = p.location_lat    ?? '';
+    const lngStr    = p.location_lng    ?? '';
+    const cityKey   = p.location_city   ?? '';
+    const sourceStr = p.location_source ?? 'default';
 
     // No persisted data → keep Jerusalem default, nothing to do
     if (!latStr || !lngStr) return;

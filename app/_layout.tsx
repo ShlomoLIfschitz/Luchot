@@ -11,6 +11,7 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
 import { NotificationService } from '../src/services/NotificationService';
+import * as Updates from 'expo-updates';
 
 if (I18nManager.isRTL) {
   I18nManager.allowRTL(false);
@@ -26,6 +27,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function init() {
+      console.log('[App] OTA bundle updateId:', Updates.updateId ?? 'embedded');
       await StorageService.init();
       await Promise.all([
         useSettingsStore.getState().loadFromStorage(),

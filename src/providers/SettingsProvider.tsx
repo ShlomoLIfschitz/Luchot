@@ -115,43 +115,26 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   loadFromStorage: async () => {
     try {
-      const [
-        hebrewOnTop, darkMode, firstDayOfWeek, defaultCalendarType,
-        diaspora, zmanimMethod, use24hTime,
-        omerRemindersEnabled, omerReminderTime,
-        candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
-      ] = await Promise.all([
-        StorageService.getPref('hebrewOnTop',                   'true'),
-        StorageService.getPref('darkMode',                      'system'),
-        StorageService.getPref('firstDayOfWeek',                '0'),
-        StorageService.getPref('defaultCalendarType',           'hebrew'),
-        StorageService.getPref('diaspora',                      'false'),
-        StorageService.getPref('zmanimMethod',                  'GRA'),
-        StorageService.getPref('use24hTime',                    'true'),
-        StorageService.getPref('omerRemindersEnabled',          'false'),
-        StorageService.getPref('omerReminderTime',              '21:00'),
-        StorageService.getPref('candleLightingRemindersEnabled', 'false'),
-        StorageService.getPref('candleLightingLeadMinutes',     '15'),
-        StorageService.getPref('candleLightingCity',            ''),
-      ]);
+      // Single batched read (one transaction). Replaces the prior Promise.all
+      // of 12 getPref() calls, which deadlocked expo-sqlite/legacy on Android.
+      const p = await StorageService.getAllPrefs();
+      const zmanim = p.zmanimMethod;
       set({
-        hebrewOnTop:         hebrewOnTop === 'true',
-        darkMode:            darkMode as 'system' | 'light' | 'dark',
-        firstDayOfWeek:      Number(firstDayOfWeek) as FirstDayOfWeek,
-        defaultCalendarType: defaultCalendarType as DefaultCalendarType,
-        diaspora:            diaspora === 'true',
+        hebrewOnTop:         (p.hebrewOnTop ?? 'true') === 'true',
+        darkMode:            (p.darkMode ?? 'system') as 'system' | 'light' | 'dark',
+        firstDayOfWeek:      Number(p.firstDayOfWeek ?? '0') as FirstDayOfWeek,
+        defaultCalendarType: (p.defaultCalendarType ?? 'hebrew') as DefaultCalendarType,
+        diaspora:            (p.diaspora ?? 'false') === 'true',
         // Migrate stored 'RABBANUT' (removed in Phase 4.1) to 'GRA'.
         // Also guards against any other unexpected stored value.
         zmanimMethod:
-          zmanimMethod === 'GRA' || zmanimMethod === 'MGA'
-            ? (zmanimMethod as ZmanimMethod)
-            : 'GRA',
-        use24hTime:          use24hTime === 'true',
-        omerRemindersEnabled: omerRemindersEnabled === 'true',
-        omerReminderTime,
-        candleLightingRemindersEnabled: candleLightingRemindersEnabled === 'true',
-        candleLightingLeadMinutes: parseInt(candleLightingLeadMinutes, 10) || 15,
-        candleLightingCity: candleLightingCity || null,
+          zmanim === 'GRA' || zmanim === 'MGA' ? (zmanim as ZmanimMethod) : 'GRA',
+        use24hTime:          (p.use24hTime ?? 'true') === 'true',
+        omerRemindersEnabled: (p.omerRemindersEnabled ?? 'false') === 'true',
+        omerReminderTime:    p.omerReminderTime ?? '21:00',
+        candleLightingRemindersEnabled: (p.candleLightingRemindersEnabled ?? 'false') === 'true',
+        candleLightingLeadMinutes: parseInt(p.candleLightingLeadMinutes ?? '15', 10) || 15,
+        candleLightingCity:  p.candleLightingCity || null,
       });
     } catch (e) {
       console.error('[SettingsProvider] loadFromStorage failed:', e);
