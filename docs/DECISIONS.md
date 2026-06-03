@@ -303,3 +303,40 @@
 - Implications: the readOnly-hang and concurrent-transaction footguns are now
   contained in one place. The 3s forceReady fallback in _layout.tsx stays as a
   safety net. No public StorageService signatures change.
+
+## App locked to LTR base — I18nManager.forceRTL(false) / allowRTL(false)
+- Date: 2026-06-03
+- Context: Luchot is a Hebrew RTL app, but the layout convention is "use
+  flexDirection 'row-reverse' explicitly" (locked, Phase 4.7). That convention
+  only produces correct Hebrew layout if the NATIVE layer stays LTR. If the OS /
+  React Native forces an RTL base, every 'row-reverse' row double-flips and the
+  whole layout inverts — the source of the standalone-APK RTL drift this session.
+- Choice: app/_layout.tsx, at module load, guards `if (I18nManager.isRTL)` and
+  calls `allowRTL(false)` + `forceRTL(false)`. The app is pinned to an LTR base;
+  Hebrew direction is achieved purely through 'row-reverse' + textAlign 'right' +
+  JSX child order, never through native RTL.
+- Alternatives considered: forceRTL(true) with plain 'row' auto-flip — rejected;
+  this is exactly the auto-flip approach that caused the Phase 4.7 bug cluster and
+  is incompatible with the locked 'row-reverse' convention.
+- Implications: This is the prerequisite for the 'row-reverse' decision — the two
+  are a pair. Do not call forceRTL(true) anywhere. New screens follow the
+  'row-reverse' convention against an LTR base.
+
+## settingsReady gate: render null until settings load, always release in finally, 3s forceReady fallback
+- Date: 2026-06-03
+- Context: Persisted settings (theme especially) load asynchronously from SQLite
+  at startup. Rendering before they load flashes the default theme; but a load
+  that throws (or hangs) must never freeze the app on a blank white screen.
+- Choice: SettingsProvider exposes `settingsReady` (false until loadFromStorage
+  completes). loadFromStorage always flips it true in a `finally` block, so even
+  a thrown error releases the gate. app/_layout.tsx renders `null` until
+  `settingsReady`, AND adds a 3-second `forceReady` setTimeout fallback so a
+  promise that never settles (a hang) still can't freeze the UI.
+- Alternatives considered: render immediately and re-theme on load — rejected
+  (theme flash); gate with no timeout — rejected (a hung load freezes the app,
+  which is exactly how the SQLite deadlock manifested as a blank screen).
+- Implications: Both halves are load-bearing — do not remove the `finally`
+  release or the 3s fallback. Note the fallback renders DEFAULT settings, so it
+  masks an underlying load failure rather than fixing it; a persistent "settings
+  revert" symptom means loadFromStorage is failing/hanging, not that the gate is
+  wrong (see the runExclusive single-flight decision).

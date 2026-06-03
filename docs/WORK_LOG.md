@@ -6,29 +6,60 @@
 
 ---
 
-## 2026-06-03 — Session: SQLite single-flight transaction queue (persistence root-cause fix)
+## 2026-06-03 — Session: RTL conformance + SQLite persistence arc
 
 **Phase:** Phase 5 (maintenance / bug fix)
-**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline).
+**Commits:** d5c1f8e, 0f772b8, 970eeac, 75e3c66, 6190c8c, 33b36a9 (6)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). 10 OTA update groups published to `preview` (6 fixes + 4 debug/instrumentation builds).
+
+### Overview
+
+Two intertwined debugging arcs on the standalone APK, both masked in Expo Go:
+1. **RTL layout** — the `row-reverse` convention only holds if the app is locked to an LTR base; several screens had drifted off-convention.
+2. **SQLite persistence** — nothing survived a kill/reopen (theme + all settings reverted, events vanished). Traced through a chain of fixes to a single root cause: concurrent `transactionAsync` deadlocks the legacy driver.
 
 ### What got done
 
-- **Root cause found** (orchestrator, code trace): nothing persisted across restarts because `expo-sqlite/legacy` deadlocks when two `transactionAsync` calls overlap on the one shared connection. `_layout.tsx` ran `settings.loadFromStorage` + `location.loadFromStorage` + `NotificationService.init` concurrently via `Promise.all` (each issuing its own transaction). The first deadlock wedged the shared connection, blocking every later read/write — so settings reverted to defaults (rendered via the 3s `forceReady` fallback) and events never persisted. The prior "batch prefs" fix only de-concurrented reads *within* one function; it didn't address overlap *across* providers.
-- **Grep confirmed the bug was not startup-only:** the same overlapping-transaction pattern lives in `useNotes.ts` (`Promise.all` of 3 reads), `useDatesNotes.ts` (`Promise.all` of 2 reads), and `LocationProvider.tsx` (fire-and-forget `setPref` calls).
-- **Fix (local-data-builder → `src/services/StorageService.ts` only):** added a module-level single-flight gate `runExclusive` + `txnTail` promise chain. `dbAll` and `dbRun` now run their `transactionAsync` body through `runExclusive`. `ensureSchema` deduped + serialized via a cached `schemaReady` promise (schema body moved to `doCreateSchema`). All public method signatures, SQL, and other files unchanged. The gate makes overlap impossible, so the existing `Promise.all` / fire-and-forget call sites become safe with zero changes.
+**RTL conformance**
+- **`d5c1f8e` — Lock LTR base (`forceRTL false`) so `row-reverse` holds (mobile-ui-builder).** `app/_layout.tsx` guards on `I18nManager.isRTL` and calls `allowRTL(false)` + `forceRTL(false)` at module load. This is the foundation the entire `flexDirection: 'row-reverse'` Hebrew-RTL convention depends on — if the native layer flips to RTL, every `row-reverse` row double-flips and breaks. (Instrumentation banner OTA preceded this to confirm which bundle was live.)
+- **`970eeac` — RTL layout pass, 31 deviant items (mobile-ui-builder, Target A).** Swept components/screens for rows not conforming to the locked `row-reverse` + first-child-on-right convention and corrected 31 layout items. Fixes are JSX child-order / `flexDirection` corrections, not CSS transforms (per the locked RTL decision).
 
-### Decisions made
+**SQLite persistence (the arc to root cause)**
+- **`0f772b8` — Theme persistence + `settingsReady` gate (local-data-builder + mobile-ui-builder).** Root layout renders `null` until `settingsReady` flips true, so the UI never flashes the default theme before the stored `darkMode` preference is applied. First attempt at fixing the revert-on-restart symptom.
+- **`75e3c66` — `settingsReady` deadlock fix: `finally` guard + 3s timeout fallback.** `loadFromStorage` now always releases the gate in a `finally` block (so a *throw* can't freeze the app on a blank white screen), and `_layout.tsx` adds a 3s `forceReady` fallback (so a *hang* can't freeze it either). This kept the app usable but, crucially, **masked** the underlying deadlock by rendering defaults after 3s — the symptom that looked like "settings don't persist."
+- **`6190c8c` — Remove `readOnly` flag + batch prefs load.** Two findings: (a) `transactionAsync(cb, true)` (read-only variant) hangs forever on standalone Android — removed; all reads now use plain read-write transactions. (b) `loadFromStorage` was firing 12 concurrent `getPref` transactions via `Promise.all` — collapsed into a single `getAllPrefs()` batch transaction. Reduced but did not eliminate the deadlock (the concurrency *across* providers remained).
+- **`33b36a9` — `runExclusive` single-flight queue (local-data-builder → `StorageService.ts` only).** Root cause confirmed by code trace: `_layout.tsx` ran `settings.loadFromStorage` + `location.loadFromStorage` + `NotificationService.init` concurrently via `Promise.all`, each issuing its own `transactionAsync`; two overlapping transactions on the one shared connection deadlock the legacy driver, wedging it for the whole session (settings revert via the 3s fallback; every later read/write — including event saves — hangs). Grep showed the same overlap pattern in `useNotes.ts` (3 reads), `useDatesNotes.ts` (2 reads), and `LocationProvider.tsx` (fire-and-forget `setPref`s) — i.e. **not startup-only**. Fix: a module-level `runExclusive` + `txnTail` promise chain that serializes every transaction; `dbAll`/`dbRun` run through it; `ensureSchema` deduped + serialized via a cached `schemaReady` promise (`doCreateSchema`). All public signatures, SQL, and other files unchanged — the gate makes the existing `Promise.all`/fire-and-forget call sites safe with zero changes to them.
 
-- Locked in DECISIONS.md (2026-06-03): "All SQLite access serialized through a single-flight queue in StorageService." Added matching one-line note to CLAUDE.md Known Issues / Quirks.
+### Decisions made (see DECISIONS.md, all 2026-06-03)
+
+- **App locked to LTR base (`I18nManager.forceRTL(false)` / `allowRTL(false)`)** — the prerequisite for the `row-reverse` Hebrew-RTL convention.
+- **`settingsReady` gate + 3s `forceReady` fallback** — never block the UI forever; always release the gate in `finally`.
+- **All SQLite access serialized through `runExclusive` (single-flight queue) in StorageService** — `expo-sqlite/legacy` deadlocks on overlapping transactions. CLAUDE.md Known Issues / Quirks note added to match.
+
+### OTA updates published this session (branch `preview`, runtime `exposdk:51.0.0`)
+
+| Message | Group ID |
+|---|---|
+| fix: SQLite single-flight queue | a558dfe6-c5d0-4c42-a94f-0a7bcfb40649 |
+| fix: SQLite persistence | ed7cd951-da1c-4c7f-9802-91de13fc107f |
+| debug: trace setPref commit + loadFromStorage call | e5136d3f-c3ca-4f0e-91e8-431feee4326b |
+| debug: StorageService SQLite logging | 678d0c03-0616-423f-a20b-78915635c609 |
+| fix: settingsReady deadlock | ade2f314-b4fc-44cc-a8ef-bbba92de6e73 |
+| fix: RTL layout pass — 31 deviant items corrected | 420671fb-79cc-42f9-8a79-0c4f2292f7d6 |
+| debug: event date logging | 7c033d48-ecbd-4491-8942-c9729a369751 |
+| fix: theme persistence | 3aa11e70-ce08-458c-86ce-f0f2e5022dad |
+| fix: lock LTR base so row-reverse convention holds | 46854148-a93e-4c05-8eec-2b1e7bbca221 |
+| debug: instrumentation banner | 89da838a-b6fb-4968-aa82-395884b65d2a |
 
 ### Open issues / blocked
 
-- Verification was code-level + typecheck + expo-doctor only. Device verification (theme persists across kill/reopen; events survive restart; day + month views don't hang) pending on the standalone build receiving this OTA.
-- Still requires the versionCode 7+ build (expo-updates native module) to receive the OTA — consistent with the 2026-06-02 OTA note.
+- All verification this session was code-level + typecheck + expo-doctor + on-device symptom observation via OTA. The `runExclusive` fix still needs final on-device confirmation: theme persists across kill/reopen, events survive restart, and day + month views (the `useNotes`/`useDatesNotes` `Promise.all` paths) don't hang.
+- OTA delivery requires a versionCode 7+ build carrying the expo-updates native module (per 2026-06-02 note). Earlier APKs won't receive these updates.
 
 ### Next steps
 
-- Confirm persistence on-device after the OTA lands on a versionCode 7+ build.
+- Confirm SQLite persistence + no-hang on-device once the OTA lands on a versionCode 7+ build.
+- The 4 `debug:`/instrumentation OTA bundles can be ignored going forward; the live fix is `a558dfe6…` (commit 33b36a9).
 
 ---
 
