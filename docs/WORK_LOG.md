@@ -33,7 +33,7 @@ Root cause: In UTC+3 (Israel summer), `new Date(year, month, day)` at local midn
 ### Open issues / blocked
 
 - On-device verification needed: (a) events now appear on the correct day in Month grid; (b) Trash2 button appears in NoteEditor when editing; (c) delete removes the event from both NoteEditor and NoteList paths.
-- OTA group ID: see below (pushed, awaiting completion).
+- OTA group ID: `75c6828b-a2b4-45fe-aea4-af264b0f28ab` (branch `preview`, runtime `exposdk:51.0.0`, message "fix: date + delete event").
 
 ### Next steps
 
