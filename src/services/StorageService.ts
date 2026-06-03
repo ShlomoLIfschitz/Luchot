@@ -24,6 +24,7 @@ let db: SQLiteDatabase | null = null;
 let schemaInitialized = false;
 let schemaV2Migrated = false;
 let schemaColorMigrated = false;
+let schemaLocationMigrated = false;
 
 function getDb(): SQLiteDatabase {
   if (!db) {
@@ -98,6 +99,15 @@ async function doCreateSchema(): Promise<void> {
       }
       schemaColorMigrated = true;
     }
+    // v4 migration: add location column
+    if (!schemaLocationMigrated) {
+      try {
+        await txn.executeSqlAsync('ALTER TABLE events ADD COLUMN location TEXT', []);
+      } catch {
+        // column already exists — no-op
+      }
+      schemaLocationMigrated = true;
+    }
   });
   schemaInitialized = true;
 }
@@ -156,7 +166,7 @@ export class StorageService {
     await ensureSchema();
     const ext = event.hebrewExtensions;
     await dbRun(
-      `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         event.id, event.summary, event.description ?? null,
         event.start.date ?? null, event.start.dateTime ?? null,
@@ -171,6 +181,7 @@ export class StorageService {
         event.created, event.updated,
         ext.notificationScheduled ? 1 : 0,
         event.reminders?.overrides?.[0]?.minutes ?? null,
+        event.location ?? null,
       ],
     );
   }
@@ -332,6 +343,7 @@ export class StorageService {
       reminders: row.reminder_minutes != null
         ? { useDefault: false, overrides: [{ method: 'popup' as const, minutes: row.reminder_minutes }] }
         : { useDefault: false },
+      location: row.location ?? undefined,
     };
   }
 

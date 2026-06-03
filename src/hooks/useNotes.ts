@@ -21,6 +21,7 @@ export interface CalendarNote {
   gregorianDateStr: string | undefined;
   reminderMinutes: number | null;
   colorId?: string | null;
+  location?: string | null;
 }
 
 // Exported so useDatesNotes (Phase 4.2-1) can reuse the same mapping
@@ -42,6 +43,7 @@ export function eventToCalendarNote(e: CalendarEvent): CalendarNote {
     gregorianDateStr: e.start.date,
     reminderMinutes: e.reminders?.overrides?.[0]?.minutes ?? null,
     colorId: e.colorId ?? null,
+    location: e.location ?? null,
   };
 }
 
@@ -101,6 +103,7 @@ export function useNotes(date: Date | null) {
     hebrewDate: HebrewDateInfo;
     reminderMinutes?: number | null;
     colorId?: string | null;
+    location?: string | null;
   }) => {
     const now = new Date().toISOString();
     const dateStr = formatDateKey(params.date);
@@ -115,6 +118,7 @@ export function useNotes(date: Date | null) {
       created: params.created ?? now,
       updated: now,
       colorId: params.colorId ?? undefined,
+      location: params.location ?? undefined,
       start: { date: dateStr },
       end: { date: dateStr },
       reminders: params.reminderMinutes != null
