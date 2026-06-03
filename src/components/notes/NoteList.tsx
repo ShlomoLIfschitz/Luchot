@@ -153,6 +153,7 @@ export function NoteList({ date, hebrewDate }: Props) {
         hebrewDate={hebrewDate}
         colors={colors}
         onSave={saveNote}
+        onDelete={deleteNote}
         onClose={() => setEditorVisible(false)}
       />
     </View>

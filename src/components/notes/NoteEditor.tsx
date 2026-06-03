@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Modal, View, Text, TextInput, Pressable, StyleSheet, Switch,
+  Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Trash2 } from 'lucide-react-native';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
 import type { ThemeColors } from '../../hooks/useThemeColors';
@@ -115,10 +116,11 @@ interface Props {
     reminderMinutes?: number | null;
     colorId?: string | null;
   }) => void;
+  onDelete?: (id: string) => void;
   onClose: () => void;
 }
 
-export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, onClose }: Props) {
+export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, onDelete, onClose }: Props) {
   const [summary, setSummary] = useState('');
   const [noteType, setNoteType] = useState<NoteType>('note');
   const [calendarType, setCalendarType] = useState<'hebrew' | 'gregorian'>('hebrew');
@@ -168,9 +170,29 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
               <View style={[s.sheet, { backgroundColor: colors.surface }]}>
                 <View style={[s.handle, { backgroundColor: colors.border }]} />
 
-                <Text style={[s.title, { color: colors.textPrimary }]}>
-                  {note ? 'ערוך הערה' : 'הערה חדשה'}
-                </Text>
+                <View style={s.headerRow}>
+                  <Text style={[s.title, { color: colors.textPrimary }]}>
+                    {note ? 'ערוך הערה' : 'הערה חדשה'}
+                  </Text>
+                  {note && onDelete && (
+                    <Pressable
+                      hitSlop={8}
+                      style={s.trashBtn}
+                      onPress={() => {
+                        Alert.alert(
+                          'מחק אירוע',
+                          'האם למחוק את האירוע לצמיתות?',
+                          [
+                            { text: 'ביטול', style: 'cancel' },
+                            { text: 'מחק', style: 'destructive', onPress: () => { onDelete(note.id); onClose(); } },
+                          ]
+                        );
+                      }}
+                    >
+                      <Trash2 size={20} color={colors.textTertiary} />
+                    </Pressable>
+                  )}
+                </View>
 
                 <TextInput
                   style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
@@ -319,7 +341,9 @@ const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  title: { fontSize: 17, fontWeight: '700', textAlign: 'right', marginBottom: 14 },
+  headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
+  title: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'right' },
+  trashBtn: { padding: 4 },
   input: {
     borderWidth: 1, borderRadius: 10, padding: 12,
     fontSize: 15, minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
