@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-06-03 — Session: date off-by-one fix + delete event UI
+
+**Phase:** Phase 5 (bug fix + UX)
+**Commits:** 14c19d5, ea4e05f (2)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed to `preview`.
+
+### What was done
+
+**Fix: UTC/local date off-by-one (orchestrator direct — single-line fix in a utility, no sub-agent needed)**
+- `src/utils/dateUtils.ts` — `formatDateKey()` switched from `toISOString().split('T')[0]` (UTC) to local `getFullYear/getMonth/getDate` components. Updated JSDoc to reflect the change.
+- `src/hooks/useNotes.ts` — `saveNote` was building `dateStr` with a raw `toISOString().split('T')[0]` call instead of going through `formatDateKey`. Fixed: added `formatDateKey` to the import and replaced the raw call.
+- `src/services/StorageService.ts` — Three raw UTC callers fixed: `getEventsForGregorianDate` (query key), `getNotesInRange` (range start and end bounds). Added `formatDateKey` import.
+
+Root cause: In UTC+3 (Israel summer), `new Date(year, month, day)` at local midnight = UTC−3h the prior day. `toISOString()` was therefore returning the previous calendar date, causing events saved for day N to be stored and queried under day N−1 — showing one cell early in the Month grid.
+
+**Feat: delete event UI (orchestrator direct — no sub-agent needed)**
+- `src/components/notes/NoteEditor.tsx` — Added `Trash2` (lucide-react-native) button in header row, visible only when editing an existing note (`note` prop present + `onDelete` prop provided). Header uses `row-reverse`: title (`flex:1`) on right (JSX-first), trash on left (JSX-last). Alert on press: title `'מחק אירוע'`, message `'האם למחוק את האירוע לצמיתות?'`, buttons `ביטול` / `מחק` (destructive). On confirm: `onDelete(note.id)` then `onClose()`. Added `Alert` to React Native imports.
+- `src/components/notes/NoteList.tsx` — Added `onDelete={deleteNote}` prop to the `<NoteEditor>` call.
+- **NoteList existing delete verified:** NoteList already had a working ✕ `Pressable` delete button (lines 93-95) with a `confirmDelete` Alert (`'מחק הערה'` / `'למחוק "${note.summary}"?'`). Calls `useNotes.deleteNote` → soft-delete via `StorageService.deleteEvent` + `incrementNotesVersion`. Functionally correct, no changes needed.
+
+### Decisions made
+
+- None new — all changes follow existing locked decisions and RTL conventions.
+
+### Open issues / blocked
+
+- On-device verification needed: (a) events now appear on the correct day in Month grid; (b) Trash2 button appears in NoteEditor when editing; (c) delete removes the event from both NoteEditor and NoteList paths.
+- OTA group ID: see below (pushed, awaiting completion).
+
+### Next steps
+
+- On-device confirm the date fix and delete UI.
+- Next task: event time + recurrence (new wave — SQLite migration needed).
+
+---
+
 ## 2026-06-03 — Session: RTL conformance + SQLite persistence arc
 
 **Phase:** Phase 5 (maintenance / bug fix)
