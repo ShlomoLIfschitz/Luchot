@@ -6,6 +6,55 @@
 
 ---
 
+## 2026-06-04 — Session: NoteEditor redesign — view/edit modes + toolbar + location field
+
+**Phase:** Phase 5 (UX enhancement)
+**Commits:** bd36070, c53d126 (2)
+**Sub-agents:** mobile-ui-builder (NoteEditor + data layer additions, per orchestrator authorization)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+**Data layer — location field (mobile-ui-builder, authorized outside normal ownership)**
+
+- `src/services/StorageService.ts` — v4 migration: `ALTER TABLE events ADD COLUMN location TEXT` (idempotent, try/catch). Added `schemaLocationMigrated` flag. INSERT updated from 22 → 23 positional `?` marks; `event.location ?? null` appended as the 23rd value (after `reminder_minutes`). `rowToEvent` maps `row.location ?? undefined`. `EventSchema.location` already existed (Google Calendar compat) — no schema file change needed.
+- `src/hooks/useNotes.ts` — `CalendarNote` gains `location?: string | null`. `eventToCalendarNote` maps `e.location ?? null`. `saveNote` params and CalendarEvent construction include `location`, passed through to `StorageService.saveEvent`.
+
+**NoteEditor redesign (mobile-ui-builder)**
+
+`src/components/notes/NoteEditor.tsx` — full redesign with two rendering branches behind `isViewMode` boolean:
+
+*View mode* (initial state when opening existing note):
+- Read-only display: summary (large), type icon + label, location row (MapPin + text, hidden if empty), recurring anchor date, reminder label.
+- Header: `row-reverse`, title (flex:1, right / JSX-first) + ✕ close (left / JSX-last).
+- Bottom toolbar: 3 centered buttons (gap 32): 🗑 מחק → Alert confirmation → `onDelete` + `onClose` | 🔗 שתף → Alert "בפיתוח" | ✏ עריכה → `setIsViewMode(false)`.
+
+*Edit mode* (initial state when creating new note, or after tapping עריכה):
+- All existing fields preserved: summary TextInput, type chips, ColorPickerRow, recurring anchor, reminder toggle + lead-time chips.
+- New location field: `row-reverse` row — TextInput `flex:1` (right / JSX-first) + MapPin GPS Pressable (left / JSX-last). GPS flow: `requestForegroundPermissionsAsync` → `getCurrentPositionAsync` → `reverseGeocodeAsync` → `"{street}, {city}"` or `"{city}"`. ActivityIndicator while loading. Permission denied → Alert "לא ניתן לקבל מיקום, אנא אפשר גישה למיקום בהגדרות". Error → Alert "לא ניתן לקבל מיקום".
+- Header: same layout as view mode.
+- Bottom: ביטול (closes modal) | שמור (accent). On save of **existing** note → `setIsViewMode(true)`. On save of **new** note → `onClose()`.
+
+*Removed:* old Trash2 header button (from previous session). Delete now lives exclusively in view-mode toolbar.
+*Added imports:* `expo-location`, `MapPin`, `Pencil`, `Share2`, `ActivityIndicator`.
+
+### Decisions made
+
+- None new — follows existing locked decisions (RTL row-reverse, no raw hex, StyleSheet.create, expo-location already installed).
+
+### Open issues / blocked
+
+- Location column already needed migration — `location TEXT` column did NOT exist in SQLite before this session (confirmed: grep found no `location` handling in StorageService). v4 migration handles all existing installs idempotently.
+- On-device verification needed: (a) view mode appears when tapping existing note from NoteList; (b) edit mode appears when creating new note from day/month/week FAB; (c) GPS autofill works; (d) delete from toolbar fires Alert and removes note.
+- OTA group ID: `3cff53cb-88eb-4bd6-b623-96655171a263` (branch `preview`, runtime `exposdk:51.0.0`, message "feat: NoteEditor redesign").
+
+### Next steps
+
+- On-device confirm the redesign.
+- Next: event time + recurrence (new wave — SQLite migration needed, schema change required).
+
+---
+
 ## 2026-06-03 — Session: date off-by-one fix + delete event UI
 
 **Phase:** Phase 5 (bug fix + UX)
