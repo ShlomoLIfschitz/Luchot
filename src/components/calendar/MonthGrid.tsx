@@ -224,7 +224,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
 
         {/* Month Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => navigateMonth(-1)} hitSlop={12}>
+          <Pressable onPress={() => navigateMonth(1)} hitSlop={12}>
             <Text style={[styles.navArrow, { color: colors.accent }]}>‹</Text>
           </Pressable>
 
@@ -240,7 +240,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
             </Text>
           </Pressable>
 
-          <Pressable onPress={() => navigateMonth(1)} hitSlop={12}>
+          <Pressable onPress={() => navigateMonth(-1)} hitSlop={12}>
             <Text style={[styles.navArrow, { color: colors.accent }]}>›</Text>
           </Pressable>
         </View>
@@ -342,8 +342,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   headerCenter:   { alignItems: 'center' },
-  monthTitle:     { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  monthSubtitle:  { fontSize: 12, marginTop: 1 },
+  monthTitle:     { fontSize: 18, fontWeight: '700', letterSpacing: -0.3, textAlign: 'center' },
+  monthSubtitle:  { fontSize: 12, marginTop: 1, textAlign: 'center' },
   navArrow:       { fontSize: 28, fontWeight: '300' },
 
   // Day name header row — flexDirection set inline based on mode

@@ -167,7 +167,7 @@ const s = StyleSheet.create({
   addBtnText: { fontSize: 13, fontWeight: '600' },
   empty: { fontSize: 13, textAlign: 'right', paddingVertical: 8 },
   noteRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
     paddingHorizontal: 12, paddingVertical: 10,
     borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8,
   },

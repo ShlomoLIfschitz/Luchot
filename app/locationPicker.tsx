@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 40 },
 
   gpsButton: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
 
   cityRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingVertical: 13,
     paddingHorizontal: 14,

@@ -42,14 +42,14 @@ export function MonthYearPicker({ visible, currentYear, currentMonth, colors, on
             <View style={[pickerStyles.sheet, { backgroundColor: colors.surface }]}>
               {/* Year row */}
               <View style={pickerStyles.yearRow}>
-                <Pressable onPress={() => setPickerYear(y => y - 1)} hitSlop={12} style={pickerStyles.yearArrow}>
+                <Pressable onPress={() => setPickerYear(y => y + 1)} hitSlop={12} style={pickerStyles.yearArrow}>
                   <Text style={[pickerStyles.arrowText, { color: colors.accent }]}>‹</Text>
                 </Pressable>
                 <View style={pickerStyles.yearCenter}>
                   <Text style={[pickerStyles.yearGreg, { color: colors.textPrimary }]}>{pickerYear}</Text>
                   <Text style={[pickerStyles.yearHebrew, { color: colors.textSecondary }]}>{hebrewYearLabel()}</Text>
                 </View>
-                <Pressable onPress={() => setPickerYear(y => y + 1)} hitSlop={12} style={pickerStyles.yearArrow}>
+                <Pressable onPress={() => setPickerYear(y => y - 1)} hitSlop={12} style={pickerStyles.yearArrow}>
                   <Text style={[pickerStyles.arrowText, { color: colors.accent }]}>›</Text>
                 </Pressable>
               </View>
@@ -93,8 +93,8 @@ const pickerStyles = StyleSheet.create({
   yearArrow: { padding: 8 },
   arrowText: { fontSize: 30, fontWeight: '300' },
   yearCenter: { alignItems: 'center' },
-  yearGreg: { fontSize: 22, fontWeight: '700' },
-  yearHebrew: { fontSize: 13, marginTop: 2 },
+  yearGreg: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  yearHebrew: { fontSize: 13, marginTop: 2, textAlign: 'center' },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   monthCell: {
     width: '30%', paddingVertical: 12, borderRadius: 10,

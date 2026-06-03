@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   actionRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -103,5 +103,6 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 16,
     fontWeight: '500',
+    textAlign: 'right',
   },
 });

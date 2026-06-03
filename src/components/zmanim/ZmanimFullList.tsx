@@ -81,7 +81,7 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
           <Text style={[styles.candleLabel, { color: colors.textPrimary }]}>הדלקת נרות</Text>
           {/* Wrap time + optional offset hint in a column so the hint sits
               directly below the time without disturbing the banner layout. */}
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ alignItems: 'flex-start' }}>
             <Text style={[styles.candleTime, { color: colors.candle }]}>
               {formatZmanTime(zmanim.candleLighting, use24h)}
             </Text>
@@ -155,10 +155,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginTop: 16,
     marginBottom: 8,
+    textAlign: 'right',
   },
 
   row: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
@@ -167,7 +168,7 @@ const styles = StyleSheet.create({
     marginVertical: 1,
     gap: 12,  // guarantees breathing room between label and time value
   },
-  label: { fontSize: 15, fontWeight: '500', flex: 1 },
+  label: { fontSize: 15, fontWeight: '500', flex: 1, textAlign: 'right' },
   time:  { fontSize: 15, fontWeight: '600' },
   dimmed: { opacity: 0.5 },
 
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   shitaLabel: { fontSize: 10, marginTop: 2 },
 
   candleBanner: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
@@ -189,7 +190,7 @@ const styles = StyleSheet.create({
   candleTime:  { fontSize: 18, fontWeight: '700' },
 
   havdalahBanner: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,

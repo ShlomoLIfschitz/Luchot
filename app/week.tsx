@@ -129,7 +129,7 @@ export default function WeekScreen() {
         )}
 
         {/* Day name labels above the 7 cells */}
-        <View style={styles.dayLabelsRow}>
+        <View style={[styles.dayLabelsRow, { flexDirection: hebrewOnTop ? 'row-reverse' : 'row' }]}>
           {dayLabels.map((label, idx) => (
             <Text
               key={idx}
@@ -161,8 +161,8 @@ const styles = StyleSheet.create({
   },
 
   header:         { alignItems: 'center', marginBottom: 16 },
-  primaryRange:   { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
-  secondaryRange: { fontSize: 13, marginTop: 4 },
+  primaryRange:   { fontSize: 18, fontWeight: '700', letterSpacing: -0.3, textAlign: 'center' },
+  secondaryRange: { fontSize: 13, marginTop: 4, textAlign: 'center' },
 
   parashaBanner: {
     paddingVertical: 12,
@@ -177,14 +177,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 2,
+    textAlign: 'center',
   },
   parashaName: {
     fontSize: 16,
     fontWeight: '700',
+    textAlign: 'center',
   },
 
   dayLabelsRow: {
-    flexDirection: 'row',
+    // flexDirection set inline (mode-aware)
     paddingHorizontal: 8,
     marginBottom: 4,
   },

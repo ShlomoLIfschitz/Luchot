@@ -195,19 +195,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dateRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   primaryLabel: {
     fontSize: 18,
     fontWeight: '700',
-    // textAlign defaults to 'auto' — respects I18nManager.isRTL
+    textAlign: 'right',
   },
   secondaryRow: {
     // 2px gap below the date row before the secondary label
     marginTop: 2,
-    alignItems: 'flex-end', // opposite corner from primary (which is at flex-start in RTL)
+    alignItems: 'flex-start', // opposite corner from primary (which is at flex-start in row-reverse)
   },
   secondaryLabel: {
     fontSize: 11,

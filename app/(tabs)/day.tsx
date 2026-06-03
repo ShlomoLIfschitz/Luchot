@@ -315,8 +315,8 @@ const styles = StyleSheet.create({
 
   // Header
   header: { alignItems: 'center', marginBottom: 16 },
-  hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  gregDate: { fontSize: 14, marginTop: 4 },
+  hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
+  gregDate: { fontSize: 14, marginTop: 4, textAlign: 'center' },
 
   // Holiday banner
   holidayBanner: {
@@ -337,6 +337,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
+    textAlign: 'right',
   },
 
   // Detail rows (Torah details)
@@ -354,7 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: 6,
   },
-  noteText: { fontSize: 14, fontWeight: '500' },
+  noteText: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
 
   // Hourly schedule
   hourRow: {
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: radius.sm,
   },
-  hourNoteText: { fontSize: 13, fontWeight: '500' },
+  hourNoteText: { fontSize: 13, fontWeight: '500', textAlign: 'right' },
 
   // FAB — right/left set inline via I18nManager (RTL-aware)
   fab: {

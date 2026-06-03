@@ -162,7 +162,7 @@ export function WeekGrid({ mode }: WeekGridProps) {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.row}>
+        <View style={[styles.row, { flexDirection: mode === 'hebrew' ? 'row-reverse' : 'row' }]}>
           {weekDays.map((day) => {
             const { primary, secondary } = getLabels(day);
             const isToday    = isSameDay(day.gregorianDate, today);
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   row: {
-    flexDirection: 'row',
+    // flexDirection is set inline (mode-aware: 'row-reverse' for hebrew, 'row' for gregorian)
   },
   cellWrapper: {
     flex: 1, // 1/7 of available width per cell

@@ -64,7 +64,7 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 16,
     paddingVertical: 14,
@@ -74,5 +74,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 15,
+    textAlign: 'right',
   },
 });

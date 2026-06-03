@@ -147,9 +147,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 8,
   },
-  appName:  { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
+  appName:  { fontSize: 28, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
   tagline:  { fontSize: 14, marginTop: 4, textAlign: 'center' },
-  version:  { fontSize: 12, marginTop: 12 },
+  version:  { fontSize: 12, marginTop: 12, textAlign: 'center' },
 
   card: {
     borderRadius: radius.lg,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
 
   creditRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,

@@ -159,12 +159,12 @@ const styles = StyleSheet.create({
 
   // Header
   header: { alignItems: 'center', marginBottom: 16 },
-  hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
-  gregDate:   { fontSize: 14, marginTop: 4 },
+  hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
+  gregDate:   { fontSize: 14, marginTop: 4, textAlign: 'center' },
 
   // Location
   locationRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 10,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
 
   // Shita selector
   shitaSelector: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: 8,
     marginBottom: 8,
   },

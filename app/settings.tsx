@@ -677,7 +677,7 @@ const omerRowStyles = StyleSheet.create({
     textAlign: 'right',
   },
   right: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },

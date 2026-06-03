@@ -40,7 +40,7 @@ export function ZmanimList({ zmanim }: Props) {
       {zmanim.candleLighting && (
         <View style={styles.row}>
           <Text style={{ color: colors.textSecondary }}>הדלקת נרות</Text>
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ alignItems: 'flex-start' }}>
             <Text style={{ color: colors.textPrimary }}>
               {formatZmanTime(zmanim.candleLighting, use24h)}
             </Text>
@@ -61,7 +61,7 @@ export function ZmanimList({ zmanim }: Props) {
 
 const styles = StyleSheet.create({
   container:  { marginVertical: 12 },
-  title:      { fontSize: 11, fontWeight: '600', marginBottom: 8 },
-  row:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: 4, gap: 12 },
+  title:      { fontSize: 11, fontWeight: '600', marginBottom: 8, textAlign: 'right' },
+  row:        { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: 4, gap: 12 },
   offsetHint: { fontSize: 11, marginTop: 1, textAlign: 'right' },
 });

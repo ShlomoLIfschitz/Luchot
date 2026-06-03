@@ -183,9 +183,6 @@ function LearningSection({
 }) {
   return (
     <View style={styles.section}>
-      {/* Title first, Icon second — with flexDirection:'row' (LTR), this
-          places the Hebrew title on the LEFT and the icon on the RIGHT,
-          which is the correct reading-start position for RTL Hebrew. */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
           {title}
@@ -271,7 +268,7 @@ const styles = StyleSheet.create({
 
   section:       { marginBottom: 20 },
   sectionHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
     marginBottom: 8,
@@ -281,6 +278,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.3,
+    textAlign: 'right',
   },
 
   card: {
@@ -290,7 +288,7 @@ const styles = StyleSheet.create({
   },
 
   row: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,

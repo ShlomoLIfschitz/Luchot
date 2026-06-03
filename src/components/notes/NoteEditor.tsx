@@ -240,14 +240,14 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
 
                 {/* ── תזכּר אותי ── */}
                 <View style={s.reminderToggleRow}>
+                  <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                    תזכּר אותי
+                  </Text>
                   <Switch
                     value={reminderEnabled}
                     onValueChange={setReminderEnabled}
                     trackColor={{ false: colors.border, true: colors.accent }}
                   />
-                  <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
-                    תזכּר אותי
-                  </Text>
                 </View>
 
                 {reminderEnabled && (
@@ -325,7 +325,7 @@ const s = StyleSheet.create({
     fontSize: 15, minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
   },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textAlign: 'right', marginBottom: 8 },
-  typeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  typeRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
   typeChip: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center', gap: 3 },
   typeIcon: { fontSize: 18 },
   typeLabel: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
@@ -344,7 +344,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   leadTimeRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     flexWrap: 'wrap',
     gap: 6,
     marginBottom: 12,
