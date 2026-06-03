@@ -114,46 +114,52 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   loadFromStorage: async () => {
-    const [
-      hebrewOnTop, darkMode, firstDayOfWeek, defaultCalendarType,
-      diaspora, zmanimMethod, use24hTime,
-      omerRemindersEnabled, omerReminderTime,
-      candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
-    ] = await Promise.all([
-      StorageService.getPref('hebrewOnTop',                   'true'),
-      StorageService.getPref('darkMode',                      'system'),
-      StorageService.getPref('firstDayOfWeek',                '0'),
-      StorageService.getPref('defaultCalendarType',           'hebrew'),
-      StorageService.getPref('diaspora',                      'false'),
-      StorageService.getPref('zmanimMethod',                  'GRA'),
-      StorageService.getPref('use24hTime',                    'true'),
-      StorageService.getPref('omerRemindersEnabled',          'false'),
-      StorageService.getPref('omerReminderTime',              '21:00'),
-      StorageService.getPref('candleLightingRemindersEnabled', 'false'),
-      StorageService.getPref('candleLightingLeadMinutes',     '15'),
-      StorageService.getPref('candleLightingCity',            ''),
-    ]);
-    set({
-      hebrewOnTop:         hebrewOnTop === 'true',
-      darkMode:            darkMode as 'system' | 'light' | 'dark',
-      firstDayOfWeek:      Number(firstDayOfWeek) as FirstDayOfWeek,
-      defaultCalendarType: defaultCalendarType as DefaultCalendarType,
-      diaspora:            diaspora === 'true',
-      // Migrate stored 'RABBANUT' (removed in Phase 4.1) to 'GRA'.
-      // Also guards against any other unexpected stored value.
-      zmanimMethod:
-        zmanimMethod === 'GRA' || zmanimMethod === 'MGA'
-          ? (zmanimMethod as ZmanimMethod)
-          : 'GRA',
-      use24hTime:          use24hTime === 'true',
-      omerRemindersEnabled: omerRemindersEnabled === 'true',
-      omerReminderTime,
-      candleLightingRemindersEnabled: candleLightingRemindersEnabled === 'true',
-      candleLightingLeadMinutes: parseInt(candleLightingLeadMinutes, 10) || 15,
-      candleLightingCity: candleLightingCity || null,
-    });
-    // Signal that persisted settings have been applied — UI may now render.
-    set({ settingsReady: true });
+    try {
+      const [
+        hebrewOnTop, darkMode, firstDayOfWeek, defaultCalendarType,
+        diaspora, zmanimMethod, use24hTime,
+        omerRemindersEnabled, omerReminderTime,
+        candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
+      ] = await Promise.all([
+        StorageService.getPref('hebrewOnTop',                   'true'),
+        StorageService.getPref('darkMode',                      'system'),
+        StorageService.getPref('firstDayOfWeek',                '0'),
+        StorageService.getPref('defaultCalendarType',           'hebrew'),
+        StorageService.getPref('diaspora',                      'false'),
+        StorageService.getPref('zmanimMethod',                  'GRA'),
+        StorageService.getPref('use24hTime',                    'true'),
+        StorageService.getPref('omerRemindersEnabled',          'false'),
+        StorageService.getPref('omerReminderTime',              '21:00'),
+        StorageService.getPref('candleLightingRemindersEnabled', 'false'),
+        StorageService.getPref('candleLightingLeadMinutes',     '15'),
+        StorageService.getPref('candleLightingCity',            ''),
+      ]);
+      set({
+        hebrewOnTop:         hebrewOnTop === 'true',
+        darkMode:            darkMode as 'system' | 'light' | 'dark',
+        firstDayOfWeek:      Number(firstDayOfWeek) as FirstDayOfWeek,
+        defaultCalendarType: defaultCalendarType as DefaultCalendarType,
+        diaspora:            diaspora === 'true',
+        // Migrate stored 'RABBANUT' (removed in Phase 4.1) to 'GRA'.
+        // Also guards against any other unexpected stored value.
+        zmanimMethod:
+          zmanimMethod === 'GRA' || zmanimMethod === 'MGA'
+            ? (zmanimMethod as ZmanimMethod)
+            : 'GRA',
+        use24hTime:          use24hTime === 'true',
+        omerRemindersEnabled: omerRemindersEnabled === 'true',
+        omerReminderTime,
+        candleLightingRemindersEnabled: candleLightingRemindersEnabled === 'true',
+        candleLightingLeadMinutes: parseInt(candleLightingLeadMinutes, 10) || 15,
+        candleLightingCity: candleLightingCity || null,
+      });
+    } catch (e) {
+      console.error('[SettingsProvider] loadFromStorage failed:', e);
+    } finally {
+      // Always release the UI gate, even if loading failed — otherwise the
+      // app freezes on a blank white screen (settingsReady never flips).
+      set({ settingsReady: true });
+    }
   },
 
   save: (key, value) => StorageService.setPref(key, value),

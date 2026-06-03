@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useColorScheme, I18nManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -20,6 +20,7 @@ if (I18nManager.isRTL) {
 export default function RootLayout() {
   const darkMode = useSettingsStore((s) => s.darkMode);
   const settingsReady = useSettingsStore((s) => s.settingsReady);
+  const [forceReady, setForceReady] = useState(false);
   const system = useColorScheme();
   const scheme = darkMode === 'system' ? (system ?? 'light') : darkMode;
 
@@ -48,10 +49,18 @@ export default function RootLayout() {
     init().catch(console.error);
   }, []);
 
+  // Safety fallback: never block the UI forever. If loadFromStorage hangs
+  // (a promise that never settles, so the finally guard cannot fire), force
+  // render after 3s so the app can never freeze on a blank white screen.
+  useEffect(() => {
+    const t = setTimeout(() => setForceReady(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
   // All hooks are declared above this point — safe to early-return here.
   // Render nothing until persisted settings are loaded so the UI never
   // flashes the default theme before the stored preference is applied.
-  if (!settingsReady) return null;
+  if (!settingsReady && !forceReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
