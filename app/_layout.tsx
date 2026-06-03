@@ -19,6 +19,7 @@ if (I18nManager.isRTL) {
 
 export default function RootLayout() {
   const darkMode = useSettingsStore((s) => s.darkMode);
+  const settingsReady = useSettingsStore((s) => s.settingsReady);
   const system = useColorScheme();
   const scheme = darkMode === 'system' ? (system ?? 'light') : darkMode;
 
@@ -46,6 +47,11 @@ export default function RootLayout() {
     }
     init().catch(console.error);
   }, []);
+
+  // All hooks are declared above this point — safe to early-return here.
+  // Render nothing until persisted settings are loaded so the UI never
+  // flashes the default theme before the stored preference is applied.
+  if (!settingsReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

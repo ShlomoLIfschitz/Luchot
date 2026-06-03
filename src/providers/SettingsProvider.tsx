@@ -44,6 +44,9 @@ interface SettingsState {
   candleLightingLeadMinutes: number;
   candleLightingCity: string | null;
 
+  // Ready gate — false until loadFromStorage() completes
+  settingsReady: boolean;
+
   // Actions
   toggleHebrewOnTop: () => void;
   setDarkMode: (m: 'system' | 'light' | 'dark') => void;
@@ -63,6 +66,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   hebrewOnTop: true,
   darkMode: 'system',
+  settingsReady: false,
   firstDayOfWeek: 0,
   defaultCalendarType: 'hebrew',
   diaspora: false,
@@ -148,6 +152,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       candleLightingLeadMinutes: parseInt(candleLightingLeadMinutes, 10) || 15,
       candleLightingCity: candleLightingCity || null,
     });
+    // Signal that persisted settings have been applied — UI may now render.
+    set({ settingsReady: true });
   },
 
   save: (key, value) => StorageService.setPref(key, value),
