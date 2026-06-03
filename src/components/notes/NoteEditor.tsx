@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
-  TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
+  TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
-import { Trash2 } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { MapPin, Pencil, Trash2, Share2 } from 'lucide-react-native';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
 import type { ThemeColors } from '../../hooks/useThemeColors';
@@ -115,6 +116,7 @@ interface Props {
     hebrewDate: HebrewDateInfo;
     reminderMinutes?: number | null;
     colorId?: string | null;
+    location?: string | null;
   }) => void;
   onDelete?: (id: string) => void;
   onClose: () => void;
@@ -128,6 +130,9 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const [reminderMinutes, setReminderMinutes] = useState<number>(0);
   const [customMinutes, setCustomMinutes] = useState<string>('30');
   const [colorId, setColorId] = useState<string | null>(null);
+  const [isViewMode, setIsViewMode] = useState(false);
+  const [location, setLocation] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -139,6 +144,8 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       setReminderMinutes(existingMinutes ?? 0);
       setCustomMinutes(String(existingMinutes ?? 30));
       setColorId(note?.colorId ?? null);
+      setLocation(note?.location ?? '');
+      setIsViewMode(!!note);
     }
   }, [visible, note]);
 
@@ -153,13 +160,72 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       }
       return reminderMinutes;
     })();
-    onSave({ id: note?.id, created: note?.created, summary: trimmed, noteType, calendarType, date, hebrewDate, reminderMinutes: finalReminderMinutes, colorId });
-    onClose();
+    onSave({
+      id: note?.id,
+      created: note?.created,
+      summary: trimmed,
+      noteType,
+      calendarType,
+      date,
+      hebrewDate,
+      reminderMinutes: finalReminderMinutes,
+      colorId,
+      location: location.trim() || null,
+    });
+    if (note?.id) {
+      setIsViewMode(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleGPS = async () => {
+    setLocationLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('לא ניתן לקבל מיקום', 'אנא אפשר גישה למיקום בהגדרות.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const results = await Location.reverseGeocodeAsync({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
+      if (results.length > 0) {
+        const r = results[0];
+        const parts = [r.street, r.city].filter(Boolean);
+        setLocation(parts.join(', '));
+      }
+    } catch {
+      Alert.alert('לא ניתן לקבל מיקום');
+    } finally {
+      setLocationLoading(false);
+    }
   };
 
   const hebDateLabel = `${toHebrewNumeral(hebrewDate.day)} ${hebrewDate.monthName} ${toHebrewYear(hebrewDate.year)}`;
   const gregDateLabel = date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' });
   const isRecurring = noteType !== 'note';
+  const noteTypeInfo = NOTE_TYPES.find((t) => t.type === noteType);
+
+  const handleDeletePress = () => {
+    Alert.alert(
+      'מחק אירוע',
+      'האם למחוק את האירוע לצמיתות?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק',
+          style: 'destructive',
+          onPress: () => {
+            onDelete?.(note!.id);
+            onClose();
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -170,164 +236,296 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
               <View style={[s.sheet, { backgroundColor: colors.surface }]}>
                 <View style={[s.handle, { backgroundColor: colors.border }]} />
 
-                <View style={s.headerRow}>
-                  <Text style={[s.title, { color: colors.textPrimary }]}>
-                    {note ? 'ערוך הערה' : 'הערה חדשה'}
-                  </Text>
-                  {note && onDelete && (
-                    <Pressable
-                      hitSlop={8}
-                      style={s.trashBtn}
-                      onPress={() => {
-                        Alert.alert(
-                          'מחק אירוע',
-                          'האם למחוק את האירוע לצמיתות?',
-                          [
-                            { text: 'ביטול', style: 'cancel' },
-                            { text: 'מחק', style: 'destructive', onPress: () => { onDelete(note.id); onClose(); } },
-                          ]
-                        );
-                      }}
-                    >
-                      <Trash2 size={20} color={colors.textTertiary} />
-                    </Pressable>
-                  )}
-                </View>
-
-                <TextInput
-                  style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
-                  value={summary}
-                  onChangeText={setSummary}
-                  placeholder="כותרת..."
-                  placeholderTextColor={colors.textTertiary}
-                  textAlign="right"
-                  autoFocus={visible && !note}
-                  multiline
-                  maxLength={200}
-                />
-
-                <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>סוג</Text>
-                <View style={s.typeRow}>
-                  {NOTE_TYPES.map(({ type, label, icon }) => {
-                    const active = noteType === type;
-                    return (
+                {isViewMode ? (
+                  // ── VIEW MODE ──────────────────────────────────────────────
+                  <>
+                    <View style={s.headerRow}>
+                      {/* title — JSX-first = rightmost in row-reverse */}
+                      <Text style={[s.title, { color: colors.textPrimary }]}>
+                        ערוך הערה
+                      </Text>
+                      {/* X button — JSX-last = leftmost */}
                       <Pressable
-                        key={type}
-                        onPress={() => setNoteType(type)}
-                        style={[
-                          s.typeChip,
-                          { borderColor: colors.border, backgroundColor: colors.background },
-                          active && { backgroundColor: colors.accent, borderColor: colors.accent },
-                        ]}
+                        hitSlop={8}
+                        onPress={onClose}
+                        accessibilityLabel="סגור"
+                        accessibilityRole="button"
                       >
-                        <Text style={s.typeIcon}>{icon}</Text>
-                        <Text style={[s.typeLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>{label}</Text>
+                        <Text style={[s.closeBtn, { color: colors.textTertiary }]}>✕</Text>
                       </Pressable>
-                    );
-                  })}
-                </View>
-
-                <ColorPickerRow
-                  noteType={noteType}
-                  colorId={colorId}
-                  onChange={setColorId}
-                  colors={colors}
-                />
-
-                {isRecurring && (
-                  <>
-                    <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
-                    <View style={s.anchorRow}>
-                      {(['hebrew', 'gregorian'] as const).map((ct) => {
-                        const active = calendarType === ct;
-                        return (
-                          <Pressable
-                            key={ct}
-                            onPress={() => setCalendarType(ct)}
-                            style={[
-                              s.anchorChip,
-                              { borderColor: colors.border, backgroundColor: colors.background },
-                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
-                            ]}
-                          >
-                            <Text style={[s.anchorLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
-                              {ct === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
                     </View>
-                  </>
-                )}
 
-                {/* ── תזכּר אותי ── */}
-                <View style={s.reminderToggleRow}>
-                  <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
-                    תזכּר אותי
-                  </Text>
-                  <Switch
-                    value={reminderEnabled}
-                    onValueChange={setReminderEnabled}
-                    trackColor={{ false: colors.border, true: colors.accent }}
-                  />
-                </View>
-
-                {reminderEnabled && (
-                  <>
-                    <View style={s.leadTimeRow}>
-                      {LEAD_TIME_OPTIONS.map(({ label, minutes }) => {
-                        const isCustom = minutes === -1;
-                        const active = isCustom
-                          ? reminderMinutes < 0 || !LEAD_TIME_OPTIONS.slice(0, -1).some(o => o.minutes === reminderMinutes)
-                          : reminderMinutes === minutes;
-                        return (
-                          <Pressable
-                            key={label}
-                            onPress={() => {
-                              if (isCustom) {
-                                setReminderMinutes(-1);
-                              } else {
-                                setReminderMinutes(minutes);
-                              }
-                            }}
-                            style={[
-                              s.leadChip,
-                              { borderColor: colors.border, backgroundColor: colors.background },
-                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
-                            ]}
-                          >
-                            <Text style={[s.leadChipLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
-                              {label}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
+                    {/* summary */}
+                    <View style={s.viewField}>
+                      <Text style={[s.viewFieldValue, s.viewSummary, { color: colors.textPrimary }]}>
+                        {summary}
+                      </Text>
                     </View>
-                    {reminderMinutes === -1 && (
-                      <View style={s.customRow}>
-                        <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
-                          דקות לפני:
+
+                    {/* note type */}
+                    {noteTypeInfo && (
+                      <View style={[s.viewField, s.viewRow]}>
+                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
+                          {noteTypeInfo.icon} {noteTypeInfo.label}
                         </Text>
-                        <TextInput
-                          style={[s.customInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
-                          value={customMinutes}
-                          onChangeText={setCustomMinutes}
-                          keyboardType="number-pad"
-                          maxLength={4}
-                        />
                       </View>
                     )}
+
+                    {/* location */}
+                    {!!location && (
+                      <View style={[s.viewField, s.viewRow]}>
+                        <MapPin size={14} color={colors.textTertiary} />
+                        <Text style={[s.viewFieldValue, { color: colors.textSecondary, flex: 1 }]}>
+                          {location}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* recurring anchor */}
+                    {isRecurring && (
+                      <View style={s.viewField}>
+                        <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
+                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
+                          {calendarType === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* reminder */}
+                    {note?.reminderMinutes != null && (
+                      <View style={s.viewField}>
+                        <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>תזכורת</Text>
+                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
+                          {note.reminderMinutes === 0
+                            ? 'בזמן האירוע'
+                            : note.reminderMinutes < 60
+                              ? `${note.reminderMinutes} דקות לפני`
+                              : note.reminderMinutes === 60
+                                ? 'שעה לפני'
+                                : note.reminderMinutes === 1440
+                                  ? 'יום לפני'
+                                  : `${note.reminderMinutes} דקות לפני`}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* bottom toolbar */}
+                    <View style={[s.toolbar, { borderTopColor: colors.border }]}>
+                      {/* delete */}
+                      <Pressable
+                        style={s.toolbarBtn}
+                        onPress={handleDeletePress}
+                        accessibilityLabel="מחק הערה"
+                        accessibilityRole="button"
+                      >
+                        <Trash2 size={22} color={colors.textTertiary} />
+                        <Text style={[s.toolbarLabel, { color: colors.textTertiary }]}>מחק</Text>
+                      </Pressable>
+
+                      {/* share */}
+                      <Pressable
+                        style={s.toolbarBtn}
+                        onPress={() => Alert.alert('שתף', 'בפיתוח')}
+                        accessibilityLabel="שתף הערה"
+                        accessibilityRole="button"
+                      >
+                        <Share2 size={22} color={colors.textTertiary} />
+                        <Text style={[s.toolbarLabel, { color: colors.textTertiary }]}>שתף</Text>
+                      </Pressable>
+
+                      {/* edit */}
+                      <Pressable
+                        style={s.toolbarBtn}
+                        onPress={() => setIsViewMode(false)}
+                        accessibilityLabel="ערוך הערה"
+                        accessibilityRole="button"
+                      >
+                        <Pencil size={22} color={colors.accent} />
+                        <Text style={[s.toolbarLabel, { color: colors.accent }]}>עריכה</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : (
+                  // ── EDIT MODE ──────────────────────────────────────────────
+                  <>
+                    <View style={s.headerRow}>
+                      {/* title — JSX-first = rightmost */}
+                      <Text style={[s.title, { color: colors.textPrimary }]}>
+                        {note ? 'ערוך הערה' : 'הערה חדשה'}
+                      </Text>
+                      {/* X button — JSX-last = leftmost */}
+                      <Pressable
+                        hitSlop={8}
+                        onPress={onClose}
+                        accessibilityLabel="סגור"
+                        accessibilityRole="button"
+                      >
+                        <Text style={[s.closeBtn, { color: colors.textTertiary }]}>✕</Text>
+                      </Pressable>
+                    </View>
+
+                    <TextInput
+                      style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
+                      value={summary}
+                      onChangeText={setSummary}
+                      placeholder="כותרת..."
+                      placeholderTextColor={colors.textTertiary}
+                      textAlign="right"
+                      autoFocus={visible && !note}
+                      multiline
+                      maxLength={200}
+                    />
+
+                    <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>סוג</Text>
+                    <View style={s.typeRow}>
+                      {NOTE_TYPES.map(({ type, label, icon }) => {
+                        const active = noteType === type;
+                        return (
+                          <Pressable
+                            key={type}
+                            onPress={() => setNoteType(type)}
+                            style={[
+                              s.typeChip,
+                              { borderColor: colors.border, backgroundColor: colors.background },
+                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                            ]}
+                          >
+                            <Text style={s.typeIcon}>{icon}</Text>
+                            <Text style={[s.typeLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>{label}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    <ColorPickerRow
+                      noteType={noteType}
+                      colorId={colorId}
+                      onChange={setColorId}
+                      colors={colors}
+                    />
+
+                    {isRecurring && (
+                      <>
+                        <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
+                        <View style={s.anchorRow}>
+                          {(['hebrew', 'gregorian'] as const).map((ct) => {
+                            const active = calendarType === ct;
+                            return (
+                              <Pressable
+                                key={ct}
+                                onPress={() => setCalendarType(ct)}
+                                style={[
+                                  s.anchorChip,
+                                  { borderColor: colors.border, backgroundColor: colors.background },
+                                  active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                                ]}
+                              >
+                                <Text style={[s.anchorLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                                  {ct === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </>
+                    )}
+
+                    {/* location field */}
+                    <View style={s.locationRow}>
+                      {/* input — JSX-first = rightmost in row-reverse */}
+                      <TextInput
+                        style={[s.locationInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
+                        value={location}
+                        onChangeText={setLocation}
+                        placeholder="מיקום"
+                        placeholderTextColor={colors.textTertiary}
+                        textAlign="right"
+                      />
+                      {/* GPS button — JSX-last = leftmost */}
+                      <Pressable
+                        onPress={handleGPS}
+                        style={s.gpsBtn}
+                        accessibilityLabel="קבל מיקום נוכחי"
+                        accessibilityRole="button"
+                        accessibilityHint="ממלא את שדה המיקום עם הכתובת הנוכחית"
+                      >
+                        {locationLoading
+                          ? <ActivityIndicator size="small" color={colors.accent} />
+                          : <MapPin size={22} color={colors.accent} />
+                        }
+                      </Pressable>
+                    </View>
+
+                    {/* reminder toggle */}
+                    <View style={s.reminderToggleRow}>
+                      <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                        תזכּר אותי
+                      </Text>
+                      <Switch
+                        value={reminderEnabled}
+                        onValueChange={setReminderEnabled}
+                        trackColor={{ false: colors.border, true: colors.accent }}
+                      />
+                    </View>
+
+                    {reminderEnabled && (
+                      <>
+                        <View style={s.leadTimeRow}>
+                          {LEAD_TIME_OPTIONS.map(({ label, minutes }) => {
+                            const isCustom = minutes === -1;
+                            const active = isCustom
+                              ? reminderMinutes < 0 || !LEAD_TIME_OPTIONS.slice(0, -1).some(o => o.minutes === reminderMinutes)
+                              : reminderMinutes === minutes;
+                            return (
+                              <Pressable
+                                key={label}
+                                onPress={() => {
+                                  if (isCustom) {
+                                    setReminderMinutes(-1);
+                                  } else {
+                                    setReminderMinutes(minutes);
+                                  }
+                                }}
+                                style={[
+                                  s.leadChip,
+                                  { borderColor: colors.border, backgroundColor: colors.background },
+                                  active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                                ]}
+                              >
+                                <Text style={[s.leadChipLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                                  {label}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                        {reminderMinutes === -1 && (
+                          <View style={s.customRow}>
+                            <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                              דקות לפני:
+                            </Text>
+                            <TextInput
+                              style={[s.customInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
+                              value={customMinutes}
+                              onChangeText={setCustomMinutes}
+                              keyboardType="number-pad"
+                              maxLength={4}
+                            />
+                          </View>
+                        )}
+                      </>
+                    )}
+
+                    <View style={s.actions}>
+                      <Pressable onPress={onClose} style={[s.btn, { borderColor: colors.border }]}>
+                        <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
+                      </Pressable>
+                      <Pressable onPress={handleSave} style={[s.btn, s.btnSave, { backgroundColor: colors.accent }]}>
+                        <Text style={[s.btnText, { color: colors.textInverse }]}>שמור</Text>
+                      </Pressable>
+                    </View>
                   </>
                 )}
-
-                <View style={s.actions}>
-                  <Pressable onPress={onClose} style={[s.btn, { borderColor: colors.border }]}>
-                    <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
-                  </Pressable>
-                  <Pressable onPress={handleSave} style={[s.btn, s.btnSave, { backgroundColor: colors.accent }]}>
-                    <Text style={[s.btnText, { color: colors.textInverse }]}>שמור</Text>
-                  </Pressable>
-                </View>
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
@@ -343,7 +541,7 @@ const s = StyleSheet.create({
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
   title: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'right' },
-  trashBtn: { padding: 4 },
+  closeBtn: { fontSize: 18, fontWeight: '600', padding: 4 },
   input: {
     borderWidth: 1, borderRadius: 10, padding: 12,
     fontSize: 15, minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
@@ -397,4 +595,45 @@ const s = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  // toolbar (view mode)
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 32,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  toolbarBtn: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  toolbarLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  // view-mode read-only fields
+  viewField: { marginBottom: 12 },
+  viewRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  viewSummary: { fontSize: 18, fontWeight: '600' },
+  viewFieldLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textAlign: 'right', marginBottom: 2 },
+  viewFieldValue: { fontSize: 15, textAlign: 'right' },
+  // location field (edit mode)
+  locationRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  locationInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    textAlign: 'right',
+  },
+  gpsBtn: { padding: 8 },
 });
