@@ -19,7 +19,9 @@ import {
   Linking,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
+import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
 import { useNotes, type CalendarNote } from '../../src/hooks/useNotes';
@@ -42,6 +44,7 @@ export default function DayScreen() {
   const colors = useThemeColors();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
+  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
 
   // Derive DayData for the selected date — month is cached, so cheap.
   const dayData = useMemo<DayData>(
@@ -80,7 +83,7 @@ export default function DayScreen() {
   const swipeGesture = Gesture.Pan().onEnd((e) => {
     if (Math.abs(e.velocityX) > 400) {
       // In RTL, swipe left = next day, swipe right = previous day
-      navigateDay(e.velocityX < 0 ? 1 : -1);
+      runOnJS(navigateDay)(e.velocityX < 0 ? 1 : -1);
     }
   });
 
@@ -116,10 +119,10 @@ export default function DayScreen() {
         {/* Date header — fixed above the scroll, always visible */}
         <View style={styles.header}>
           <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-            {hebrewFormatted}
+            {hebrewOnTop ? hebrewFormatted : gregFormatted}
           </Text>
           <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-            {gregFormatted}
+            {hebrewOnTop ? gregFormatted : hebrewFormatted}
           </Text>
         </View>
 

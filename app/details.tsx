@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import {
   BookOpen,
   BookMarked,
@@ -21,6 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react-native';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
+import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import {
@@ -48,6 +50,7 @@ export default function DetailsScreen() {
   const colors = useThemeColors();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
+  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
 
   const dayData = useMemo<DayData>(
     () => dateService.getDayData(selectedDate),
@@ -69,7 +72,7 @@ export default function DetailsScreen() {
 
   const swipeGesture = Gesture.Pan().onEnd((e) => {
     if (Math.abs(e.velocityX) > 400) {
-      navigateDay(e.velocityX < 0 ? 1 : -1);
+      runOnJS(navigateDay)(e.velocityX < 0 ? 1 : -1);
     }
   });
 
@@ -136,10 +139,10 @@ export default function DetailsScreen() {
           {/* Header — date */}
           <View style={styles.header}>
             <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-              {hebrewFormatted}
+              {hebrewOnTop ? hebrewFormatted : gregFormatted}
             </Text>
             <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-              {gregFormatted}
+              {hebrewOnTop ? gregFormatted : hebrewFormatted}
             </Text>
           </View>
 

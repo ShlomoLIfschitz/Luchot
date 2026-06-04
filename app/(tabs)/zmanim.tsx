@@ -5,6 +5,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { MapPin, Navigation } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
@@ -50,6 +51,7 @@ export default function ZmanimScreen() {
 
   const zmanimMethod = useSettingsStore((s) => s.zmanimMethod);
   const setZmanimMethod = useSettingsStore((s) => s.setZmanimMethod);
+  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
 
   // Day data for header
   const dayData = useMemo(
@@ -77,7 +79,7 @@ export default function ZmanimScreen() {
 
   const swipeGesture = Gesture.Pan().onEnd((e) => {
     if (Math.abs(e.velocityX) > 400) {
-      navigateDay(e.velocityX < 0 ? 1 : -1);
+      runOnJS(navigateDay)(e.velocityX < 0 ? 1 : -1);
     }
   });
 
@@ -92,10 +94,10 @@ export default function ZmanimScreen() {
           {/* Header — date */}
           <View style={styles.header}>
             <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-              {hebrewFormatted}
+              {hebrewOnTop ? hebrewFormatted : gregFormatted}
             </Text>
             <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-              {gregFormatted}
+              {hebrewOnTop ? gregFormatted : hebrewFormatted}
             </Text>
           </View>
 

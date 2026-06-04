@@ -13,6 +13,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useCalendarStore } from '../../providers/CalendarProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
@@ -149,13 +150,21 @@ export function WeekGrid({ mode }: WeekGridProps) {
     [router],
   );
 
+  // navigateWeek — JS-thread function called via runOnJS from the worklet.
+  const navigateWeek = useCallback(
+    (direction: 1 | -1) => {
+      const next = new Date(selectedDate);
+      next.setDate(next.getDate() + 7 * direction);
+      setSelectedDate(next);
+    },
+    [selectedDate, setSelectedDate],
+  );
+
   // Swipe gesture — moves between WEEKS, not between days
   const swipeGesture = Gesture.Pan().onEnd((e) => {
     if (Math.abs(e.velocityX) > 400) {
       const direction = e.velocityX < 0 ? 1 : -1; // RTL: left swipe = next week
-      const next = new Date(selectedDate);
-      next.setDate(next.getDate() + 7 * direction);
-      setSelectedDate(next);
+      runOnJS(navigateWeek)(direction);
     }
   });
 

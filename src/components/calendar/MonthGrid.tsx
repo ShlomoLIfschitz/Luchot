@@ -11,6 +11,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { useCalendarStore } from '../../providers/CalendarProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
@@ -198,7 +199,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   // ── Swipe gesture ──────────────────────────────────────────────────────────
   const swipeGesture = Gesture.Pan().onEnd((e) => {
     if (Math.abs(e.velocityX) > 400) {
-      navigateMonth(e.velocityX < 0 ? 1 : -1);
+      runOnJS(navigateMonth)(e.velocityX < 0 ? 1 : -1);
     }
   });
 
