@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-06-04 — Session: Hebrew month navigation — exact HDate cursor (Session B)
+
+**Phase:** Phase 5 (navigation bug fixes — Session B of the 2-session split; fixes Bug 1)
+**Commits:** 6f6b3c9 (DateService), 781a59a (CalendarProvider), aa31a60 (MonthGrid + index.tsx) + this docs entry (4)
+**Sub-agents:** local-data-builder (Tasks 1+2: DateService + CalendarProvider), mobile-ui-builder (Task 3: MonthGrid + index.tsx). Orchestrator: verified HDate arithmetic empirically, ran DoD, made one integration fix (see below).
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+- **Pre-flight (orchestrator) — verified HDate month arithmetic in hebcal v5.x.** Ran a node check against the installed `@hebcal/core`: `new HDate(1, m, y).add(±1, 'months')` handles every edge case correctly — Adar I(12)→Adar II(13); Adar II(13)→Nisan(1); Elul(6)→Tishrei(7) year+1; Tishrei(7)−1→Elul(6) year−1; Nisan(1)−1→Adar II(13) in a leap year. So `HDate.add` is used directly — **no manual stepping needed**.
+- **Task 1 — DateService (local-data-builder).** Extracted the per-day construction body of `getMonthData` into a private `buildDayData(date): DayData` that fetches that single day's hebcal events (same flags: il/omer/sedrot) and runs the identical classification + learning logic. `getMonthData` now loops and calls it — output unchanged (per-day fetch instead of one batched fetch; cached per month so amortized). Added `getHebrewMonthData(hYear, hMonth)`: iterates `1..HDate.daysInMonth(hMonth,hYear)`, maps each `HDate.greg()` through `buildDayData`. Cached under a distinct `he_${hYear}_${hMonth}_${diaspora}` key (cannot collide with Gregorian keys); `setDiaspora`'s existing `monthCache.clear()` invalidates Hebrew entries too.
+- **Task 2 — CalendarProvider (local-data-builder).** Added a parallel Hebrew cursor — `currentHebrewYear`, `currentHebrewMonth`, `hebrewMonthData` (init from `new HDate()`) — plus `navigateHebrewMonth(direction)` (steps via `HDate.add`, reloads `hebrewMonthData`, does NOT touch `selectedDate` — view-only navigation, confirmed decision) and `refreshHebrewMonth()`. Gregorian cursor untouched.
+- **Task 3 — MonthGrid + index.tsx (mobile-ui-builder).** In `mode==='hebrew'`, MonthGrid reads `hebrewMonthData` and drives both chevrons + swipe through `navigateHebrewMonth` (mode-aware `gridData`/`navigate` aliases). Header title now exact from `gridData[0].hebrewDate` (retires the `[14]` heuristic). `index.tsx` calls `refreshHebrewMonth()` on mount. Gregorian mode fully unchanged.
+
+### Decisions made
+
+- None new. Implements the confirmed decisions (Hebrew nav is view-only; getMonthData refactored-not-rewritten; hebcal v5.x HDate arithmetic).
+
+### Orchestrator integration fix (found at the DoD gate)
+
+- **Hebrew-tab Gregorian subtitle was frozen.** The sub-agent left `secondaryTitle` in hebrew mode pointing at `gregMonthName` (derived from the Gregorian cursor `currentMonth`/`currentYear`). Since the Hebrew tab never navigates the Gregorian cursor, the subtitle would stay stuck on today's Gregorian month while swiping through Hebrew months. Fixed in MonthGrid: in hebrew mode the secondary line is now derived from the Hebrew month's **midpoint** `gregorianDate` (`gridData[Math.floor(len/2)]`), so it tracks the displayed month. This completes Task 3's "secondaryTitle resolves correctly per mode" requirement. Done directly by the orchestrator (SendMessage to continue the warm agent is unavailable; a cold re-spawn for ~8 lines was the expensive path).
+
+### Open issues / blocked
+
+- **Month/year picker (`MonthYearPicker`) does nothing visible in Hebrew mode** — it still reads/writes the Gregorian cursor via `navigateToMonth`, which the Hebrew grid does not consume. So in hebrew mode the header-tap picker is effectively inert (it moves the Gregorian cursor, not the Hebrew grid). Explicitly out of scope this session; candidate for a follow-up (a Hebrew month/year picker + `navigateToHebrewMonth`).
+- **Header chevrons** now correctly drive `navigateHebrewMonth` in hebrew mode — verify on device they agree with swipe direction.
+
+### Next steps
+
+- **Manual on-device verification (DoD):** navigate forward/backward Sivan → Tammuz → Av → Elul → Tishrei (year rollover) — no month skipped or repeated; titles exact. If in a leap year, verify Adar I → Adar II → Nisan. Confirm Gregorian tab unchanged and `selectedDate` unaffected by Hebrew navigation.
+- Follow-up candidate: Hebrew-aware month/year picker.
+
+---
+
 ## 2026-06-04 — Session: swipe direction (RTL) + horizontal-only gesture constraint
 
 **Phase:** Phase 5 (navigation bug fixes — Session A of a 2-session split)
