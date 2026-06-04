@@ -80,11 +80,6 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
             onPress={() => openEdit(note)}
             style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
           >
-            <Pressable
-              onPress={(e) => { e.stopPropagation?.(); setColorPickerNote(note); }}
-              hitSlop={8}
-              style={[s.colorDot, { backgroundColor: resolveHexColor(note) }]}
-            />
             {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
             <View style={s.noteBody}>
               <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
@@ -97,6 +92,7 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
             <Pressable onPress={() => confirmDelete(note)} hitSlop={10} style={s.deleteBtn}>
               <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
             </Pressable>
+            <View style={[s.colorBar, { backgroundColor: resolveHexColor(note) }]} />
           </Pressable>
         ))
       )}
@@ -181,10 +177,11 @@ const s = StyleSheet.create({
   noteTag: { fontSize: 11, textAlign: 'right', marginTop: 2 },
   deleteBtn: { padding: 4 },
   deleteIcon: { fontSize: 14 },
-  colorDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  colorBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginRight: 8,
   },
   colorModalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   colorModalSheet: { borderRadius: 16, padding: 20, elevation: 8 },
