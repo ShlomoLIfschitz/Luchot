@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-06-05 — Session: Gal C — C4 recurring reminders + yearly renewal (Gal C closes)
+
+**Phase:** Phase 5 (Gal C, session 4 of 4 — closes Gal C: event time + full recurrence)
+**Commits:** (this session) C4 reminders + renewal + this docs entry
+**Sub-agents:** local-data-builder (Wave 1: NotificationService.ensureRecurringReminders + StorageService getRecurringRemindableEvents/getEventsNeedingRenewal/confirmRenewal/suppressRenewal), mobile-ui-builder (Wave 2: _layout.tsx init wiring + sequential yearly-renewal Alert dialog). Orchestrator: ran the DoD gate.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline, no new deps). JS-only — ready for OTA (push pending user go).
+
+### What was done
+
+- **Wave 1 — reminders + renewal logic (local-data-builder).** `NotificationService.ensureRecurringReminders()` — additive sweep for daily/weekly/monthly reminders: 60-day forward window, ≤20/event, Gregorian JS-Date occurrence generation (daily/weekly/monthly with day-of-month skip for non-existent days), fire time = timed→master HH:MM on occurrence−lead / all-day→09:00−lead, id `evt-{eventId}-{YYYYMMDD}`, cancel-then-reschedule per event for idempotency. No useNotes/expandRecurringNotes import (circular-safe). `ensureAnnualReminders` untouched. StorageService: `getRecurringRemindableEvents` (daily/weekly/monthly + reminder + is_exception=0), `getEventsNeedingRenewal` (SQL pre-filter on yearly/reminder/not-suppressed/11-month grace + JS check that the most-recent occurrence has passed since `created`, hebrew via HDate), `confirmRenewal` (last_renewal_ask=today YYYY-MM-DD), `suppressRenewal` (renewal_ask_suppressed=1).
+- **Wave 2 — init wiring + renewal dialog (mobile-ui-builder).** `app/_layout.tsx`: `await NotificationService.ensureRecurringReminders()` added after `ensureAnnualReminders()` in init (sequential). New `useEffect` gated on `settingsReady` with a `useRef` once-per-launch guard → `getEventsNeedingRenewal()` → SEQUENTIAL Alerts ("תזכורת שנתית" / "האם להמשיך לקבל תזכורת עבור {summary}?"): "המשך"→confirmRenewal+next, "אל תשאל שוב"→suppressRenewal+next, dismiss→next without writing (reappears next launch). All hooks before the early return; non-blocking.
+
+### Decisions made
+
+- Logged **Gal C C4** in DECISIONS.md (2026-06-05): sweep-on-init recurring reminders (60d/20-cap, evt-{id}-{date} ids, cancel-then-reschedule, Gregorian arithmetic, no circular import); yearly renewal prompt (criteria, confirm/suppress, root _layout host, sequential Alerts, dismiss=reappear, YYYY-MM-DD last_renewal_ask). **Gal C complete (C1–C4).**
+
+### Open issues / blocked
+
+- **KNOWN LIMITATION — recurring reminders are NOT exception/tombstone-aware.** The sweep schedules the master series only, so a reminder can still fire for an occurrence deleted "לתאריך זה בלבד", and an override's edited time isn't used. Deliberately out of C4 scope — first post-Gal-C cleanup candidate (fetch exceptions + overlay in the sweep).
+- **Aggregate iOS 64-notification cap** not enforced across events (only candle-lighting self-caps). Revisit if hit.
+- View-mode "עוגן תאריך" cosmetic note (from C3) unchanged.
+
+### Next steps
+
+- **On-device verification (this feature):** daily event w/ reminder ~2 min out → notification arrives; weekly → correct weekday; all-day recurring → fires at 09:00−lead; a yearly event past its anniversary (with reminder) → renewal dialog on next launch; "המשך" → gone, reminder stays, re-arms; "אל תשאל שוב" → never reappears; dismissed → reappears next launch; brand-new yearly (anniversary not passed) → no dialog; non-yearly recurring → no dialog.
+- **OTA push** on user go: `eas update --branch preview --message "feat: Gal C — C4 recurring reminders + yearly renewal"`.
+- **Gal C is closed.** Post-Gal-C backlog (from earlier sessions): exception-aware reminders; unify LocationProvider+SettingsProvider; Holiday card (Yom Tov); Hebrew month/year picker; weekly-DST verify.
+
+---
+
 ## 2026-06-05 — Session: Gal C — C3 follow-up bugfix (recurrence anchor gate)
 
 **Phase:** Phase 5 (Gal C, C3 follow-up bug fix)

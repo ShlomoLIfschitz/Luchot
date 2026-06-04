@@ -498,3 +498,45 @@
   all recurrence types (cosmetic; consider hiding for non-yearly). `onSaveOccurrence
   Exception`/`onDeleteOccurrence` are optional props (no-op if a future caller forgets
   them) — all current callers pass them.
+
+## Gal C C4 — recurring reminders + yearly renewal (Gal C closes)
+- Date: 2026-06-05
+- Context: C4 added reminder scheduling for daily/weekly/monthly events and the
+  yearly renewal prompt, completing Gal C.
+- Choices:
+  1. **`ensureRecurringReminders` sweep-on-init** (additive to NotificationService,
+     alongside the existing yearly/Omer/candle sweeps, wired in `_layout.tsx` init).
+     Daily/weekly/monthly only; **Gregorian JS-Date arithmetic** (these types are
+     calendar-independent by the locked model). Rolling window = 60 days forward,
+     ≤20 occurrences/event. Fire time: timed → master's HH:MM on the occurrence day −
+     lead; all-day → 09:00 − lead (locked anchor, same as yearly). Id namespace
+     `evt-{eventId}-{YYYYMMDD}` (occurrence date). **Idempotency = cancel-then-
+     reschedule per event**: each sweep cancels that event's `evt-{id}-*` set and
+     reschedules the window, so edits to lead/time take effect and nothing duplicates.
+     `ensureAnnualReminders` (yearly) untouched.
+  2. **No circular import:** NotificationService does NOT reuse `expandRecurringNotes`/
+     `eventToCalendarNote` (useNotes imports NotificationService) — it computes
+     occurrences itself from CalendarEvent.
+  3. **Yearly renewal prompt.** `getEventsNeedingRenewal()` = yearly + has reminder +
+     `renewal_ask_suppressed=0` + `last_renewal_ask` null or older than 11 months
+     (SQL `date('now','-11 months')`) + the most-recent past occurrence is ≥ the
+     event's `created` (so a brand-new yearly event whose first anniversary hasn't
+     arrived is NOT prompted). Hebrew anniversaries computed via HDate. Dialog hosted
+     in root `_layout.tsx` (locked), gated on `settingsReady` with a once-per-launch
+     ref guard, shown as SEQUENTIAL Alerts ("תזכורת שנתית" / "האם להמשיך…"). "המשך" →
+     `confirmRenewal` (sets `last_renewal_ask` = today YYYY-MM-DD, re-arms ~1yr);
+     "אל תשאל שוב" → `suppressRenewal` (`renewal_ask_suppressed=1`). Dismiss writes
+     nothing and the event re-surfaces next launch (locked — ignored prompt never
+     cancels the reminder). `last_renewal_ask` stored as YYYY-MM-DD to match the SQL
+     `date()` comparison.
+- Alternatives considered: reuse expandRecurringNotes for the sweep (rejected —
+  circular import); skip-if-already-scheduled idempotency like Omer (rejected — would
+  not reflect a changed lead/time; cancel-then-reschedule does); blocking the renewal
+  prompt before render (rejected — runs after settingsReady, never blocks UI).
+- Implications / KNOWN LIMITATION: recurring reminders are **not** exception/tombstone-
+  aware — the sweep schedules the master series only, so a reminder can still fire for
+  an occurrence the user deleted "לתאריך זה בלבד", and an override's edited time isn't
+  used for its reminder. Deliberately out of C4 scope; the first post-Gal-C cleanup
+  candidate (fetch exceptions + overlay in the sweep). Also: aggregate iOS 64-notif
+  cap isn't enforced across events (only candle-lighting self-caps) — revisit if users
+  hit it. With C4, **Gal C is complete (C1–C4).**
