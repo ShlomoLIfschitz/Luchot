@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-06-04 — Session: GPS in Settings — Nominatim city + exact coords for candle lighting
+
+**Phase:** Phase 5 (Feature 1 of the GPS/Shabbat-card pair; Feature 2 deferred to next session)
+**Commits:** 9f82c22 (SettingsProvider), 2c2a7e1 (isIsraelCoords + NotificationService), f75600a (settings.tsx) + this docs entry (4)
+**Sub-agents:** local-data-builder (Steps 1–3: SettingsProvider fields + isIsraelCoords + NotificationService override), mobile-ui-builder (Step 4: settings.tsx GPS button). Orchestrator: closed one under-scoped gap directly, ran the DoD gate, committed, pushed OTA.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline, no new deps). OTA pushed.
+
+### What was done
+
+- **Step 1 — SettingsProvider (local-data-builder).** Added 3 persisted GPS fields — `candleLightingLat`/`candleLightingLng` (`number|null`) and `candleLightingPlaceName` (`string|null`) — wired in all three places (interface+default, setter, `loadFromStorage`) per the `use24hTime` rule (numbers `String()` on save, truthy-guard `parseFloat` on load so `''`→null not NaN). New `setCandleLightingLocation(lat,lng,placeName)` stores all three atomically and re-triggers reminders with a coordinate override. `setCandleLightingCity` now CLEARS the 3 GPS fields (GPS and curated-city are mutually exclusive).
+- **Step 2 — isIsraelCoords util (local-data-builder, new file).** `isIsraelCoords(lat,lng)` bounding box (lat 29–33, lon 34–36). Source of truth for the il (Israel/diaspora) flag derived from coordinates.
+- **Step 3 — NotificationService override (local-data-builder).** `ensureCandleLightingReminders` gains optional `override { lat, lng, placeName, il }`: when present, uses precise coords for `getZmanim`, `placeName` for the body label, `il` for erev-Yom-Tov detection, skipping the city-key lookup. When absent, the city-key path is byte-for-byte unchanged (back-compat for existing `candleLightingCity` users).
+- **Step 4 — settings.tsx GPS button (mobile-ui-builder).** Replaced the coarse `findNearestCityKey` snap with a user-triggered Nominatim reverse-geocode (5s timeout, `User-Agent: Luchot-App/1.0`, city-level name `address.city ?? town ?? village`, silent fallback). Stores exact lat/lng + Hebrew city name via `setCandleLightingLocation`. City row + accessibility label prefer the stored place name; the update button and enable-on-location guard now recognize GPS-only state. Manual city picker retained as the offline fallback. Helper returns `{ success, permissionDenied }` so the enable-on-success and permission-denied UX is preserved.
+
+### Decisions made
+
+- None new architecturally. Implements the locked session decisions (Nominatim user-triggered + silent fallback — already in DECISIONS.md 2026-06-04; il from coordinate bounding box; curated-city pick clears GPS fields; back-compat for city-key users; 3-place persistence pattern).
+
+### Orchestrator fix (found reviewing the local-data-builder report)
+
+- **GPS-only users would lose reminders on toggle/lead-minute change.** The agent left `setCandleLightingRemindersEnabled` and `setCandleLightingLeadMinutes` on the city-key path. Since a GPS-only user has `candleLightingCity === null`, those calls hit the `!override && !city` guard → cancel reminders, reschedule nothing. The Step 3 brief required *all* existing callers to pass the override when coords are present, so this was completing the spec, not a deviation. Added a `buildCandleOverride(state)` helper (returns the override from current GPS fields, or undefined) and threaded it through both setters. Applied directly by the orchestrator (SendMessage to continue the warm agent is unavailable; a cold re-spawn for ~20 lines is the expensive path — consistent with the established single/small-fix precedent). typecheck re-verified 0 errors after.
+
+### Open issues / blocked
+
+- **`il` flag at offset cities:** `getCandleLightingOffset` still returns the default 18-min minhag for any non-special coords (correct); diaspora users get 18 min as expected. No action needed — noted for awareness.
+- **Stale place name on curated re-pick** is handled (curated city pick clears GPS fields). No open item.
+
+### Next steps
+
+- **Feature 2 — Shabbat card** in day.tsx "תורה וזמנים" tab (next session). Still has one open design fork: whether the card computes its zmanim from the Settings candle-lighting coords or the app `useLocationStore` coords (raised in the prior planning report). Plus extracting `reverseGeocodeNominatim` from NoteEditor to `src/utils/reverseGeocode.ts`.
+- **On-device verification (this feature):** see the checklist in the session report — confirm GPS fills the Hebrew city name, persists across kill/reopen, and existing curated-city users' reminders still fire.
+
+---
+
 ## 2026-06-04 — Session: fix Hebrew backward navigation (HDate.add day-1 boundary)
 
 **Phase:** Phase 5 (follow-up bug fix to Session B)
