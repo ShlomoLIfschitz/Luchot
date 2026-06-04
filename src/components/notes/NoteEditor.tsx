@@ -1,6 +1,6 @@
 // src/components/notes/NoteEditor.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -15,6 +15,35 @@ import type { HebrewDateInfo } from '../../services/DateService';
 import { toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
 import { reverseGeocodeNominatim } from '../../utils/reverseGeocode';
+import { useSettingsStore } from '../../providers/SettingsProvider';
+import { useTimeOfDayPicker } from '../../hooks/useTimeOfDayPicker';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Format a Date to HH:MM (or h:MM AM/PM) depending on user preference. */
+function formatHM(date: Date, use24h: boolean): string {
+  return date.toLocaleTimeString('he-IL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: !use24h,
+  });
+}
+
+/** Parse an ISO 8601 string into a Date. Returns null on failure. */
+function parseISO(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** A Date anchored to today at 09:00 — sensible default for new timed events. */
+function defaultStartTime(): Date {
+  const d = new Date();
+  d.setHours(9, 0, 0, 0);
+  return d;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const LEAD_TIME_OPTIONS: { label: string; minutes: number }[] = [
   { label: 'בזמן האירוע', minutes: 0 },
@@ -44,6 +73,8 @@ const DEFAULT_COLOR_FOR_TYPE: Record<NoteType, ColorTokenKey> = {
   yahrzeit:    'tagPersonal',
   anniversary: 'tagPersonal',
 };
+
+// ─── ColorPickerRow ───────────────────────────────────────────────────────────
 
 interface ColorPickerRowProps {
   noteType: NoteType;
@@ -108,6 +139,8 @@ const cpStyles = StyleSheet.create({
   },
 });
 
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface Props {
   visible: boolean;
   note?: CalendarNote;
@@ -125,12 +158,23 @@ interface Props {
     reminderMinutes?: number | null;
     colorId?: string | null;
     location?: string | null;
+    // C2 time params
+    allDay?: boolean;
+    startTime?: Date | null;
+    endTime?: Date | null;
+    reminderTime?: Date | null;
   }) => void;
   onDelete?: (id: string) => void;
   onClose: () => void;
 }
 
+// ─── NoteEditor ───────────────────────────────────────────────────────────────
+
 export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, onDelete, onClose }: Props) {
+  // ── Settings (must be called before any early return — Rules of Hooks) ──────
+  const use24hTime = useSettingsStore((s) => s.use24hTime);
+
+  // ── Core edit state ──────────────────────────────────────────────────────────
   const [summary, setSummary] = useState('');
   const [noteType, setNoteType] = useState<NoteType>('note');
   const [calendarType, setCalendarType] = useState<'hebrew' | 'gregorian'>('hebrew');
@@ -145,6 +189,97 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const locationInputRef = useRef<TextInput>(null);
   const [focusTarget, setFocusTarget] = useState<'summary' | 'location' | null>(null);
 
+  // ── C2 time state ────────────────────────────────────────────────────────────
+  // allDay: true = all-day event (legacy behavior). false = timed event.
+  const [allDay, setAllDay] = useState(true);
+  // startTime / endTime are always Date objects (even when allDay=true, ignored on save)
+  const [startTime, setStartTime] = useState<Date>(defaultStartTime);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  // reminderTime: user-picked clock time that anchors an all-day reminder.
+  // Only used when allDay=true && reminderEnabled=true.
+  const [reminderTime, setReminderTime] = useState<Date>(defaultStartTime);
+  // pendingSave: when true, we are waiting for the user to confirm a reminder time
+  // (allDay + reminder case) before actually calling onSave.
+  const [pendingSave, setPendingSave] = useState(false);
+
+  // Trigger flag for the deferred all-day+reminder save flow.
+  // Declared before handleReminderTimeChange so the setter is in scope.
+  const [triggerSaveWithReminderTime, setTriggerSaveWithReminderTime] = useState<Date | null>(null);
+
+  // ── Time pickers (all three hooks BEFORE any early return — Rules of Hooks) ──
+  const {
+    openPicker: openStartPicker,
+    picker: startPicker,
+  } = useTimeOfDayPicker(startTime, setStartTime, use24hTime);
+
+  const {
+    openPicker: openEndPicker,
+    picker: endPicker,
+  } = useTimeOfDayPicker(endTime ?? defaultStartTime(), useCallback((d: Date) => setEndTime(d), []), use24hTime);
+
+  // Reminder time picker: when confirmed, store the picked time AND trigger the
+  // pending save (if pendingSave is true).
+  const handleReminderTimeChange = useCallback((d: Date) => {
+    setReminderTime(d);
+    if (pendingSave) {
+      setPendingSave(false);
+      // We do not call onSave here — the save is triggered by the effect below
+      // so React state has settled before we read it.
+      // Instead we set a flag that the effect will pick up.
+      setTriggerSaveWithReminderTime(d);
+    }
+  }, [pendingSave]);
+
+  const {
+    openPicker: openReminderTimePicker,
+    picker: reminderTimePicker,
+  } = useTimeOfDayPicker(reminderTime, handleReminderTimeChange, use24hTime);
+
+  // ── Effect: execute deferred save once reminder time is committed ─────────────
+  useEffect(() => {
+    if (triggerSaveWithReminderTime === null) return;
+    // Snapshot the time so we can clear the trigger immediately.
+    const rTime = triggerSaveWithReminderTime;
+    setTriggerSaveWithReminderTime(null);
+
+    const trimmed = summary.trim();
+    if (!trimmed) return;
+    const finalReminderMinutes: number | null = (() => {
+      if (!reminderEnabled) return null;
+      if (reminderMinutes === -1) {
+        const parsed = parseInt(customMinutes, 10);
+        return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+      }
+      return reminderMinutes;
+    })();
+
+    onSave({
+      id: note?.id,
+      created: note?.created,
+      summary: trimmed,
+      noteType,
+      calendarType,
+      date,
+      hebrewDate,
+      reminderMinutes: finalReminderMinutes,
+      colorId,
+      location: location.trim() || null,
+      allDay: true,
+      startTime: null,
+      endTime: null,
+      reminderTime: rTime,
+    });
+    if (note?.id) {
+      setIsViewMode(true);
+    } else {
+      onClose();
+    }
+  // We intentionally only depend on triggerSaveWithReminderTime so this fires
+  // exactly once per committed reminder-time, not on every state change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerSaveWithReminderTime]);
+
+  // ── Reset state when modal opens / note changes ───────────────────────────────
   useEffect(() => {
     if (visible) {
       setSummary(note?.summary ?? '');
@@ -157,21 +292,33 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       setColorId(note?.colorId ?? null);
       setLocation(note?.location ?? '');
       setIsViewMode(!!note);
+      setPendingSave(false);
+      setTriggerSaveWithReminderTime(null);
+
+      // Time fields
+      const isTimedNote = note ? !note.isAllDay : false;
+      setAllDay(!isTimedNote);
+      const parsedStart = parseISO(note?.startDateTime);
+      setStartTime(parsedStart ?? defaultStartTime());
+      const parsedEnd = parseISO(note?.endDateTime);
+      setEndTime(parsedEnd);
+      setReminderTime(defaultStartTime());
     }
   }, [visible, note]);
 
   useEffect(() => {
     if (!isViewMode && focusTarget) {
       const ref = focusTarget === 'summary' ? summaryInputRef : locationInputRef;
-      // let the edit-mode inputs mount first
       const t = setTimeout(() => ref.current?.focus(), 50);
       return () => clearTimeout(t);
     }
   }, [isViewMode, focusTarget]);
 
+  // ── Save handler ─────────────────────────────────────────────────────────────
   const handleSave = () => {
     const trimmed = summary.trim();
     if (!trimmed) return;
+
     const finalReminderMinutes: number | null = (() => {
       if (!reminderEnabled) return null;
       if (reminderMinutes === -1) {
@@ -180,6 +327,16 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       }
       return reminderMinutes;
     })();
+
+    // All-day + reminder: must pick a clock time before saving.
+    // Do NOT silently default — the data layer has a defensive 09:00 fallback,
+    // but the UI contract is to always supply reminderTime for all-day reminders.
+    if (allDay && reminderEnabled && finalReminderMinutes !== null) {
+      setPendingSave(true);
+      openReminderTimePicker();
+      return;
+    }
+
     onSave({
       id: note?.id,
       created: note?.created,
@@ -191,6 +348,12 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       reminderMinutes: finalReminderMinutes,
       colorId,
       location: location.trim() || null,
+      allDay,
+      startTime: allDay ? null : startTime,
+      endTime: allDay ? null : endTime,
+      // Timed events: data layer anchors reminder to startDateTime automatically.
+      // All-day without reminder: no reminderTime needed.
+      reminderTime: undefined,
     });
     if (note?.id) {
       setIsViewMode(true);
@@ -199,6 +362,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
     }
   };
 
+  // ── GPS ───────────────────────────────────────────────────────────────────────
   const handleGPS = async () => {
     setLocationLoading(true);
     try {
@@ -247,6 +411,11 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+      {/* Time pickers — rendered outside KeyboardAvoidingView/ScrollView */}
+      {startPicker}
+      {endPicker}
+      {reminderTimePicker}
+
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={s.overlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -275,6 +444,16 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                         {summary}
                       </Text>
                     </Pressable>
+
+                    {/* time (timed events only) */}
+                    {note && !note.isAllDay && note.startDateTime && (
+                      <Pressable style={[s.viewField, s.viewRow]} onPress={() => enterEdit(null)}>
+                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
+                          {formatHM(new Date(note.startDateTime), use24hTime)}
+                          {note.endDateTime ? ` — ${formatHM(new Date(note.endDateTime), use24hTime)}` : ''}
+                        </Text>
+                      </Pressable>
+                    )}
 
                     {/* note type */}
                     {noteTypeInfo && (
@@ -474,6 +653,82 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                       </Pressable>
                     </View>
 
+                    {/* ── All-day toggle ────────────────────────────────────── */}
+                    <View style={s.allDayRow}>
+                      {/* label — JSX-first = rightmost (row-reverse) */}
+                      <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                        כל היום
+                      </Text>
+                      {/* Switch — JSX-last = leftmost */}
+                      <Switch
+                        value={allDay}
+                        onValueChange={setAllDay}
+                        trackColor={{ false: colors.border, true: colors.accent }}
+                        accessibilityLabel="כל היום"
+                      />
+                    </View>
+
+                    {/* ── Time fields (only when allDay = false) ────────────── */}
+                    {!allDay && (
+                      <>
+                        {/* Start time row */}
+                        <View style={s.timeFieldRow}>
+                          {/* label — JSX-first = rightmost */}
+                          <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>משעה</Text>
+                          {/* time value — JSX-last = leftmost */}
+                          <Pressable
+                            onPress={openStartPicker}
+                            style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                            accessibilityLabel={`שעת התחלה: ${formatHM(startTime, use24hTime)}`}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
+                              {formatHM(startTime, use24hTime)}
+                            </Text>
+                          </Pressable>
+                        </View>
+
+                        {/* End time row */}
+                        <View style={s.timeFieldRow}>
+                          {/* label — JSX-first = rightmost */}
+                          <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>עד שעה</Text>
+                          {/* time value / add affordance — JSX-last = leftmost */}
+                          {endTime !== null ? (
+                            <View style={s.endTimeGroup}>
+                              <Pressable
+                                onPress={openEndPicker}
+                                style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                                accessibilityLabel={`שעת סיום: ${formatHM(endTime, use24hTime)}`}
+                                accessibilityRole="button"
+                              >
+                                <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
+                                  {formatHM(endTime, use24hTime)}
+                                </Text>
+                              </Pressable>
+                              {/* Clear end time */}
+                              <Pressable
+                                onPress={() => setEndTime(null)}
+                                hitSlop={10}
+                                accessibilityLabel="הסר שעת סיום"
+                                accessibilityRole="button"
+                              >
+                                <Text style={[s.clearEndTime, { color: colors.textTertiary }]}>✕</Text>
+                              </Pressable>
+                            </View>
+                          ) : (
+                            <Pressable
+                              onPress={openEndPicker}
+                              style={[s.timeChip, s.timeChipAdd, { borderColor: colors.border }]}
+                              accessibilityLabel="הוסף שעת סיום"
+                              accessibilityRole="button"
+                            >
+                              <Text style={[s.timeChipText, { color: colors.textTertiary }]}>הוסף</Text>
+                            </Pressable>
+                          )}
+                        </View>
+                      </>
+                    )}
+
                     {/* reminder toggle */}
                     <View style={s.reminderToggleRow}>
                       <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
@@ -575,6 +830,51 @@ const s = StyleSheet.create({
   btn: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   btnSave: { borderWidth: 0 },
   btnText: { fontSize: 15, fontWeight: '600' },
+  // All-day toggle (matches reminderToggleRow style)
+  allDayRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  // Time fields (only shown when allDay = false)
+  timeFieldRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  timeFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textAlign: 'right',
+    minWidth: 50,
+  },
+  timeChip: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.md,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  timeChipAdd: {
+    // No background fill for the "הוסף" affordance — it reads as a ghost button.
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  endTimeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  clearEndTime: {
+    fontSize: 14,
+    padding: 4,
+  },
   reminderToggleRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

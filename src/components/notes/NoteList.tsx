@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, Modal, TouchableWithoutFeedback } from 'react-native';
 import { Cake, Flame, Gem, FileText, type LucideIcon } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { useNotes, CalendarNote, NoteType } from '../../hooks/useNotes';
+import { useSettingsStore } from '../../providers/SettingsProvider';
+import { useNotes, type CalendarNote, type NoteType } from '../../hooks/useNotes';
 import { NoteEditor } from './NoteEditor';
 import type { HebrewDateInfo } from '../../services/DateService';
 import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
@@ -17,18 +18,37 @@ const TYPE_ICON: Record<NoteType, LucideIcon> = {
   anniversary: Gem,
 };
 
+/** Format HH:MM (or h:MM AM/PM) from a Date, honoring the user's 24h preference. */
+function formatHM(date: Date, use24h: boolean): string {
+  return date.toLocaleTimeString('he-IL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: !use24h,
+  });
+}
+
 interface Props {
   date: Date;
   hebrewDate: HebrewDateInfo;
   hideAddButton?: boolean;
+  /**
+   * When true, renders ONLY notes where isAllDay === true.
+   * Use in day.tsx events tab so timed events don't double-show alongside
+   * the hourly grid. Default false = show all (preserves other callers).
+   */
+  onlyAllDay?: boolean;
 }
 
-export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
+export function NoteList({ date, hebrewDate, hideAddButton, onlyAllDay = false }: Props) {
   const colors = useThemeColors();
+  const use24hTime = useSettingsStore((s) => s.use24hTime);
   const { notes, saveNote, deleteNote } = useNotes(date);
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingNote, setEditingNote] = useState<CalendarNote | undefined>(undefined);
   const [colorPickerNote, setColorPickerNote] = useState<CalendarNote | null>(null);
+
+  // Apply onlyAllDay filter
+  const visibleNotes = onlyAllDay ? notes.filter((n) => n.isAllDay) : notes;
 
   const resolveHexColor = (note: CalendarNote): string => {
     const effectiveKey: ColorTokenKey =
@@ -71,33 +91,51 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
         <Text style={[s.headerTitle, { color: colors.textTertiary }]}>הערות</Text>
       </View>
 
-      {notes.length === 0 ? (
+      {visibleNotes.length === 0 ? (
         <Text style={[s.empty, { color: colors.textTertiary }]}>אין הערות ליום זה</Text>
       ) : (
-        notes.map((note) => (
-          <View key={note.id} style={s.noteRowWrapper}>
-            {/* bar — JSX-first = renders on RIGHT, outside the capsule */}
-            <View style={[s.colorBar, { backgroundColor: resolveHexColor(note) }]} />
-            {/* capsule — JSX-second = renders on LEFT */}
-            <Pressable
-              onPress={() => openEdit(note)}
-              style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            >
-              {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
-              <View style={s.noteBody}>
-                <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
-                {note.recurring && (
-                  <Text style={[s.noteTag, { color: colors.textTertiary }]}>
-                    {note.calendarType === 'hebrew' ? '↺ עברי' : '↺ לועזי'}
+        visibleNotes.map((note) => {
+          // Parse timed event start for time label
+          const timedStart =
+            !note.isAllDay && note.startDateTime
+              ? (() => {
+                  const d = new Date(note.startDateTime);
+                  return isNaN(d.getTime()) ? null : d;
+                })()
+              : null;
+
+          return (
+            <View key={note.id} style={s.noteRowWrapper}>
+              {/* bar — JSX-first = renders on RIGHT, outside the capsule */}
+              <View style={[s.colorBar, { backgroundColor: resolveHexColor(note) }]} />
+              {/* capsule — JSX-second = renders on LEFT */}
+              <Pressable
+                onPress={() => openEdit(note)}
+                style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+              >
+                {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
+                <View style={s.noteBody}>
+                  <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
+                  {note.recurring && (
+                    <Text style={[s.noteTag, { color: colors.textTertiary }]}>
+                      {note.calendarType === 'hebrew' ? '↺ עברי' : '↺ לועזי'}
+                    </Text>
+                  )}
+                </View>
+                {/* Time label — JSX-last = leftmost in row-reverse.
+                    Only shown for timed notes. Sits to the left of the summary. */}
+                {timedStart !== null && (
+                  <Text style={[s.timeLabel, { color: colors.textTertiary }]}>
+                    {formatHM(timedStart, use24hTime)}
                   </Text>
                 )}
-              </View>
-              <Pressable onPress={() => confirmDelete(note)} hitSlop={10} style={s.deleteBtn}>
-                <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
+                <Pressable onPress={() => confirmDelete(note)} hitSlop={10} style={s.deleteBtn}>
+                  <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
+                </Pressable>
               </Pressable>
-            </Pressable>
-          </View>
-        ))
+            </View>
+          );
+        })
       )}
 
       {/* Quick color picker */}
@@ -121,6 +159,24 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
                         key={key}
                         onPress={() => {
                           if (!colorPickerNote) return;
+                          // Thread all time + location fields to avoid data loss on
+                          // color-only change (C2 fix: previously these were omitted,
+                          // so a color pick would wipe startDateTime / endDateTime /
+                          // location on a timed event).
+                          const parsedStart =
+                            !colorPickerNote.isAllDay && colorPickerNote.startDateTime
+                              ? (() => {
+                                  const d = new Date(colorPickerNote.startDateTime);
+                                  return isNaN(d.getTime()) ? null : d;
+                                })()
+                              : null;
+                          const parsedEnd =
+                            !colorPickerNote.isAllDay && colorPickerNote.endDateTime
+                              ? (() => {
+                                  const d = new Date(colorPickerNote.endDateTime);
+                                  return isNaN(d.getTime()) ? null : d;
+                                })()
+                              : null;
                           void saveNote({
                             id: colorPickerNote.id,
                             created: colorPickerNote.created,
@@ -133,6 +189,12 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
                             hebrewDate,
                             reminderMinutes: colorPickerNote.reminderMinutes,
                             colorId: key,
+                            // Preserve location (was missing before — would wipe it)
+                            location: colorPickerNote.location,
+                            // Preserve time fields (was missing before — would wipe them)
+                            allDay: colorPickerNote.isAllDay,
+                            startTime: parsedStart,
+                            endTime: parsedEnd,
                           });
                           setColorPickerNote(null);
                         }}
@@ -187,6 +249,12 @@ const s = StyleSheet.create({
   noteTag: { fontSize: 11, textAlign: 'right', marginTop: 2 },
   deleteBtn: { padding: 4 },
   deleteIcon: { fontSize: 14 },
+  // Time label for timed notes — last JSX child → leftmost in row-reverse
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    flexShrink: 0,
+  },
   colorBar: {
     width: 4,
     alignSelf: 'stretch',

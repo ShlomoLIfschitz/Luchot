@@ -24,6 +24,10 @@ export interface CalendarNote {
   reminderMinutes: number | null;
   colorId?: string | null;
   location?: string | null;
+  // Time fields (C2). Set for timed events; null/absent for all-day.
+  startDateTime?: string | null;  // ISO 8601 with timezone (start.dateTime)
+  endDateTime?: string | null;    // ISO 8601 with timezone (end.dateTime), optional
+  isAllDay: boolean;              // true when start.dateTime is null (no precise time)
   // Exception/tombstone overlay fields (C1). Present only on exception rows;
   // undefined on normal notes. status mirrors CalendarEvent.status.
   status?: 'confirmed' | 'tentative' | 'cancelled';
@@ -54,6 +58,13 @@ export function eventToCalendarNote(e: CalendarEvent): CalendarNote {
     reminderMinutes: e.reminders?.overrides?.[0]?.minutes ?? null,
     colorId: e.colorId ?? null,
     location: e.location ?? null,
+    // Time fields (C2): derived from the Google-Calendar start/end convention.
+    // isAllDay is true when start.dateTime is absent — NOT based on start.date
+    // presence, because timed events also store start.date (the calendar day)
+    // for day-keying in getEventsForGregorianDate (Task 4).
+    startDateTime: e.start.dateTime ?? null,
+    endDateTime: e.end?.dateTime ?? null,
+    isAllDay: e.start.dateTime == null,
     // Exception/tombstone fields — undefined on normal rows (is_exception = 0).
     status: e.status,
     recurrenceId: e.hebrewExtensions.recurrenceId,
@@ -133,6 +144,12 @@ export function useNotes(date: Date | null) {
     reminderMinutes?: number | null;
     colorId?: string | null;
     location?: string | null;
+    // C2 time params — all optional for back-compat; existing callers omit them
+    // and get the previous all-day behavior unchanged.
+    allDay?: boolean;           // default: true (preserves existing all-day behavior)
+    startTime?: Date | null;    // hours/minutes for timed event start
+    endTime?: Date | null;      // hours/minutes for timed event end (optional)
+    reminderTime?: Date | null; // user-picked clock time for all-day reminder anchor
   }) => {
     const now = new Date().toISOString();
     const dateStr = formatDateKey(params.date);
@@ -145,6 +162,57 @@ export function useNotes(date: Date | null) {
     const recurrenceCalendar: 'hebrew' | 'gregorian' | undefined =
       recurring ? params.calendarType : undefined;
 
+    // ── Build start/end based on allDay flag ──────────────────────────────────
+    // allDay defaults to true so omitting it preserves the prior all-day behavior.
+    const isAllDay = params.allDay !== false;
+
+    let eventStart: CalendarEvent['start'];
+    let eventEnd: CalendarEvent['end'];
+
+    if (isAllDay) {
+      // All-day: use date-only fields. start.date and end.date set; no dateTime.
+      eventStart = { date: dateStr };
+      eventEnd   = { date: dateStr };
+    } else {
+      // Timed event: merge params.date (calendar day) with startTime (hours/minutes).
+      // We take year/month/day from the calendar date (local) and apply the hours/
+      // minutes from the picked time Date, then convert to ISO 8601 for storage.
+      //
+      // Task 4 fix: we ALSO set start.date = dateStr so that getEventsForGregorianDate
+      // (which queries WHERE start_date = ?) still finds this event by day.
+      // isAllDay is derived from dateTime presence (== null), NOT date presence,
+      // so having both fields does not corrupt the all-day flag.
+      const startTimeDate = params.startTime ?? new Date(); // fallback to now if somehow null
+      const mergedStart = new Date(
+        params.date.getFullYear(),
+        params.date.getMonth(),
+        params.date.getDate(),
+        startTimeDate.getHours(),
+        startTimeDate.getMinutes(),
+        0,
+        0,
+      );
+      const startISO = mergedStart.toISOString();
+
+      eventStart = { date: dateStr, dateTime: startISO, timeZone: 'Asia/Jerusalem' };
+
+      if (params.endTime) {
+        const mergedEnd = new Date(
+          params.date.getFullYear(),
+          params.date.getMonth(),
+          params.date.getDate(),
+          params.endTime.getHours(),
+          params.endTime.getMinutes(),
+          0,
+          0,
+        );
+        eventEnd = { date: dateStr, dateTime: mergedEnd.toISOString(), timeZone: 'Asia/Jerusalem' };
+      } else {
+        // No explicit end time: mirror start (minimal sane default for a point-in-time event).
+        eventEnd = { date: dateStr, dateTime: startISO, timeZone: 'Asia/Jerusalem' };
+      }
+    }
+
     const event: CalendarEvent = {
       id: params.id ?? generateUUID(),
       summary: params.summary,
@@ -153,8 +221,8 @@ export function useNotes(date: Date | null) {
       updated: now,
       colorId: params.colorId ?? undefined,
       location: params.location ?? undefined,
-      start: { date: dateStr },
-      end: { date: dateStr },
+      start: eventStart,
+      end: eventEnd,
       reminders: params.reminderMinutes != null
         ? { useDefault: false, overrides: [{ method: 'popup', minutes: params.reminderMinutes }] }
         : { useDefault: false },
@@ -190,16 +258,36 @@ export function useNotes(date: Date | null) {
     if (params.reminderMinutes != null) {
       const isOneTime = recurrenceType === 'none';
       if (isOneTime) {
-        // Compute trigger for one-time events only
+        // Compute trigger for one-time events only.
         const startDateTime = event.start.dateTime;
         let triggerDate: Date;
         if (startDateTime) {
+          // Timed event: trigger = startDateTime − reminderMinutes
           triggerDate = new Date(new Date(startDateTime).getTime() - params.reminderMinutes * 60 * 1000);
         } else {
-          // All-day: 09:00 on event day minus reminderMinutes (locked Wave 2 policy)
+          // All-day event with reminder.
+          // C2 policy: anchor = reminderTime (user-picked clock time for this day).
+          // REPLACES the prior hard-coded 09:00 default.
+          // UI contract: Wave 2 MUST supply reminderTime whenever reminderMinutes is
+          // set and allDay is true. The defensive 09:00 fallback below exists only for
+          // safety — it should never fire in normal operation.
           const [year, month, day] = (event.start.date ?? '').split('-').map(Number);
-          triggerDate = new Date(year, month - 1, day, 9, 0, 0, 0);
-          triggerDate.setMinutes(triggerDate.getMinutes() - params.reminderMinutes);
+          if (params.reminderTime) {
+            triggerDate = new Date(
+              year,
+              month - 1,
+              day,
+              params.reminderTime.getHours(),
+              params.reminderTime.getMinutes(),
+              0,
+              0,
+            );
+          } else {
+            // DEFENSIVE FALLBACK ONLY — UI is contracted to always supply reminderTime
+            // for all-day reminders. This path should never execute in production.
+            triggerDate = new Date(year, month - 1, day, 9, 0, 0, 0);
+          }
+          triggerDate = new Date(triggerDate.getTime() - params.reminderMinutes * 60 * 1000);
         }
         if (triggerDate > new Date()) {
           await NotificationService.scheduleLocalNotification({

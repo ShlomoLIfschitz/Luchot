@@ -1,6 +1,7 @@
 // app/(tabs)/day.tsx
 // Phase 3.5 — Day screen. Full implementation per docs/SCREENS.md.
 // Phase 3.7a-1 — ScreenHeader added (outside ScrollView, stays fixed).
+// C2 — Hourly schedule moved to events tab; real hour bucketing; tab reset on date change.
 //
 // NoteEditor adaptation note (vs. original Phase 3.5 spec):
 //   NoteEditor is a React Native Modal component, not a @gorhom/bottom-sheet.
@@ -9,7 +10,7 @@
 //   useThemeColors internally. The ref-based pattern in the spec was adapted
 //   to a useState boolean accordingly.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -98,18 +99,41 @@ export default function DayScreen() {
   // Date picker — Phase 4.4
   const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
 
-  // Notes for this day.
+  // Notes for this day. Used for:
+  //   1. Hour bucketing in the hourly grid (timed notes)
+  //   2. NoteEditor for adding/editing from the grid
+  // NoteList has its own internal useNotes — that's the existing pattern; not refactored here.
   const { notes, saveNote } = useNotes(selectedDate);
 
   // NoteEditor visibility — NoteEditor is Modal-based, not BottomSheet.
   // Controlled via visible boolean prop instead of a ref.
   const [editorVisible, setEditorVisible] = useState(false);
+  // The note being edited from the hourly grid (null = adding new note).
+  const [gridEditNote, setGridEditNote] = useState<CalendarNote | undefined>(undefined);
 
   // Internal tab state — defaults to 'events', no persistence.
   const [activeTab, setActiveTab] = useState<'events' | 'torah'>('events');
 
-  const openNoteEditor = useCallback(() => setEditorVisible(true), []);
-  const closeNoteEditor = useCallback(() => setEditorVisible(false), []);
+  // C2: Reset to events tab whenever the selected date changes.
+  // This prevents the user from landing on the torah tab when swiping days.
+  useEffect(() => {
+    setActiveTab('events');
+  }, [selectedDate]);
+
+  const openNoteEditor = useCallback(() => {
+    setGridEditNote(undefined);
+    setEditorVisible(true);
+  }, []);
+
+  const openGridNoteEditor = useCallback((note: CalendarNote) => {
+    setGridEditNote(note);
+    setEditorVisible(true);
+  }, []);
+
+  const closeNoteEditor = useCallback(() => {
+    setEditorVisible(false);
+    setGridEditNote(undefined);
+  }, []);
 
   // Day navigation — swipe left/right to move days
   const navigateDay = useCallback(
@@ -130,18 +154,31 @@ export default function DayScreen() {
       if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
     });
 
-  // Bucket notes by hour for the schedule view.
-  // Notes don't carry an hour field yet — all appear in "all-day" bucket
-  // at key -1. Per-hour bucketing deferred to Phase 4.
+  // C2: Real hour bucketing — timed notes bucketed by their start hour (0–23).
+  // All-day notes (isAllDay === true) are excluded; they appear in NoteList above.
   const notesByHour = useMemo(() => {
     const map: Record<number, CalendarNote[]> = {};
     for (const note of notes) {
-      const hour = -1; // all-day for now
-      if (!map[hour]) map[hour] = [];
-      map[hour].push(note);
+      if (!note.isAllDay && note.startDateTime) {
+        const d = new Date(note.startDateTime);
+        if (!isNaN(d.getTime())) {
+          const hour = d.getHours();
+          if (!map[hour]) map[hour] = [];
+          map[hour].push(note);
+        }
+      }
     }
     return map;
   }, [notes]);
+
+  /** Format HH:MM for the grid label, honoring use24hTime. */
+  const formatHM = useCallback((date: Date): string => {
+    return date.toLocaleTimeString('he-IL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: !use24hTime,
+    });
+  }, [use24hTime]);
 
   // Date formatting
   const hebrewFormatted = `${toHebrewNumeral(dayData.hebrewDate.day)} ${dayData.hebrewDate.monthName} ${toHebrewYear(dayData.hebrewDate.year)}`;
@@ -206,11 +243,19 @@ export default function DayScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* active tab content */}
           <View>
             {activeTab === 'events' ? (
+              // ── Events tab ─────────────────────────────────────────────────
+              // Shows: all-day notes only (NoteList onlyAllDay) + add button +
+              // hourly schedule grid with timed notes bucketed by start hour.
               <>
-                <NoteList date={selectedDate} hebrewDate={dayData.hebrewDate} hideAddButton />
+                {/* All-day notes only — timed events appear in the hourly grid below */}
+                <NoteList
+                  date={selectedDate}
+                  hebrewDate={dayData.hebrewDate}
+                  hideAddButton
+                  onlyAllDay
+                />
                 <Pressable
                   onPress={openNoteEditor}
                   style={[styles.addEventBtn, { backgroundColor: colors.accentLight }]}
@@ -219,8 +264,55 @@ export default function DayScreen() {
                 >
                   <Text style={[styles.addEventBtnText, { color: colors.accent }]}>+ הוסף אירוע</Text>
                 </Pressable>
+
+                {/* Hourly schedule — C2: moved from torah tab to events tab.
+                    Timed notes bucketed by getHours() of startDateTime. */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
+                    לוח שעות
+                  </Text>
+
+                  {HOURS.map((hour) => {
+                    const hourLabel = hour.toString().padStart(2, '0') + ':00';
+                    const hourNotes = notesByHour[hour] ?? [];
+
+                    return (
+                      <View key={hour} style={styles.hourRow}>
+                        <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
+                          {hourLabel}
+                        </Text>
+                        <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
+                        <View style={styles.hourContent}>
+                          {hourNotes.map((note) => {
+                            const startDate = new Date(note.startDateTime!);
+                            const timeStr = formatHM(startDate);
+                            return (
+                              <Pressable
+                                key={note.id}
+                                onPress={() => openGridNoteEditor(note)}
+                                style={[
+                                  styles.hourNote,
+                                  { backgroundColor: colors.accentLight },
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${note.summary}, ${timeStr}`}
+                              >
+                                <Text style={[styles.hourNoteText, { color: colors.accent }]}>
+                                  {timeStr} {note.summary}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
               </>
             ) : (
+              // ── Torah & Zmanim tab ─────────────────────────────────────────
+              // Keeps: ShabbatCard, holiday banner, Torah details, ZmanimList.
+              // Hourly schedule removed (C2 — moved to events tab).
               <>
                 {/* Shabbat Card — returns null on non-Fri/Sat days */}
                 <ShabbatCard
@@ -286,39 +378,20 @@ export default function DayScreen() {
 
                 {/* Zmanim */}
                 <ZmanimList zmanim={zmanim} />
-
-                {/* Hourly Schedule */}
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-                    לוח שעות
-                  </Text>
-
-                  {HOURS.map((hour) => {
-                    const hourLabel = hour.toString().padStart(2, '0') + ':00';
-
-                    return (
-                      <View key={hour} style={styles.hourRow}>
-                        <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
-                          {hourLabel}
-                        </Text>
-                        <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
-                        <View style={styles.hourContent} />
-                      </View>
-                    );
-                  })}
-                </View>
               </>
             )}
           </View>
         </ScrollView>
 
         {/* Note Editor — Modal-based, controlled via visible prop.
+            Serves both the "add new event" button and the hourly grid taps.
             NoteEditor requires colors passed in (does not call useThemeColors
             internally). saveNote (async → Promise<void>) is assignable to
             onSave (→ void) because void in callback position means the caller
             does not use the return value. */}
         <NoteEditor
           visible={editorVisible}
+          note={gridEditNote}
           date={selectedDate}
           hebrewDate={dayData.hebrewDate}
           colors={colors}
@@ -412,7 +485,7 @@ const styles = StyleSheet.create({
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md },
   actionText: { fontSize: 13, fontWeight: '600' },
 
-  // Notes
+  // Notes (legacy style names kept for safety — unused by new components)
   noteRow: {
     paddingVertical: 8,
     paddingHorizontal: 12,
