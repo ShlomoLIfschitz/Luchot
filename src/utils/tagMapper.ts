@@ -39,8 +39,12 @@ export function buildDayTags(
   }
 
   // 2. Rosh Chodesh → tagSpecial (only when not already a Yom Tov,
-  //    to avoid double-tagging e.g. Rosh Hashana which is both)
-  if (dayData.hebrewDate.isRoshChodesh && !dayData.isYomTov) {
+  //    to avoid double-tagging e.g. Rosh Hashana which is both).
+  //    Also skip if hebcal already emitted a Rosh Chodesh entry into
+  //    holidays[] (detected via stable English label) to avoid the
+  //    "ראש חודש" / "ראש חודש סיון" duplicate.
+  const hasRoshChodeshHoliday = dayData.holidaysEn.some((h) => h.startsWith('Rosh Chodesh'));
+  if (dayData.hebrewDate.isRoshChodesh && !dayData.isYomTov && !hasRoshChodeshHoliday) {
     tags.push({ category: 'special', label: 'ראש חודש' });
   }
 
