@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-06-04 — Session: follow-up #3 — tab bar STRUCTURAL fix + GPS diagnostics
+
+**Phase:** Phase 5 (bug fix + diagnostics)
+**Commits:** f4f0efa, 1b9090b (2) + this docs entry
+**Sub-agents:** none — orchestrator edited directly (user explicitly said "fix them yourself directly").
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+- **Tab bar — STRUCTURAL fix (orchestrator, direct)** [f4f0efa] — `app/(tabs)/day.tsx`. **Root cause of the persistent stacking across 2 prior sessions:** the tab bar was the `stickyHeaderIndices={[1]}` child of the ScrollView. React Native re-parents a sticky header into an internal `ScrollViewStickyHeader` (Animated.View) wrapper with its own measurement/positioning; in this RTL + nested-flex case the wrapper never gave the row a stable full-width context, so the two Pressables collapsed and rendered stacked. Every prior fix (flex:1 → alignSelf:flex-end → justifyContent:flex-start) failed because they were all applied *inside* the broken sticky wrapper. **Fix:** moved the date header + tab bar OUT of the ScrollView, rendering them as normal fixed children of the root column View (tab bar below the date header); removed `stickyHeaderIndices`; added `scroll: { flex: 1 }` to the ScrollView so it fills the remaining space. A plain flex-row View lays the tabs out reliably (אירועים right, תורה וזמנים left, flush right, no wrapping) and, being outside the scroll viewport, the bar stays permanently visible (functionally sticky). Date header is now also fixed (no longer scrolls away).
+- **GPS diagnostics (orchestrator, direct)** [1b9090b] — `src/components/notes/NoteEditor.tsx`. Added 3 TEMP DIAGNOSTIC `console.log`s in `handleGPS` (no label logic changed): the coords object after `getCurrentPositionAsync`, the full `reverseGeocodeAsync` results array (JSON), and the error message in the inner catch (changed `catch {` → `catch (e) {`). This will definitively show whether the geocoder returns data, returns empty, or throws on-device.
+
+### Decisions made
+
+- None new — tab bar fix is an implementation-level restructure within the existing locked design (two tabs, sticky-while-scrolling, RTL). Still no sticky-header dependency; bar is now a fixed top region.
+
+### Open issues / blocked
+
+- **GPS root cause still unconfirmed** — awaiting on-device logcat from the diagnostic logs. Once known, either remove the logs (if geocoder works and label now populates) or change approach (if geocoder throws/returns empty — within locked constraints: no new deps, no network backend). The TEMP DIAGNOSTIC logs MUST be removed in the next session.
+
+### Next steps
+
+- User runs the app, taps the GPS pin, and reports the `[GPS]` lines from logcat (see report for capture instructions).
+- On-device confirm the tab bar now renders horizontally and stays pinned.
+
+---
+
 ## 2026-06-04 — Session: follow-up #2 — tab bar (real fix), GPS label, color bar position
 
 **Phase:** Phase 5 (UX polish)
