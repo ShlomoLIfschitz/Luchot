@@ -207,6 +207,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      console.log('[GPS] coords:', JSON.stringify(pos.coords)); // TEMP DIAGNOSTIC
 
       // Reverse geocode is best-effort: the Android platform Geocoder can
       // return [] (or null street/city) WITHOUT throwing, which previously
@@ -218,6 +219,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         });
+        console.log('[GPS] reverseGeocode results:', JSON.stringify(results)); // TEMP DIAGNOSTIC
         if (results.length > 0) {
           const r = results[0];
           const parts = [r.name, r.street, r.city ?? r.district ?? r.subregion ?? r.region]
@@ -226,8 +228,9 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
             label = parts.join(', ');
           }
         }
-      } catch {
+      } catch (e) {
         // Geocoder backend unavailable — fall through to coordinates.
+        console.log('[GPS] reverseGeocode threw:', e instanceof Error ? e.message : String(e)); // TEMP DIAGNOSTIC
       }
 
       if (!label) {
