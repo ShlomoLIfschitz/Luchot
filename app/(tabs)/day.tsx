@@ -17,10 +17,8 @@ import {
   ScrollView,
   Pressable,
   Linking,
-  I18nManager,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { Plus } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
@@ -62,6 +60,9 @@ export default function DayScreen() {
   // NoteEditor visibility — NoteEditor is Modal-based, not BottomSheet.
   // Controlled via visible boolean prop instead of a ref.
   const [editorVisible, setEditorVisible] = useState(false);
+
+  // Internal tab state — defaults to 'events', no persistence.
+  const [activeTab, setActiveTab] = useState<'events' | 'torah'>('events');
 
   const openNoteEditor = useCallback(() => setEditorVisible(true), []);
   const closeNoteEditor = useCallback(() => setEditorVisible(false), []);
@@ -115,8 +116,9 @@ export default function DayScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
         >
-          {/* Header — date display */}
+          {/* index 0 — date header */}
           <View style={styles.header}>
             <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
               {hebrewFormatted}
@@ -126,103 +128,133 @@ export default function DayScreen() {
             </Text>
           </View>
 
-          {/* Holiday Banner */}
-          {isHoliday && primaryHoliday && (
-            <View style={[styles.holidayBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
-              <Text style={[styles.holidayText, { color: colors.tagHoliday }]}>
-                ✡ {primaryHoliday}
+          {/* index 1 — tab bar (sticky) */}
+          <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+            {/* RTL: 'אירועים' first in JSX → renders on the right */}
+            <Pressable
+              onPress={() => setActiveTab('events')}
+              style={styles.tabItem}
+              accessibilityRole="tab"
+              accessibilityLabel="אירועים"
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
+                אירועים
               </Text>
-            </View>
-          )}
-
-          {/* Torah Details */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-              פרטים תורניים
-            </Text>
-
-            {dayData.parasha && (
-              <DetailRow
-                label="פרשת השבוע"
-                value={dayData.parasha}
-                colors={colors}
-              />
-            )}
-
-            {dayData.omerDay && (
-              <DetailRow
-                label="ספירת העומר"
-                value={`יום ${toHebrewNumeral(dayData.omerDay)} לעומר`}
-                colors={colors}
-              />
-            )}
-
-            {dayData.dafYomi && (
-              <DetailRow
-                label="דף יומי"
-                value={dayData.dafYomi.display}
-                colors={colors}
-                actionLabel="→ ספריא"
-                onAction={() => Linking.openURL(dayData.dafYomi!.url)}
-              />
-            )}
-
-            {dayData.rambamOneChapter && (
-              <DetailRow
-                label='רמב״ם יומי'
-                value={dayData.rambamOneChapter.display}
-                colors={colors}
-                actionLabel="→ ספריא"
-                onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
-              />
-            )}
+              {activeTab === 'events' && (
+                <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />
+              )}
+            </Pressable>
+            {/* 'תורה וזמנים' second in JSX → renders on the left */}
+            <Pressable
+              onPress={() => setActiveTab('torah')}
+              style={styles.tabItem}
+              accessibilityRole="tab"
+              accessibilityLabel="תורה וזמנים"
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
+                תורה וזמנים
+              </Text>
+              {activeTab === 'torah' && (
+                <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />
+              )}
+            </Pressable>
           </View>
 
-          {/* Zmanim — reuse existing component */}
-          <ZmanimList zmanim={zmanim} />
+          {/* index 2 — single wrapper for active tab content */}
+          <View>
+            {activeTab === 'events' ? (
+              <>
+                <NoteList date={selectedDate} hebrewDate={dayData.hebrewDate} hideAddButton />
+                <Pressable
+                  onPress={openNoteEditor}
+                  style={[styles.addEventBtn, { backgroundColor: colors.accentLight }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="הוסף אירוע"
+                >
+                  <Text style={[styles.addEventBtnText, { color: colors.accent }]}>+ הוסף אירוע</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                {/* Holiday Banner */}
+                {isHoliday && primaryHoliday && (
+                  <View style={[styles.holidayBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
+                    <Text style={[styles.holidayText, { color: colors.tagHoliday }]}>
+                      ✡ {primaryHoliday}
+                    </Text>
+                  </View>
+                )}
 
-          {/* User notes for this day — tappable list (view/edit/delete) */}
-          <View style={styles.section}>
-            <NoteList date={selectedDate} hebrewDate={dayData.hebrewDate} hideAddButton />
-          </View>
-
-          {/* Hourly Schedule */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-              לוח שעות
-            </Text>
-
-            {HOURS.map((hour) => {
-              const hourLabel = hour.toString().padStart(2, '0') + ':00';
-
-              return (
-                <View key={hour} style={styles.hourRow}>
-                  <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
-                    {hourLabel}
+                {/* Torah Details */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
+                    פרטים תורניים
                   </Text>
-                  <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
-                  <View style={styles.hourContent} />
+
+                  {dayData.parasha && (
+                    <DetailRow
+                      label="פרשת השבוע"
+                      value={dayData.parasha}
+                      colors={colors}
+                    />
+                  )}
+
+                  {dayData.omerDay && (
+                    <DetailRow
+                      label="ספירת העומר"
+                      value={`יום ${toHebrewNumeral(dayData.omerDay)} לעומר`}
+                      colors={colors}
+                    />
+                  )}
+
+                  {dayData.dafYomi && (
+                    <DetailRow
+                      label="דף יומי"
+                      value={dayData.dafYomi.display}
+                      colors={colors}
+                      actionLabel="→ ספריא"
+                      onAction={() => Linking.openURL(dayData.dafYomi!.url)}
+                    />
+                  )}
+
+                  {dayData.rambamOneChapter && (
+                    <DetailRow
+                      label='רמב״ם יומי'
+                      value={dayData.rambamOneChapter.display}
+                      colors={colors}
+                      actionLabel="→ ספריא"
+                      onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
+                    />
+                  )}
                 </View>
-              );
-            })}
+
+                {/* Zmanim */}
+                <ZmanimList zmanim={zmanim} />
+
+                {/* Hourly Schedule */}
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
+                    לוח שעות
+                  </Text>
+
+                  {HOURS.map((hour) => {
+                    const hourLabel = hour.toString().padStart(2, '0') + ':00';
+
+                    return (
+                      <View key={hour} style={styles.hourRow}>
+                        <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
+                          {hourLabel}
+                        </Text>
+                        <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
+                        <View style={styles.hourContent} />
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </View>
-
-          {/* Bottom spacer for FAB clearance */}
-          <View style={styles.bottomSpacer} />
         </ScrollView>
-
-        {/* FAB — RTL-aware positioning via I18nManager */}
-        <Pressable
-          onPress={openNoteEditor}
-          style={[
-            styles.fab,
-            { backgroundColor: colors.accent },
-            I18nManager.isRTL ? { left: 24 } : { right: 24 },
-          ]}
-          accessibilityLabel="הוסף אירוע או הערה"
-        >
-          <Plus color={colors.textInverse} size={24} />
-        </Pressable>
 
         {/* Note Editor — Modal-based, controlled via visible prop.
             NoteEditor requires colors passed in (does not call useThemeColors
@@ -358,21 +390,38 @@ const styles = StyleSheet.create({
   },
   hourNoteText: { fontSize: 13, fontWeight: '500', textAlign: 'right' },
 
-  // FAB — right/left set inline via I18nManager (RTL-aware)
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: radius.full,
+  // Tab bar (sticky header)
+  tabBar: {
+    flexDirection: 'row-reverse',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 8,
+  },
+  tabItem: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingVertical: 10,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabUnderline: {
+    height: 2,
+    width: '80%',
+    borderRadius: 1,
+    marginTop: 4,
   },
 
-  bottomSpacer: { height: 60 },
+  // Inline add-event button (events tab)
+  addEventBtn: {
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 12,
+  },
+  addEventBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
