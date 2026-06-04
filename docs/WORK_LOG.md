@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-06-04 — Session: fix Hebrew backward navigation (HDate.add day-1 boundary)
+
+**Phase:** Phase 5 (follow-up bug fix to Session B)
+**Commits:** (this session) the one-line fix + this docs entry
+**Sub-agents:** none — single-line fix applied directly by the orchestrator (exact change pre-diagnosed; cold sub-agent spawn for one line is the expensive path; consistent with the established single-line-fix precedent).
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+- **`src/providers/CalendarProvider.tsx` — `navigateHebrewMonth` backward double-step fix.** Root cause (diagnosed prior turn, empirically confirmed): `new HDate(1, m, y).add(-1, 'months')` slips one day before the intended 1st (e.g. `1 Sivan → 30 Nisan` instead of `1 Iyyar`), so `getMonth()` reports the month **two** steps back — backward navigation jumped two months while forward was correct. Fix: anchor the stepping HDate to **day 15** instead of day 1. `navigateHebrewMonth` reads only `getMonth()`/`getFullYear()` from the stepped date, so the day is a pure pivot; day 15 is safely inside every Hebrew month (≥29 days) in both directions. Verified across all edge cases (Adar I/II, Tishrei/Elul year rollover, leap-year Nisan→Adar II). One-line change + explanatory comment; nothing else touched.
+
+### Decisions made
+
+- None new.
+
+### Open issues / blocked
+
+- Month/year picker still inert in Hebrew mode (carried over from Session B — needs a Hebrew-aware picker + `navigateToHebrewMonth`). Unchanged this session.
+
+### Deviations
+
+- Added a 2nd commit (this WORK_LOG entry) beyond the Architect's single-commit strategy, per CLAUDE.md end-of-session state discipline. The code change is exactly the one line specified.
+
+### Next steps
+
+- On-device confirm a full backward walk Tishrei → Elul → Av → Tammuz → Sivan → Iyyar → Nisan (no skip/repeat), plus a leap-year Nisan → Adar II → Adar I.
+
+---
+
 ## 2026-06-04 — Session: Hebrew month navigation — exact HDate cursor (Session B)
 
 **Phase:** Phase 5 (navigation bug fixes — Session B of the 2-session split; fixes Bug 1)
