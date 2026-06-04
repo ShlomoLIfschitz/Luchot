@@ -238,6 +238,7 @@ export class NotificationService {
     enabled: boolean,
     leadMinutes: number,
     city: string | null,
+    override?: { lat: number; lng: number; placeName: string; il: boolean },
   ): Promise<void> {
     // 1. Always cancel all candle-* first (city or lead-time change requires full reset)
     const scheduled = await NotificationService.getScheduled();
@@ -246,15 +247,31 @@ export class NotificationService {
         await NotificationService.cancelNotification(n.identifier);
       }
     }
-    if (!enabled || !city) return;
+    if (!enabled) return;
+    if (!override && !city) return;
 
-    // 2. Resolve city → coordinates + metadata
-    const coords = getCityCoordinates(city);
-    if (!coords) return; // unknown key — defensive
-    const { lat, lng } = coords;
-    const cityEntry = findCityByKey(city);
-    const cityNameHe = cityEntry?.nameHe ?? city;
-    const il = cityEntry?.country === 'IL';
+    // 2. Resolve coordinates + display name + il flag
+    let lat: number;
+    let lng: number;
+    let cityNameHe: string;
+    let il: boolean;
+
+    if (override) {
+      // GPS override path — skip city-key resolution entirely
+      lat = override.lat;
+      lng = override.lng;
+      cityNameHe = override.placeName;
+      il = override.il;
+    } else {
+      // Existing city-key path (back-compat) — city is non-null here (guarded above)
+      const coords = getCityCoordinates(city!);
+      if (!coords) return; // unknown key — defensive
+      lat = coords.lat;
+      lng = coords.lng;
+      const cityEntry = findCityByKey(city!);
+      cityNameHe = cityEntry?.nameHe ?? city!;
+      il = cityEntry?.country === 'IL';
+    }
 
     // 3. City-specific candle-lighting offset (Jerusalem 40 min, Haifa 30, Safed 40, others 18)
     const clOffsetMinutes = getCandleLightingOffset(lat, lng).minutes;
