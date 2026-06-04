@@ -80,7 +80,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   navigateHebrewMonth: (direction) => {
     const { currentHebrewMonth, currentHebrewYear } = get();
-    const stepped = new HDate(1, currentHebrewMonth, currentHebrewYear).add(direction, 'months');
+    // Anchor to day 15 — HDate.add(±1,'months') from day 1 can slip into the prior month boundary; day 15 is safely inside every Hebrew month in both directions.
+    const stepped = new HDate(15, currentHebrewMonth, currentHebrewYear).add(direction, 'months');
     const newMonth = stepped.getMonth();
     const newYear = stepped.getFullYear();
     const hebrewMonthData = dateService.getHebrewMonthData(newYear, newMonth);
