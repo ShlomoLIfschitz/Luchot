@@ -1,12 +1,12 @@
 // src/components/notes/NoteEditor.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { MapPin, Pencil, Trash2, Share2 } from 'lucide-react-native';
+import { MapPin, Pencil, Trash2, Share2, Cake, Flame, Gem, FileText, type LucideIcon } from 'lucide-react-native';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
 import type { ThemeColors } from '../../hooks/useThemeColors';
@@ -29,6 +29,13 @@ const NOTE_TYPES: { type: NoteType; label: string; icon: string }[] = [
   { type: 'yahrzeit',    label: 'יארצייט',   icon: '🕯' },
   { type: 'anniversary', label: 'יום שנה',   icon: '💍' },
 ];
+
+const TYPE_ICON: Record<NoteType, LucideIcon> = {
+  note:        FileText,
+  birthday:    Cake,
+  yahrzeit:    Flame,
+  anniversary: Gem,
+};
 
 const DEFAULT_COLOR_FOR_TYPE: Record<NoteType, ColorTokenKey> = {
   note:        'tagEvent',
@@ -133,6 +140,9 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const [isViewMode, setIsViewMode] = useState(false);
   const [location, setLocation] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
+  const summaryInputRef = useRef<TextInput>(null);
+  const locationInputRef = useRef<TextInput>(null);
+  const [focusTarget, setFocusTarget] = useState<'summary' | 'location' | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -148,6 +158,15 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       setIsViewMode(!!note);
     }
   }, [visible, note]);
+
+  useEffect(() => {
+    if (!isViewMode && focusTarget) {
+      const ref = focusTarget === 'summary' ? summaryInputRef : locationInputRef;
+      // let the edit-mode inputs mount first
+      const t = setTimeout(() => ref.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [isViewMode, focusTarget]);
 
   const handleSave = () => {
     const trimmed = summary.trim();
@@ -225,6 +244,11 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const isRecurring = noteType !== 'note';
   const noteTypeInfo = NOTE_TYPES.find((t) => t.type === noteType);
 
+  const enterEdit = (target: 'summary' | 'location' | null) => {
+    setFocusTarget(target);
+    setIsViewMode(false);
+  };
+
   const handleDeletePress = () => {
     Alert.alert(
       'מחק אירוע',
@@ -256,10 +280,6 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                   // ── VIEW MODE ──────────────────────────────────────────────
                   <>
                     <View style={s.headerRow}>
-                      {/* title — JSX-first = rightmost in row-reverse */}
-                      <Text style={[s.title, { color: colors.textPrimary }]}>
-                        ערוך הערה
-                      </Text>
                       {/* X button — JSX-last = leftmost */}
                       <Pressable
                         hitSlop={8}
@@ -272,44 +292,45 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                     </View>
 
                     {/* summary */}
-                    <View style={s.viewField}>
+                    <Pressable style={s.viewField} onPress={() => enterEdit('summary')}>
                       <Text style={[s.viewFieldValue, s.viewSummary, { color: colors.textPrimary }]}>
                         {summary}
                       </Text>
-                    </View>
+                    </Pressable>
 
                     {/* note type */}
                     {noteTypeInfo && (
-                      <View style={[s.viewField, s.viewRow]}>
+                      <Pressable style={[s.viewField, s.viewRow]} onPress={() => enterEdit(null)}>
+                        {(() => { const TypeIcon = TYPE_ICON[noteType]; return <TypeIcon size={20} color={colors.textSecondary} />; })()}
                         <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
-                          {noteTypeInfo.icon} {noteTypeInfo.label}
+                          {noteTypeInfo.label}
                         </Text>
-                      </View>
+                      </Pressable>
                     )}
 
                     {/* location */}
                     {!!location && (
-                      <View style={[s.viewField, s.viewRow]}>
+                      <Pressable style={[s.viewField, s.viewRow]} onPress={() => enterEdit('location')}>
                         <MapPin size={14} color={colors.textTertiary} />
                         <Text style={[s.viewFieldValue, { color: colors.textSecondary, flex: 1 }]}>
                           {location}
                         </Text>
-                      </View>
+                      </Pressable>
                     )}
 
                     {/* recurring anchor */}
                     {isRecurring && (
-                      <View style={s.viewField}>
+                      <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
                         <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
                         <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
                           {calendarType === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
                         </Text>
-                      </View>
+                      </Pressable>
                     )}
 
                     {/* reminder */}
                     {note?.reminderMinutes != null && (
-                      <View style={s.viewField}>
+                      <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
                         <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>תזכורת</Text>
                         <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
                           {note.reminderMinutes === 0
@@ -322,7 +343,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                                   ? 'יום לפני'
                                   : `${note.reminderMinutes} דקות לפני`}
                         </Text>
-                      </View>
+                      </Pressable>
                     )}
 
                     {/* bottom toolbar */}
@@ -381,6 +402,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                     </View>
 
                     <TextInput
+                      ref={summaryInputRef}
                       style={[s.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
                       value={summary}
                       onChangeText={setSummary}
@@ -394,8 +416,9 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
 
                     <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>סוג</Text>
                     <View style={s.typeRow}>
-                      {NOTE_TYPES.map(({ type, label, icon }) => {
+                      {NOTE_TYPES.map(({ type, label }) => {
                         const active = noteType === type;
+                        const Icon = TYPE_ICON[type];
                         return (
                           <Pressable
                             key={type}
@@ -406,7 +429,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                               active && { backgroundColor: colors.accent, borderColor: colors.accent },
                             ]}
                           >
-                            <Text style={s.typeIcon}>{icon}</Text>
+                            <Icon size={20} color={colors.textSecondary} />
                             <Text style={[s.typeLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>{label}</Text>
                           </Pressable>
                         );
@@ -450,6 +473,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                     <View style={s.locationRow}>
                       {/* input — JSX-first = rightmost in row-reverse */}
                       <TextInput
+                        ref={locationInputRef}
                         style={[s.locationInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
                         value={location}
                         onChangeText={setLocation}
@@ -565,7 +589,6 @@ const s = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textAlign: 'right', marginBottom: 8 },
   typeRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
   typeChip: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center', gap: 3 },
-  typeIcon: { fontSize: 18 },
   typeLabel: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
   anchorRow: { gap: 8, marginBottom: 16 },
   anchorChip: { borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },

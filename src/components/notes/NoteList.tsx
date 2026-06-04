@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, Modal, TouchableWithoutFeedback } from 'react-native';
+import { Cake, Flame, Gem, FileText, type LucideIcon } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useNotes, CalendarNote, NoteType } from '../../hooks/useNotes';
 import { NoteEditor } from './NoteEditor';
@@ -9,11 +10,11 @@ import type { HebrewDateInfo } from '../../services/DateService';
 import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
 import { overlay } from '../../constants/overlay';
 
-const TYPE_ICONS: Record<NoteType, string> = {
-  note:        '📝',
-  birthday:    '🎂',
-  yahrzeit:    '🕯',
-  anniversary: '💍',
+const TYPE_ICON: Record<NoteType, LucideIcon> = {
+  note:        FileText,
+  birthday:    Cake,
+  yahrzeit:    Flame,
+  anniversary: Gem,
 };
 
 interface Props {
@@ -84,7 +85,7 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
               hitSlop={8}
               style={[s.colorDot, { backgroundColor: resolveHexColor(note) }]}
             />
-            <Text style={s.noteIcon}>{TYPE_ICONS[note.noteType]}</Text>
+            {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
             <View style={s.noteBody}>
               <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
               {note.recurring && (
@@ -175,7 +176,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 10,
     borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8,
   },
-  noteIcon: { fontSize: 20 },
   noteBody: { flex: 1 },
   noteSummary: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
   noteTag: { fontSize: 11, textAlign: 'right', marginTop: 2 },
