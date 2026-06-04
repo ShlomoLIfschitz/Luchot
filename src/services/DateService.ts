@@ -164,6 +164,83 @@ export class DateService {
   }
 
   /**
+   * Build a fully-populated DayData for a single Gregorian Date.
+   * Used internally by getMonthData and getHebrewMonthData.
+   * Fetches hebcal events for that one day and runs the same
+   * classification logic that getMonthData previously applied
+   * per-day over a batched eventMap.
+   */
+  private buildDayData(date: Date): DayData {
+    const hdate = new HDate(date);
+
+    const events = HebrewCalendar.calendar({
+      start: date,
+      end: date,
+      isHebrewYear: false,
+      il: !this.diaspora,
+      omer: true,
+      sedrot: true,
+    });
+
+    const holidays: string[] = [];
+    const holidaysEn: string[] = [];
+    let parasha: string | undefined;
+    let isYomTov = false;
+    let isCholHamoed = false;
+    let omerDay: number | undefined;
+
+    for (const ev of events) {
+      const mask = ev.getFlags();
+      if (mask & flags.PARSHA_HASHAVUA) {
+        parasha = ev.renderBrief('he');
+      } else if (mask & flags.OMER_COUNT) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        omerDay = (ev as any).omer;
+      } else if (mask & flags.YOM_TOV_ENDS || mask & flags.CHAG) {
+        isYomTov = true;
+        holidays.push(ev.renderBrief('he'));
+        holidaysEn.push(ev.renderBrief('en'));
+      } else if (mask & flags.CHOL_HAMOED) {
+        isCholHamoed = true;
+        holidays.push(ev.renderBrief('he'));
+        holidaysEn.push(ev.renderBrief('en'));
+      } else if (!(mask & flags.PARSHA_HASHAVUA) && !(mask & flags.OMER_COUNT)) {
+        holidays.push(ev.renderBrief('he'));
+        holidaysEn.push(ev.renderBrief('en'));
+      }
+    }
+
+    const monthInfo = HEBREW_MONTH_NAMES[hdate.getMonth()] ?? { he: '', en: '' };
+
+    return {
+      gregorianDate: date,
+      hebrewDate: {
+        day: hdate.getDate(),
+        month: hdate.getMonth(),
+        year: hdate.getFullYear(),
+        monthName: monthInfo.he,
+        monthNameTranslit: monthInfo.en,
+        fullDate: `${toHebrewNumeral(hdate.getDate())} ${monthInfo.he}`,
+        isShabbat: date.getDay() === 6,
+        isRoshChodesh: hdate.getDate() === 1 || hdate.getDate() === 30,
+      },
+      holidays,
+      holidaysEn,
+      parasha,
+      isYomTov,
+      isCholHamoed,
+      omerDay,
+      dafYomi:          renderLearning('dafYomi',      hdate, !this.diaspora),
+      rambamOneChapter: renderLearning('rambam1',      hdate, !this.diaspora),
+      mishnaYomi:       renderLearning('mishnaYomi',   hdate, !this.diaspora),
+      nachYomi:         renderLearning('nachYomi',     hdate, !this.diaspora),
+      tanakhYomi:       renderLearning('tanakhYomi',   hdate, !this.diaspora),
+      chofetzChaim:     renderLearning('chofetzChaim', hdate, !this.diaspora),
+      psalms:           renderLearning('psalms',       hdate, !this.diaspora),
+    };
+  }
+
+  /**
    * Get all day data for a given Gregorian month.
    * Cached per month.
    */
@@ -174,89 +251,33 @@ export class DateService {
     const days: DayData[] = [];
     const daysInMonth = new Date(year, month, 0).getDate();
 
-    // Fetch all hebcal events for this month once
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month - 1, daysInMonth);
-
-    const events = HebrewCalendar.calendar({
-      start: startDate,
-      end: endDate,
-      isHebrewYear: false,
-      il: !this.diaspora,
-      omer: true,
-      sedrot: true,
-    });
-
-    // Build a map: dateString → events
-    const eventMap = new Map<string, HebcalEvent[]>();
-    for (const ev of events) {
-      const d = ev.getDate().greg();
-      const k = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-      if (!eventMap.has(k)) eventMap.set(k, []);
-      eventMap.get(k)!.push(ev);
+    for (let d = 1; d <= daysInMonth; d++) {
+      days.push(this.buildDayData(new Date(year, month - 1, d)));
     }
 
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month - 1, d);
-      const hdate = new HDate(date);
-      const evKey = `${year}-${month}-${d}`;
-      const dayEvents = eventMap.get(evKey) ?? [];
+    monthCache.set(key, days);
+    return days;
+  }
 
-      const holidays: string[] = [];
-      const holidaysEn: string[] = [];
-      let parasha: string | undefined;
-      let isYomTov = false;
-      let isCholHamoed = false;
-      let omerDay: number | undefined;
+  /**
+   * Get all day data for a given Hebrew month.
+   * Iterates over every day in the Hebrew month (HDate.daysInMonth handles
+   * leap-year Adar I/II correctly), converts each to its Gregorian date,
+   * and delegates to buildDayData.
+   * Cached with a distinct key prefixed "he_" to avoid collision with
+   * Gregorian keys (which are formatted as "${year}-${month}-${d|i}").
+   * setDiaspora clears monthCache, which also invalidates Hebrew entries.
+   */
+  getHebrewMonthData(hYear: number, hMonth: number): DayData[] {
+    const key = `he_${hYear}_${hMonth}_${this.diaspora}`;
+    if (monthCache.has(key)) return monthCache.get(key)!;
 
-      for (const ev of dayEvents) {
-        const mask = ev.getFlags();
-        if (mask & flags.PARSHA_HASHAVUA) {
-          parasha = ev.renderBrief('he');
-        } else if (mask & flags.OMER_COUNT) {
-          omerDay = (ev as any).omer;
-        } else if (mask & flags.YOM_TOV_ENDS || mask & flags.CHAG) {
-          isYomTov = true;
-          holidays.push(ev.renderBrief('he'));
-          holidaysEn.push(ev.renderBrief('en'));
-        } else if (mask & flags.CHOL_HAMOED) {
-          isCholHamoed = true;
-          holidays.push(ev.renderBrief('he'));
-          holidaysEn.push(ev.renderBrief('en'));
-        } else if (!(mask & flags.PARSHA_HASHAVUA) && !(mask & flags.OMER_COUNT)) {
-          holidays.push(ev.renderBrief('he'));
-          holidaysEn.push(ev.renderBrief('en'));
-        }
-      }
+    const days: DayData[] = [];
+    const len = HDate.daysInMonth(hMonth, hYear);
 
-      const monthInfo = HEBREW_MONTH_NAMES[hdate.getMonth()] ?? { he: '', en: '' };
-
-      days.push({
-        gregorianDate: date,
-        hebrewDate: {
-          day: hdate.getDate(),
-          month: hdate.getMonth(),
-          year: hdate.getFullYear(),
-          monthName: monthInfo.he,
-          monthNameTranslit: monthInfo.en,
-          fullDate: `${toHebrewNumeral(hdate.getDate())} ${monthInfo.he}`,
-          isShabbat: date.getDay() === 6,
-          isRoshChodesh: hdate.getDate() === 1 || hdate.getDate() === 30,
-        },
-        holidays,
-        holidaysEn,
-        parasha,
-        isYomTov,
-        isCholHamoed,
-        omerDay,
-        dafYomi:          renderLearning('dafYomi',      hdate, !this.diaspora),
-        rambamOneChapter: renderLearning('rambam1',      hdate, !this.diaspora),
-        mishnaYomi:       renderLearning('mishnaYomi',   hdate, !this.diaspora),
-        nachYomi:         renderLearning('nachYomi',     hdate, !this.diaspora),
-        tanakhYomi:       renderLearning('tanakhYomi',   hdate, !this.diaspora),
-        chofetzChaim:     renderLearning('chofetzChaim', hdate, !this.diaspora),
-        psalms:           renderLearning('psalms',       hdate, !this.diaspora),
-      });
+    for (let day = 1; day <= len; day++) {
+      const hd = new HDate(day, hMonth, hYear);
+      days.push(this.buildDayData(hd.greg()));
     }
 
     monthCache.set(key, days);
