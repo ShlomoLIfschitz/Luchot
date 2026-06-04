@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-06-04 — Session: follow-up #2 — tab bar (real fix), GPS label, color bar position
+
+**Phase:** Phase 5 (UX polish)
+**Commits:** b311863, 3e5822b, a59ed59 (3) + this docs entry
+**Sub-agents:** mobile-ui-builder (all 3 UI edits, 1 round, per orchestrator authorization)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done — incl. root cause of why the previous attempts didn't work
+
+- **Tab bar (mobile-ui-builder)** [b311863] — `app/(tabs)/day.tsx`. **Root cause:** the previous fix put `alignSelf: 'flex-end'` on the tab bar, which is the **sticky header** (ScrollView `stickyHeaderIndices={[1]}`). `alignSelf:'flex-end'` makes the sticky header shrink to its content width, which under the sticky wrapper collapses so the Hebrew tab labels wrap → the tabs *looked* stacked. Fix: removed `alignSelf:'flex-end'`; the bar is now full-width with `flexDirection:'row-reverse'` + `justifyContent:'flex-start'` (packs tabs to the right edge in RTL) + `alignItems:'center'`. Tabs use padding only (no flex). Full-width bar also keeps the sticky background covering the screen.
+- **GPS label (mobile-ui-builder)** [3e5822b] — `src/components/notes/NoteEditor.tsx`. Implemented the requested build: `parts = [name, street, city ?? district ?? subregion ?? region].filter(Boolean)`; assign label only when `parts.length > 0`; coordinates are the last resort. **Note on root cause:** the previous label logic was already functionally equivalent (it also only fell back to coords when all fields were empty). So if the field STILL shows raw coords after this OTA, the cause is NOT the label code — it's that `reverseGeocodeAsync` is either throwing on-device (Android Geocoder backend unavailable → caught → coords) or returning a first result whose name/street/locality are all null. That is the coordinate fallback working as designed, not a label bug. Flag for on-device check.
+- **Color bar position (mobile-ui-builder)** [a59ed59] — `src/components/notes/NoteList.tsx`. Moved the 4dp color bar OUT of the bordered capsule. Each row is now a `row-reverse` wrapper View: bar is the first child (renders right, outside the capsule), capsule is second (flex:1, left), 4dp `gap`. `resolveHexColor` (already returns the actual color hex) reused for the bar.
+
+### Decisions made
+
+- None new — all three implement the locked follow-up spec.
+
+### Open issues / blocked
+
+- **GPS:** if coords still display after this update, the geocoder itself is the problem (throw or all-null result), not the label code — would need a different approach (e.g. accept that some locations only resolve to coords, or a different geocoding source — but no new deps / no network backend per locked decisions). Confirm on device first.
+- The inert color-picker Modal in NoteList remains (from the dot removal two sessions ago) — still a future cleanup candidate.
+
+### Next steps
+
+- On-device confirm all three (see session report verification checklist).
+
+---
+
 ## 2026-06-04 — Session: follow-up — tab bar layout + GPS label priority
 
 **Phase:** Phase 5 (UX polish)
