@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-06-05 — Session: Gal C — C3 recurrence UI + per-occurrence edit/delete
+
+**Phase:** Phase 5 (Gal C, session 3 of 4 — recurrence UI; C4 notifications + renewal follow)
+**Commits:** (this session) C3 recurrence UI + this docs entry
+**Sub-agents:** local-data-builder (Wave 1: saveNote explicit recurrence params + extended `saveExceptionForOccurrence` overrides + `getEventById`), mobile-ui-builder (Wave 2: `recurringId.ts` helper + NoteEditor recurrence picker/anchor chips + edit/delete-occurrence dialogs at all triggers + dead color-quick-pick removal). Orchestrator: added two `useNotes` occurrence wrappers, fixed a deferred-save/edit-all interaction bug, ran the DoD gate.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline, no new deps). JS-only — ready for OTA (push pending user go).
+
+### What was done
+
+- **Wave 1 — data shape (local-data-builder).** `saveNote` gained explicit optional `recurrenceType` + `recurrenceCalendar` (explicit wins; old noteType→yearly stays as fallback; yearly defaults calendar to hebrew, monthly honors calendar, daily/weekly/none → no calendar). `saveExceptionForOccurrence` overrides extended to the full editable set (summary, location, colorId, category, allDay, startDateTime/endDateTime, reminderMinutes). New `StorageService.getEventById`.
+- **Orchestrator — useNotes occurrence wrappers.** Added `deleteOccurrence(masterId, occurrenceDate)` (tombstone) and `saveOccurrenceException(masterId, occurrenceDate, overrides)` thin wrappers (StorageService call + notes refresh) so the UI consumes the hook, not StorageService directly (ownership: useNotes is data-layer).
+- **Wave 2 — UI (mobile-ui-builder).** New `src/utils/recurringId.ts` `splitInstanceId`. NoteEditor: "חזרה" chip row (none/daily/weekly/monthly/yearly) for all types + yearly-only עברי/לועזי anchor chips; threads recurrenceType/recurrenceCalendar through onSave; inits from the edited note. Edit/delete recurring instance → 2-choice Alert ("לתאריך זה בלבד" / "לכל התאריכים") at NoteEditor toolbar, NoteList ✕, and day.tsx grid: this-date → saveOccurrenceException/deleteOccurrence; all-dates → saveNote(masterId, anchor=note.gregorianDateStr local-midnight)/deleteNote(masterId). Removed the dead color-quick-pick Modal + its state/styles/imports.
+
+### Decisions made
+
+- Logged **Gal C C3** in DECISIONS.md (2026-06-05): explicit recurrence picker replaces implicit derivation; composite-id addressing for occurrence ops; 2-choice edit/delete dialogs at every trigger; edit-all anchors on the master's original date; dead color-quick-pick removed.
+
+### Orchestrator fix (caught at the integration gate)
+
+- **Deferred-save (C2 all-day+reminder) ignored C3 edit-all target.** The C2 effect that runs after the reminder-time prompt rebuilt `onSave` with `note?.id` (composite) + `date` (occurrence), so editing a recurring **all-day-with-reminder** event (birthday/yahrzeit — the common case) via "לכל התאריכים" would write a STRAY row at the composite id / occurrence date instead of updating the master. Fixed: `doDirectSave` now stashes the resolved `{id, date}` in `pendingSaveTarget` before opening the reminder picker, and the deferred effect consumes it (correct masterId + series anchor). Applied directly by the orchestrator (NoteEditor UI logic, ~6 targeted edits; cold re-spawn was the expensive path). typecheck re-verified 0 after.
+
+### Open issues / blocked
+
+- **C4 scope:** daily/weekly/monthly events now exist but have NO reminder scheduling (`ensureAnnualReminders` is still yearly-only); the yearly renewal prompt ("האם להמשיך לקבל תזכורות?") is unbuilt. Both are C4.
+- **View-mode "עוגן תאריך"** still shows calendarType for all recurrence types — cosmetic; consider hiding for non-yearly (C4 polish).
+- **`onDeleteOccurrence`/`onSaveOccurrenceException` are optional props** (no-op if a future caller forgets them) — all current callers pass them.
+- **Weekly DST drift** (from C1) still to verify on device.
+
+### Next steps
+
+- **On-device verification (this feature):** daily/weekly/monthly/yearly-hebrew/yearly-gregorian recurring events appear on the right days; edit/delete "לתאריך זה בלבד" affects only that date; "לכל התאריכים" affects the series without shifting the anchor; existing birthdays/yahrzeits still appear; non-recurring events show no dialog; **the birthday+reminder edit-all path** (the orchestrator-fixed interaction) saves correctly.
+- **OTA push** on user go: `eas update --branch preview --message "feat: Gal C — C3 recurrence UI"`.
+- **C4 — notifications + renewal:** daily/weekly/monthly reminder scheduling (sweep-on-init rolling window, per the locked model); yearly renewal prompt hosted in root `_layout` with `renewal_ask_suppressed`/`last_renewal_ask` (C1 columns, currently unused).
+
+---
+
 ## 2026-06-04 — Session: Gal C — C2 event time end-to-end (UI)
 
 **Phase:** Phase 5 (Gal C, session 2 of 4 — UI; C3 recurrence UI, C4 notifications follow)

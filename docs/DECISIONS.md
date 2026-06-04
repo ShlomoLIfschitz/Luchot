@@ -452,3 +452,49 @@
   since the dot was removed); it was hardened in C2 to thread time/location but its
   reminder-anchor path would hit the defensive 09:00 — a latent (unreachable) edge to
   resolve if C3 re-wires it. Weekly recurrence DST drift (from C1) still to verify.
+
+## Gal C C3 — recurrence UI + per-occurrence edit/delete
+- Date: 2026-06-05
+- Context: C3 exposed recurrence in NoteEditor and wired the edit/delete-occurrence
+  dialogs on top of the C1 exception/tombstone infrastructure.
+- Choices:
+  1. **Explicit recurrence picker replaces implicit `noteType→yearly`.** NoteEditor
+     has a "חזרה" chip row (none/daily/weekly/monthly/yearly) for ALL event types,
+     plus calendar-anchor chips (עברי/לועזי) shown ONLY for yearly. `saveNote` takes
+     explicit `recurrenceType`/`recurrenceCalendar` (explicit wins; the old
+     noteType-derived value remains a back-compat fallback for callers that omit it).
+     Type chips (birthday/yahrzeit) no longer drive recurrence.
+  2. **Composite-id is the addressing scheme for occurrence ops.** `splitInstanceId`
+     (`src/utils/recurringId.ts`, `lastIndexOf(':')`) → `{masterId, occurrenceDate}`.
+     occurrenceDate null ⇒ master/one-off ⇒ operate directly (no dialog).
+  3. **Edit/delete recurring instance ⇒ a 2-choice Alert** ("לתאריך זה בלבד" /
+     "לכל התאריכים") at EVERY trigger (NoteEditor toolbar, NoteList inline ✕, day.tsx
+     grid). "this date" → `saveOccurrenceException`/`deleteOccurrence` (C1 override /
+     tombstone writers, exposed as thin `useNotes` wrappers); "all dates" →
+     `saveNote(masterId, …)` / `deleteNote(masterId)` (cascades). This also fixed a
+     latent bug: NoteList's ✕ previously called `deleteNote(compositeId)` → silent
+     no-op for recurring instances.
+  4. **"לכל התאריכים" anchors on the master's original date, NOT the displayed
+     occurrence.** A recurring instance is a shallow copy of the master, so its
+     `gregorianDateStr` is the master's anchor; edit-all parses it as LOCAL midnight
+     and passes it as `saveNote`'s `date`. Passing the occurrence date would shift the
+     series.
+  5. **Dead color quick-pick removed.** The NoteList color-picker Modal had no opener
+     (confirmed: `setColorPickerNote` only ever called with null); removed with its
+     state/styles/imports.
+- Alternatives considered: keep implicit recurrence (rejected — can't express
+  daily/weekly/monthly, and couples recurrence to note type); edit-in-place of the
+  master for "this occurrence" (rejected in C1 — loses the series); anchoring edit-all
+  on the occurrence date (rejected — shifts daily/weekly/monthly series).
+- Orchestrator fix (integration gate): the C2 all-day+reminder DEFERRED-save effect
+  reconstructed `onSave` with `note?.id` + `date`, ignoring C3's edit-all
+  `masterId`+anchor — so editing a recurring all-day-with-reminder event (i.e. a
+  birthday/yahrzeit, the common case) via "all dates" would have written a stray row
+  at the composite id / occurrence date. Fixed by capturing the resolved save target
+  `{id, date}` in `pendingSaveTarget` when deferring and consuming it in the effect.
+- Implications: C4 (notifications) — daily/weekly/monthly events now exist but have NO
+  reminder scheduling yet (`ensureAnnualReminders` still yearly-only); the yearly
+  renewal prompt is still unbuilt. View-mode "עוגן תאריך" still shows calendarType for
+  all recurrence types (cosmetic; consider hiding for non-yearly). `onSaveOccurrence
+  Exception`/`onDeleteOccurrence` are optional props (no-op if a future caller forgets
+  them) — all current callers pass them.
