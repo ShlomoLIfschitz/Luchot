@@ -133,30 +133,24 @@ export default function DayScreen() {
             {/* RTL: 'אירועים' first in JSX → renders on the right */}
             <Pressable
               onPress={() => setActiveTab('events')}
-              style={styles.tabItem}
+              style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
               accessibilityRole="tab"
               accessibilityLabel="אירועים"
             >
               <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
                 אירועים
               </Text>
-              {activeTab === 'events' && (
-                <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />
-              )}
             </Pressable>
             {/* 'תורה וזמנים' second in JSX → renders on the left */}
             <Pressable
               onPress={() => setActiveTab('torah')}
-              style={styles.tabItem}
+              style={[styles.tabItem, activeTab === 'torah' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
               accessibilityRole="tab"
               accessibilityLabel="תורה וזמנים"
             >
               <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
                 תורה וזמנים
               </Text>
-              {activeTab === 'torah' && (
-                <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />
-              )}
             </Pressable>
           </View>
 
@@ -395,21 +389,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 8,
+    alignSelf: 'flex-end',
   },
   tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  tabUnderline: {
-    height: 2,
-    width: '80%',
-    borderRadius: 1,
-    marginTop: 4,
   },
 
   // Inline add-event button (events tab)
