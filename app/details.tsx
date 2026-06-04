@@ -34,6 +34,7 @@ import {
 } from '../src/services/DateService';
 import { radius } from '../src/constants/radius';
 import { useDatePicker } from '../src/hooks/useDatePicker';
+import { swipeDirection } from '../src/constants/layout';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -70,11 +71,14 @@ export default function DetailsScreen() {
     [selectedDate, setSelectedDate],
   );
 
-  const swipeGesture = Gesture.Pan().onEnd((e) => {
-    if (Math.abs(e.velocityX) > 400) {
-      runOnJS(navigateDay)(e.velocityX < 0 ? 1 : -1);
-    }
-  });
+  const onSwipe = useCallback((vx: number) => navigateDay(swipeDirection(vx)), [navigateDay]);
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
+    });
 
   // Header date formatting
   const hebrewFormatted = `${toHebrewNumeral(dayData.hebrewDate.day)} ${dayData.hebrewDate.monthName} ${toHebrewYear(dayData.hebrewDate.year)}`;

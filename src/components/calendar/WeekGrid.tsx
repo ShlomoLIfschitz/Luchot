@@ -30,6 +30,7 @@ import {
 } from '../../services/DateService';
 import { buildDayTags } from '../../utils/tagMapper';
 import { formatDateKey } from '../../utils/dateUtils';
+import { swipeDirection } from '../../constants/layout';
 import type { FirstDayOfWeek } from '../../providers/SettingsProvider';
 
 type WeekGridMode = 'hebrew' | 'gregorian';
@@ -161,12 +162,14 @@ export function WeekGrid({ mode }: WeekGridProps) {
   );
 
   // Swipe gesture — moves between WEEKS, not between days
-  const swipeGesture = Gesture.Pan().onEnd((e) => {
-    if (Math.abs(e.velocityX) > 400) {
-      const direction = e.velocityX < 0 ? 1 : -1; // RTL: left swipe = next week
-      runOnJS(navigateWeek)(direction);
-    }
-  });
+  const onSwipe = useCallback((vx: number) => navigateWeek(swipeDirection(vx)), [navigateWeek]);
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
+    });
 
   return (
     <GestureDetector gesture={swipeGesture}>

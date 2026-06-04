@@ -26,6 +26,7 @@ import { useNotes } from '../../hooks/useNotes';
 import { useDatesNotes } from '../../hooks/useDatesNotes';
 import { dateService } from '../../services/DateService';
 import { formatDateKey } from '../../utils/dateUtils';
+import { swipeDirection } from '../../constants/layout';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -197,11 +198,14 @@ export function MonthGrid({ mode }: MonthGridProps) {
   );
 
   // ── Swipe gesture ──────────────────────────────────────────────────────────
-  const swipeGesture = Gesture.Pan().onEnd((e) => {
-    if (Math.abs(e.velocityX) > 400) {
-      runOnJS(navigateMonth)(e.velocityX < 0 ? 1 : -1);
-    }
-  });
+  const onSwipe = useCallback((vx: number) => navigateMonth(swipeDirection(vx)), [navigateMonth]);
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
+    });
 
   // ── Month title computation ────────────────────────────────────────────────
   const gregMonthName = useMemo(() => {

@@ -19,6 +19,7 @@ import type { ZmanimMethod } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
+import { swipeDirection } from '../../src/constants/layout';
 import { findCityByKey } from '../../src/constants/cities';
 import { findNearestCity } from '../../src/utils/locationLookup';
 
@@ -77,11 +78,14 @@ export default function ZmanimScreen() {
     [selectedDate, setSelectedDate],
   );
 
-  const swipeGesture = Gesture.Pan().onEnd((e) => {
-    if (Math.abs(e.velocityX) > 400) {
-      runOnJS(navigateDay)(e.velocityX < 0 ? 1 : -1);
-    }
-  });
+  const onSwipe = useCallback((vx: number) => navigateDay(swipeDirection(vx)), [navigateDay]);
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
+    });
 
   return (
     <GestureDetector gesture={swipeGesture}>

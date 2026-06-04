@@ -37,6 +37,7 @@ import {
 import { radius } from '../../src/constants/radius';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
+import { swipeDirection } from '../../src/constants/layout';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
 
@@ -80,12 +81,14 @@ export default function DayScreen() {
     [selectedDate, setSelectedDate],
   );
 
-  const swipeGesture = Gesture.Pan().onEnd((e) => {
-    if (Math.abs(e.velocityX) > 400) {
-      // In RTL, swipe left = next day, swipe right = previous day
-      runOnJS(navigateDay)(e.velocityX < 0 ? 1 : -1);
-    }
-  });
+  const onSwipe = useCallback((vx: number) => navigateDay(swipeDirection(vx)), [navigateDay]);
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
+    });
 
   // Bucket notes by hour for the schedule view.
   // Notes don't carry an hour field yet — all appear in "all-day" bucket
