@@ -37,7 +37,7 @@ import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { radius } from '../src/constants/radius';
 import { overlay } from '../src/constants/overlay';
 import { CITIES, findCityByKey } from '../src/constants/cities';
-import { findNearestCity, findNearestCityKey } from '../src/utils/locationLookup';
+import { findNearestCity } from '../src/utils/locationLookup';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
@@ -178,6 +178,8 @@ export default function SettingsScreen() {
     setOmerRemindersEnabled, setOmerReminderTime,
     candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
     setCandleLightingRemindersEnabled, setCandleLightingLeadMinutes, setCandleLightingCity,
+    candleLightingPlaceName,
+    setCandleLightingLocation,
   } = useSettingsStore();
 
   const router = useRouter();
@@ -225,11 +227,58 @@ export default function SettingsScreen() {
 
   const trackColor = { false: colors.border, true: colors.accent };
 
-  const resolveLocationToCity = async (): Promise<string | null> => {
+  /**
+   * Requests foreground location permission, gets current GPS position, and
+   * reverse-geocodes a city-level name via Nominatim (Hebrew).
+   *
+   * On success: calls setCandleLightingLocation(lat, lng, cityName) and
+   * returns { success: true }.
+   *
+   * On permission denial: returns { success: false, permissionDenied: true }.
+   * On any other failure (network error, timeout, non-200, null city from
+   * address): returns { success: false, permissionDenied: false } — SILENT,
+   * no Alert for the geocode miss itself.
+   */
+  const resolveAndStoreLocation = async (): Promise<{ success: boolean; permissionDenied: boolean }> => {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return null;
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-    return findNearestCityKey(pos.coords.latitude, pos.coords.longitude);
+    if (status !== 'granted') {
+      return { success: false, permissionDenied: true };
+    }
+    let lat: number;
+    let lng: number;
+    try {
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } catch {
+      return { success: false, permissionDenied: false };
+    }
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      let response: Response;
+      try {
+        response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=he`,
+          { headers: { 'User-Agent': 'Luchot-App/1.0' }, signal: controller.signal },
+        );
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (!response.ok) {
+        return { success: false, permissionDenied: false };
+      }
+      const data = (await response.json()) as { address?: { city?: string; town?: string; village?: string } };
+      const cityName = data.address?.city ?? data.address?.town ?? data.address?.village ?? null;
+      if (cityName === null) {
+        return { success: false, permissionDenied: false };
+      }
+      setCandleLightingLocation(lat, lng, cityName);
+      return { success: true, permissionDenied: false };
+    } catch {
+      // Covers AbortError (timeout), JSON parse failures, and any fetch error.
+      return { success: false, permissionDenied: false };
+    }
   };
 
   const handleCandleLightingToggle = async (newValue: boolean) => {
@@ -237,11 +286,11 @@ export default function SettingsScreen() {
       setCandleLightingRemindersEnabled(false);
       return;
     }
-    if (candleLightingCity !== null) {
+    if (candleLightingCity !== null || candleLightingPlaceName !== null) {
       setCandleLightingRemindersEnabled(true);
       return;
     }
-    // No city yet — must resolve before enabling
+    // No location yet — must resolve before enabling
     Alert.alert(
       'מיקום להדלקת נרות',
       'להשתמש במיקום הנוכחי לחישוב זמן ההדלקה?',
@@ -256,12 +305,12 @@ export default function SettingsScreen() {
         {
           text: 'השתמש במיקום',
           onPress: async () => {
-            const key = await resolveLocationToCity();
-            if (key) {
-              setCandleLightingCity(key);
+            const result = await resolveAndStoreLocation();
+            if (result.success) {
+              // Store already updated by resolveAndStoreLocation; just enable.
               setCandleLightingRemindersEnabled(true);
             } else {
-              // Permission denied or no city within threshold — fall to picker
+              // Permission denied or silent geocode miss — fall back to manual picker.
               pendingCandleLightingEnable.current = true;
               setCandleLightingCityPicker(true);
             }
@@ -536,7 +585,7 @@ export default function SettingsScreen() {
               android_ripple={{ color: colors.border }}
               onPress={() => setCandleLightingCityPicker(true)}
               style={[omerRowStyles.row, { backgroundColor: colors.surface }]}
-              accessibilityLabel={`עיר: ${findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}`}
+              accessibilityLabel={`עיר: ${candleLightingPlaceName ?? findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}`}
               accessibilityRole="button"
             >
               {/* RIGHT side — label (first in JSX = right in row-reverse) */}
@@ -545,19 +594,19 @@ export default function SettingsScreen() {
               <View style={omerRowStyles.right}>
                 <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
                 <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
+                  {candleLightingPlaceName ?? findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
                 </Text>
               </View>
-              {/* LEFT side — update button (last in JSX = left in row-reverse) */}
-              {candleLightingCity !== null && (
+              {/* LEFT side — update button (last in JSX = left in row-reverse).
+                  Show when any location is set — curated city OR GPS place name. */}
+              {(candleLightingCity !== null || candleLightingPlaceName !== null) && (
                 <Pressable
                   onPress={async () => {
-                    const key = await resolveLocationToCity();
-                    if (key) {
-                      setCandleLightingCity(key);
-                    } else {
+                    const result = await resolveAndStoreLocation();
+                    if (!result.success && result.permissionDenied) {
                       Alert.alert('שגיאה', 'לא ניתנה הרשאת מיקום');
                     }
+                    // Silent on geocode miss — keep current city/location.
                   }}
                   style={[candleRowStyles.updateBtn, { backgroundColor: colors.accentLight }]}
                 >
