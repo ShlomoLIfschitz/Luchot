@@ -27,6 +27,7 @@ import { useZmanim } from '../../src/hooks/useZmanim';
 import { useNotes, type CalendarNote } from '../../src/hooks/useNotes';
 import { ZmanimList } from '../../src/components/zmanim/ZmanimList';
 import { NoteEditor } from '../../src/components/notes/NoteEditor';
+import { NoteList } from '../../src/components/notes/NoteList';
 import {
   dateService,
   toHebrewNumeral,
@@ -180,24 +181,10 @@ export default function DayScreen() {
           {/* Zmanim — reuse existing component */}
           <ZmanimList zmanim={zmanim} />
 
-          {/* All-day notes (no time anchor yet) */}
-          {notesByHour[-1] && notesByHour[-1].length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-                אירועי היום
-              </Text>
-              {notesByHour[-1].map((note) => (
-                <View
-                  key={note.id}
-                  style={[styles.noteRow, { backgroundColor: colors.surfaceElevated }]}
-                >
-                  <Text style={[styles.noteText, { color: colors.textPrimary }]}>
-                    {note.summary}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* User notes for this day — tappable list (view/edit/delete) */}
+          <View style={styles.section}>
+            <NoteList date={selectedDate} hebrewDate={dayData.hebrewDate} hideAddButton />
+          </View>
 
           {/* Hourly Schedule */}
           <View style={styles.section}>
@@ -207,7 +194,6 @@ export default function DayScreen() {
 
             {HOURS.map((hour) => {
               const hourLabel = hour.toString().padStart(2, '0') + ':00';
-              const hourNotes = notesByHour[hour] ?? [];
 
               return (
                 <View key={hour} style={styles.hourRow}>
@@ -215,18 +201,7 @@ export default function DayScreen() {
                     {hourLabel}
                   </Text>
                   <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
-                  <View style={styles.hourContent}>
-                    {hourNotes.map((note) => (
-                      <View
-                        key={note.id}
-                        style={[styles.hourNote, { backgroundColor: colors.tagEventBg }]}
-                      >
-                        <Text style={[styles.hourNoteText, { color: colors.tagEvent }]}>
-                          {note.summary}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
+                  <View style={styles.hourContent} />
                 </View>
               );
             })}

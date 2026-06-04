@@ -19,9 +19,10 @@ const TYPE_ICONS: Record<NoteType, string> = {
 interface Props {
   date: Date;
   hebrewDate: HebrewDateInfo;
+  hideAddButton?: boolean;
 }
 
-export function NoteList({ date, hebrewDate }: Props) {
+export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
   const colors = useThemeColors();
   const { notes, saveNote, deleteNote } = useNotes(date);
   const [editorVisible, setEditorVisible] = useState(false);
@@ -61,9 +62,11 @@ export function NoteList({ date, hebrewDate }: Props) {
     <View style={s.container}>
       {/* Section header */}
       <View style={s.header}>
-        <Pressable onPress={openAdd} style={[s.addBtn, { backgroundColor: colors.accentLight }]}>
-          <Text style={[s.addBtnText, { color: colors.accent }]}>+ הוסף הערה</Text>
-        </Pressable>
+        {!hideAddButton && (
+          <Pressable onPress={openAdd} style={[s.addBtn, { backgroundColor: colors.accentLight }]}>
+            <Text style={[s.addBtnText, { color: colors.accent }]}>+ הוסף הערה</Text>
+          </Pressable>
+        )}
         <Text style={[s.headerTitle, { color: colors.textTertiary }]}>הערות</Text>
       </View>
 
