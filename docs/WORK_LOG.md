@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-06-04 — Session: Gal C — C2 event time end-to-end (UI)
+
+**Phase:** Phase 5 (Gal C, session 2 of 4 — UI; C3 recurrence UI, C4 notifications follow)
+**Commits:** (this session) C2 time UI + this docs entry
+**Sub-agents:** local-data-builder (Wave 1: useNotes CalendarNote time fields + saveNote time/reminder persistence), mobile-ui-builder (Wave 2: useTimeOfDayPicker hook + NoteEditor all-day toggle/time pickers/reminder-time prompt + NoteList time display & color-quick-pick hardening + day.tsx tab-reset & hourly restructure). Orchestrator: reverted an over-reach (Wave 1 rewrote the existing Omer useTimePicker), ran the DoD gate.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline, no new deps). JS-only — ready for OTA (push pending user go).
+
+### What was done
+
+- **Wave 1 — time data layer (local-data-builder).** `CalendarNote` gained `startDateTime`/`endDateTime`/`isAllDay`; `eventToCalendarNote` maps them (`isAllDay = start.dateTime == null`). `saveNote` gained OPTIONAL params `allDay` (default true), `startTime`, `endTime`, `reminderTime` (back-compat — existing callers unchanged). All-day → date-only; timed → stores `start.dateTime` AND `start.date` (so the `WHERE start_date=?` day query still finds timed events — Task 4 fix). All-day reminder fires at **reminderTime − reminderMinutes** (picked clock time replaces the hard-coded 09:00; 09:00 retained only as a commented defensive fallback).
+- **Wave 2 — time UI (mobile-ui-builder).** New `src/hooks/useTimeOfDayPicker.tsx` (Date I/O, mirrors useDatePicker, honors `use24hTime` via is24Hour). NoteEditor: additive "כל היום" toggle (default ON) + start (required) / end (optional, clearable) time fields when off; reminder + all-day → prompts "באיזה שעה לתזכר?" before saving (deferred-save via a trigger effect, no double-save); `Props.onSave` widened with the 4 optional params. NoteList: HH:MM label as the last row-reverse child (left of summary) for timed notes; `onlyAllDay` prop; color quick-pick hardened to thread time+location. day.tsx: `useEffect([selectedDate]) → setActiveTab('events')`; hourly schedule moved to the אירועים tab with real `getHours()` bucketing of timed notes (tap a grid chip → opens editor via `gridEditNote`); all-day notes show in `NoteList onlyAllDay` above; torah tab keeps only ShabbatCard/holiday/Torah/Zmanim.
+
+### Decisions made
+
+- Logged **Gal C C2** in DECISIONS.md (2026-06-04): all-day reminder anchor = picked time − lead (no silent 09:00); timed events dual-store start.date + start.dateTime with isAllDay derived from dateTime presence; separate useTimeOfDayPicker hook (Omer useTimePicker untouched).
+
+### Orchestrator fix (caught reviewing Wave 1)
+
+- **Wave 1 over-reached by rewriting the existing `useTimePicker.tsx`** (a battle-tested string-based hook used by `settings.tsx` for the Omer reminder, forced-24h) into a Date API — breaking settings.tsx and changing working code. Reverted it (`git checkout HEAD -- src/hooks/useTimePicker.tsx`); the new event-time picker became a SEPARATE hook (`useTimeOfDayPicker`) built in Wave 2, the proper owner of interaction hooks. Net: Omer feature 100% untouched, no settings.tsx change, event times get a purpose-built setting-aware hook. typecheck re-verified 0 after revert.
+
+### Open issues / blocked
+
+- **NoteList color quick-pick is dead code** (no opener since the color dot was removed in an earlier session — `setColorPickerNote` is only ever called with null). Wave 2 hardened its save path (threads time/location) for if/when C3 re-wires it, but its reminder-anchor branch would hit the defensive 09:00 — a LATENT (currently unreachable) edge. Resolve when/if re-wired.
+- **C3 hand-off:** NoteEditor `onSave` must add explicit `recurrenceType`/`recurrenceCalendar` when the recurrence picker lands (today recurrence is re-derived from `noteType`).
+- **Weekly DST drift** (from C1) still to verify on device.
+
+### Next steps
+
+- **On-device verification (this feature):** timed event → appears in hourly grid at correct hour; all-day → NoteList above grid, no time label; reminder + all-day → prompted for time, not silent 09:00; navigate days → אירועים tab resets; NoteList timed row shows HH:MM; Omer reminder time picker in Settings still works (untouched, but confirm).
+- **OTA push** on user go: `eas update --branch preview --message "feat: Gal C — C2 event time end-to-end"`.
+- **C3 — recurrence UI:** recurrence picker (none/daily/weekly/monthly/yearly + hebrew/gregorian for yearly), edit/delete "לתאריך זה בלבד / לכל התאריכים" dialogs calling the C1 `saveExceptionForOccurrence`/`saveTombstoneForOccurrence`; thread recurrenceType through onSave; composite-id → master-id extraction for delete/edit.
+
+---
+
 ## 2026-06-04 — Session: Gal C — C1 schema + data foundation (event time + recurrence)
 
 **Phase:** Phase 5 (Gal C, session 1 of 4 — DATA ONLY; C2 time UI, C3 recurrence UI, C4 notifications follow)

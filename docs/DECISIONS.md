@@ -416,3 +416,39 @@
   `_layout` (locked). Reminder-without-time = user picks the time explicitly, no
   silent 09:00 fallback for that case (locked; the 09:00 all-day policy remains for
   reminders where the user does NOT pick a time).
+
+## Gal C C2 — event time end-to-end (UI + reminder anchor)
+- Date: 2026-06-04
+- Context: C2 wired event time into the UI on top of the C1 data foundation.
+  Two choices needed locking beyond the C1 entry.
+- Choices:
+  1. **All-day reminder anchor = user-picked clock time − reminderMinutes.** When a
+     reminder is enabled on an ALL-DAY event, NoteEditor prompts "באיזה שעה לתזכר?"
+     and the picked time replaces 09:00 as the anchor; the existing lead-time chips
+     ("שעה לפני" etc.) still subtract. So pick 20:00 + "שעה לפני" → fires 19:00.
+     `saveNote` keeps a 09:00 path ONLY as a defensive fallback (the UI is contracted
+     to always supply the picked time); it should never fire in normal use. Timed
+     events keep `start.dateTime − reminderMinutes` as before.
+  2. **Timed events store BOTH `start.date` AND `start.dateTime`.** `start.dateTime`
+     is the precise time; `start.date` (the YYYY-MM-DD calendar day) is also persisted
+     so `getEventsForGregorianDate` (which queries `WHERE start_date = ?`) still finds
+     the event by day. `isAllDay` is derived from `start.dateTime == null`, NEVER from
+     `start.date` presence — so storing both does not corrupt the all-day flag.
+- UI structure: NoteEditor gained an additive "כל היום" toggle (default ON) +
+  start/optional-end time pickers via a NEW `useTimeOfDayPicker` hook (Date I/O,
+  honors `use24hTime`; the pre-existing string-based `useTimePicker` for the Omer
+  reminder is untouched). day.tsx moved the hourly schedule to the אירועים tab with
+  real hour bucketing from `start.dateTime` (all-day notes stay in NoteList via a new
+  `onlyAllDay` prop; timed notes render in the grid); the activeTab now resets to
+  'events' on every `selectedDate` change.
+- Alternatives considered: one unified time-picker hook (rejected — the Omer picker
+  needs string/forced-24h, event times need Date/setting-aware 24h; different
+  contracts); storing only `start.dateTime` for timed events (rejected — breaks the
+  `WHERE start_date=?` day query); fire-at-picked-time ignoring lead chips (rejected
+  — makes the lead-time UI inconsistent between timed and all-day events).
+- Implications: C3 (recurrence picker + edit/delete dialogs) must add an explicit
+  `recurrenceType` to NoteEditor's `onSave` params (today recurrence is re-derived
+  from `noteType`). The NoteList color quick-pick Modal remains DEAD CODE (no opener
+  since the dot was removed); it was hardened in C2 to thread time/location but its
+  reminder-anchor path would hit the defensive 09:00 — a latent (unreachable) edge to
+  resolve if C3 re-wires it. Weekly recurrence DST drift (from C1) still to verify.
