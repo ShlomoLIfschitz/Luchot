@@ -387,11 +387,13 @@ const styles = StyleSheet.create({
   // Tab bar (sticky header)
   tabBar: {
     flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 8,
-    alignSelf: 'flex-end',
   },
   tabItem: {
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
