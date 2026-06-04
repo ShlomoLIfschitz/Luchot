@@ -150,17 +150,81 @@ export function useNotes(date: Date | null) {
     startTime?: Date | null;    // hours/minutes for timed event start
     endTime?: Date | null;      // hours/minutes for timed event end (optional)
     reminderTime?: Date | null; // user-picked clock time for all-day reminder anchor
+    // C3 explicit recurrence params — optional for back-compat.
+    // When provided, these WIN over the implicit noteType derivation.
+    // Callers that do NOT pass these (e.g. NoteList color picker, NoteEditor
+    // pre-Wave-2) continue to get the old implicit behavior unchanged.
+    recurrenceType?: RecurrenceType;
+    recurrenceCalendar?: 'hebrew' | 'gregorian' | null;
   }) => {
     const now = new Date().toISOString();
     const dateStr = formatDateKey(params.date);
-    // Gal C: orthogonal recurrence model — type + calendar are separate axes.
-    // C1 preserves existing behavior: birthday/yahrzeit/anniversary → yearly,
-    // anchored to the chosen calendar. The recurrence picker (daily/weekly/
-    // monthly) arrives in C2/C3; until then noteType still implies yearly.
-    const recurring = params.noteType !== 'note';
-    const recurrenceType = recurring ? 'yearly' : 'none';
-    const recurrenceCalendar: 'hebrew' | 'gregorian' | undefined =
-      recurring ? params.calendarType : undefined;
+
+    // ── Recurrence: explicit params win; fall back to noteType derivation ────────
+    //
+    // Explicit path (Wave 2 passes params.recurrenceType):
+    //   recurrenceType = params.recurrenceType (any of the 5 enum values)
+    //   recurrenceCalendar rules per type:
+    //     yearly  → params.recurrenceCalendar ?? params.calendarType ?? 'hebrew'
+    //               (yearly ALWAYS needs a calendar; default hebrew)
+    //     monthly → params.recurrenceCalendar ?? params.calendarType (can be undefined)
+    //               (monthly may or may not be calendar-anchored; leave undefined if unspecified)
+    //     daily | weekly | none → undefined
+    //               (calendar-independent; daily/weekly are Gregorian by the locked model)
+    //
+    // Fallback path (caller omits params.recurrenceType — backward-compat):
+    //   birthday / yahrzeit / anniversary → yearly, calendar = calendarType
+    //   note → none, calendar = undefined
+    //   This exactly matches the C1 implicit derivation so no existing row is affected.
+    //
+    // Back-compat guarantee: if a birthday row is edited WITHOUT passing recurrenceType
+    // (should not happen post-Wave-2 but is defensively safe), the fallback derives
+    // 'yearly' from noteType, preserving the stored recurrence.
+
+    let recurrenceType: RecurrenceType;
+    let recurrenceCalendar: 'hebrew' | 'gregorian' | undefined;
+
+    if (params.recurrenceType !== undefined) {
+      // ── Explicit path ──────────────────────────────────────────────────────────
+      recurrenceType = params.recurrenceType;
+      switch (recurrenceType) {
+        case 'yearly':
+          // Yearly events always carry a calendar discriminator (needed by
+          // expandYearly to route hebrew vs. gregorian expansion).
+          // Precedence: explicit param > calendarType > 'hebrew' (safe default).
+          recurrenceCalendar =
+            params.recurrenceCalendar != null
+              ? params.recurrenceCalendar
+              : (params.calendarType ?? 'hebrew');
+          break;
+        case 'monthly':
+          // Monthly events CAN be calendar-anchored (hebrew or gregorian).
+          // If the caller passes null explicitly, honour it (no calendar anchor).
+          // If omitted, fall back to calendarType (so a monthly-hebrew note keeps
+          // its calendar). expandMonthly falls back to calendarType when this is
+          // undefined, so undefined is safe.
+          recurrenceCalendar =
+            params.recurrenceCalendar != null
+              ? params.recurrenceCalendar
+              : params.calendarType;
+          break;
+        case 'daily':
+        case 'weekly':
+        case 'none':
+        default:
+          // Calendar-independent types: daily/weekly use Gregorian by the locked
+          // model; none is N/A. Do not persist a misleading calendar value.
+          recurrenceCalendar = undefined;
+          break;
+      }
+    } else {
+      // ── Fallback path: implicit derivation from noteType (C1 / pre-Wave-2) ────
+      // birthday / yahrzeit / anniversary → yearly recurring, anchored to calendarType.
+      // note → one-time (none), no calendar anchor.
+      const recurring = params.noteType !== 'note';
+      recurrenceType = recurring ? 'yearly' : 'none';
+      recurrenceCalendar = recurring ? params.calendarType : undefined;
+    }
 
     // ── Build start/end based on allDay flag ──────────────────────────────────
     // allDay defaults to true so omitting it preserves the prior all-day behavior.
@@ -310,5 +374,35 @@ export function useNotes(date: Date | null) {
     incrementNotesVersion();
   }, []);
 
-  return { notes, saveNote, deleteNote, refreshKey: notesVersion };
+  // Gal C C3 — per-occurrence operations on a recurring series.
+  // The UI extracts masterId + occurrenceDate from a composite instance id
+  // ({masterId}:{YYYY-MM-DD}) and calls these. Thin wrappers over the C1
+  // StorageService exception/tombstone writers + a notes refresh.
+
+  /** "מחק לתאריך זה בלבד" — writes a tombstone so this one date is skipped; series continues. */
+  const deleteOccurrence = useCallback(async (masterId: string, occurrenceDate: string) => {
+    await StorageService.saveTombstoneForOccurrence(masterId, occurrenceDate);
+    incrementNotesVersion();
+  }, []);
+
+  /** "ערוך לתאריך זה בלבד" — writes an override row for this one date; series unchanged. */
+  const saveOccurrenceException = useCallback(async (
+    masterId: string,
+    occurrenceDate: string,
+    overrides: {
+      summary?: string;
+      location?: string | null;
+      colorId?: string | null;
+      category?: NoteCategory;
+      allDay?: boolean;
+      startDateTime?: string | null;
+      endDateTime?: string | null;
+      reminderMinutes?: number | null;
+    },
+  ) => {
+    await StorageService.saveExceptionForOccurrence(masterId, occurrenceDate, overrides);
+    incrementNotesVersion();
+  }, []);
+
+  return { notes, saveNote, deleteNote, deleteOccurrence, saveOccurrenceException, refreshKey: notesVersion };
 }

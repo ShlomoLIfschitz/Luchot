@@ -15,7 +15,7 @@ import {
   type SQLStatementArg,
   type ResultSet,
 } from 'expo-sqlite/legacy';
-import { CalendarEvent } from '../schemas/EventSchema';
+import { CalendarEvent, NoteCategory } from '../schemas/EventSchema';
 import { formatDateKey, generateUUID } from '../utils/dateUtils';
 
 // ── DB handle ──────────────────────────────────────────────────────────────────
@@ -450,54 +450,104 @@ export class StorageService {
    * The override is a new standalone CalendarEvent row with:
    *   - A fresh UUID id (distinct from both the master and the composite slot id).
    *   - is_exception = true, recurrence_id = masterId, exception_date = occurrenceDate.
-   *   - recurrence_type = 'none' (it is a single-occurrence stand-in, not itself recurring).
+   *   - recurrence_type = 'none' (a single-occurrence stand-in, not itself recurring).
    *   - status = 'confirmed'.
-   *   - start.date = occurrenceDate (the overridden date), unless startDateTime is supplied.
-   *   - All provided override fields merged in (summary, colorId, startDateTime, reminderMinutes).
+   *   - start.date always = occurrenceDate (for day-keying in getEventsForGregorianDate).
    *
-   * Routes through saveEvent so named-column INSERT is the single write path.
+   * Overrides param — all fields optional; omitted fields fall back to empty/null defaults
+   * on the override row (master values are NOT automatically inherited — the caller must
+   * carry forward any master fields it wants to preserve on the override):
+   *   summary / location / colorId / category — identity / display fields.
+   *   allDay / startDateTime / endDateTime — time placement:
+   *     allDay = true (default): date-only fields, no dateTime.
+   *     allDay = false + startDateTime: start.date = occurrenceDate AND start.dateTime =
+   *       startDateTime (day-keying preserved). end.dateTime = endDateTime ?? startDateTime.
+   *     startDateTime / endDateTime must be ISO 8601 with timezone when provided.
+   *   category: should match the master's NoteCategory unless the user changed it.
+   *   reminderMinutes — reminder offset in minutes.
    *
-   * Note for C3: to re-edit or re-delete a specific override later, query
-   * getExceptions() and filter by recurrence_id = masterId AND exception_date = date.
-   * The override's real UUID id is stored in the returned row; use that id for
-   * subsequent saveEvent or deleteEvent calls.
+   * Routes through saveEvent so the named-column INSERT is the single write path.
+   *
+   * Re-editing / deleting a specific override: call getExceptions() and filter by
+   * recurrence_id = masterId AND exception_date = occurrenceDate. Use the row's real
+   * UUID id for subsequent saveEvent or deleteEvent calls.
    *
    * @param masterId        The id of the master recurring event.
    * @param occurrenceDate  ISO "YYYY-MM-DD" of the occurrence being overridden.
-   * @param overrides       Optional field overrides (summary, colorId, startDateTime, reminderMinutes).
+   * @param overrides       Field overrides — full type inline on the parameter.
    */
   static async saveExceptionForOccurrence(
     masterId: string,
     occurrenceDate: string,
     overrides: {
+      // ── Identity / display ───────────────────────────────────────────────────
       summary?: string;
+      location?: string | null;
       colorId?: string | null;
-      startDateTime?: string;
+      /** The event category (noteType mapped to NoteCategory). The override row
+       *  should carry the master's category unless the user changed it. */
+      category?: NoteCategory;
+      // ── Time placement ───────────────────────────────────────────────────────
+      /** true = all-day (default). false = timed; requires startDateTime. */
+      allDay?: boolean;
+      /** ISO 8601 with timezone (e.g. "2026-06-04T09:00:00.000Z"). Required when allDay=false. */
+      startDateTime?: string | null;
+      /** ISO 8601 with timezone. Optional even when timed; mirrors startDateTime if omitted. */
+      endDateTime?: string | null;
+      // ── Reminder ─────────────────────────────────────────────────────────────
       reminderMinutes?: number | null;
-    } = {},
+    },
   ): Promise<void> {
     await ensureSchema();
     const now = new Date().toISOString();
+
+    // ── Build start / end ────────────────────────────────────────────────────────
+    // start.date is ALWAYS occurrenceDate so getEventsForGregorianDate (WHERE
+    // start_date = ?) can locate this override. isAllDay is derived from dateTime
+    // presence (null → all-day), not date presence — both can coexist on timed rows.
+    const isAllDay = overrides.allDay !== false;
+
+    let eventStart: CalendarEvent['start'];
+    let eventEnd: CalendarEvent['end'];
+
+    if (isAllDay || !overrides.startDateTime) {
+      // All-day override: date-only fields.
+      eventStart = { date: occurrenceDate };
+      eventEnd   = { date: occurrenceDate };
+    } else {
+      // Timed override: set both date (for day-keying) and dateTime.
+      eventStart = {
+        date: occurrenceDate,
+        dateTime: overrides.startDateTime,
+        timeZone: 'Asia/Jerusalem',
+      };
+      const endISO = overrides.endDateTime ?? overrides.startDateTime; // mirror start if no end
+      eventEnd = {
+        date: occurrenceDate,
+        dateTime: endISO,
+        timeZone: 'Asia/Jerusalem',
+      };
+    }
+
     const overrideEvent: CalendarEvent = {
       id: generateUUID(),
       summary: overrides.summary ?? '',
+      location: overrides.location ?? undefined,
       status: 'confirmed',
       created: now,
       updated: now,
       colorId: overrides.colorId ?? undefined,
-      start: overrides.startDateTime
-        ? { dateTime: overrides.startDateTime }
-        : { date: occurrenceDate },
-      end: overrides.startDateTime
-        ? { dateTime: overrides.startDateTime }
-        : { date: occurrenceDate },
+      start: eventStart,
+      end: eventEnd,
       reminders: overrides.reminderMinutes != null
         ? { useDefault: false, overrides: [{ method: 'popup', minutes: overrides.reminderMinutes }] }
         : { useDefault: false },
       hebrewExtensions: {
+        // Override rows are keyed only to the Gregorian date (occurrenceDate).
+        // Hebrew-calendar anchoring belongs to the master; overrides are one-off placements.
         calendarType: 'gregorian',
         recurrenceType: 'none',
-        category: 'personal',
+        category: overrides.category ?? 'personal',
         afterSunset: false,
         notificationScheduled: overrides.reminderMinutes != null,
         recurrenceId: masterId,
@@ -640,6 +690,23 @@ export class StorageService {
         : { useDefault: false },
       location: row.location ?? undefined,
     };
+  }
+
+  /**
+   * Returns a single CalendarEvent by its real UUID id, or null if not found /
+   * soft-cancelled.
+   *
+   * Primary use case: Wave 2 "edit all occurrences" — it has a composite instance
+   * id (masterId:YYYY-MM-DD) and needs to load the master row to recover its
+   * original anchor date (gregorianDateStr / hebrewDate) before calling saveNote.
+   *
+   * Does NOT filter on status so tombstone/exception rows can also be fetched if
+   * needed (though in practice edit-all will always target a master, not a child).
+   */
+  static async getEventById(id: string): Promise<CalendarEvent | null> {
+    await ensureSchema();
+    const row = await dbFirst(`SELECT * FROM events WHERE id = ?`, [id]);
+    return row ? StorageService.rowToEvent(row) : null;
   }
 
   static async getEventsWithReminders(): Promise<CalendarEvent[]> {

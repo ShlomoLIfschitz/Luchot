@@ -17,6 +17,8 @@ import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
 import { reverseGeocodeNominatim } from '../../utils/reverseGeocode';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useTimeOfDayPicker } from '../../hooks/useTimeOfDayPicker';
+import { splitInstanceId } from '../../utils/recurringId';
+import type { RecurrenceType, NoteCategory } from '../../schemas/EventSchema';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +75,15 @@ const DEFAULT_COLOR_FOR_TYPE: Record<NoteType, ColorTokenKey> = {
   yahrzeit:    'tagPersonal',
   anniversary: 'tagPersonal',
 };
+
+// Recurrence type options for the explicit picker (Task 1)
+const RECURRENCE_OPTIONS: { label: string; value: RecurrenceType }[] = [
+  { label: 'ללא חזרה', value: 'none' },
+  { label: 'יומי',     value: 'daily' },
+  { label: 'שבועי',    value: 'weekly' },
+  { label: 'חודשי',    value: 'monthly' },
+  { label: 'שנתי',     value: 'yearly' },
+];
 
 // ─── ColorPickerRow ───────────────────────────────────────────────────────────
 
@@ -163,14 +174,37 @@ interface Props {
     startTime?: Date | null;
     endTime?: Date | null;
     reminderTime?: Date | null;
+    // C3 explicit recurrence params
+    recurrenceType?: RecurrenceType;
+    recurrenceCalendar?: 'hebrew' | 'gregorian' | null;
   }) => void;
   onDelete?: (id: string) => void;
+  /** C3: thread from useNotes so the editor can write a tombstone for a single occurrence. */
+  onDeleteOccurrence?: (masterId: string, occurrenceDate: string) => void;
+  /** C3: thread from useNotes so the editor can write an override for a single occurrence. */
+  onSaveOccurrenceException?: (
+    masterId: string,
+    occurrenceDate: string,
+    overrides: {
+      summary?: string;
+      location?: string | null;
+      colorId?: string | null;
+      category?: NoteCategory;
+      allDay?: boolean;
+      startDateTime?: string | null;
+      endDateTime?: string | null;
+      reminderMinutes?: number | null;
+    },
+  ) => void;
   onClose: () => void;
 }
 
 // ─── NoteEditor ───────────────────────────────────────────────────────────────
 
-export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, onDelete, onClose }: Props) {
+export function NoteEditor({
+  visible, note, date, hebrewDate, colors,
+  onSave, onDelete, onDeleteOccurrence, onSaveOccurrenceException, onClose,
+}: Props) {
   // ── Settings (must be called before any early return — Rules of Hooks) ──────
   const use24hTime = useSettingsStore((s) => s.use24hTime);
 
@@ -189,6 +223,13 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   const locationInputRef = useRef<TextInput>(null);
   const [focusTarget, setFocusTarget] = useState<'summary' | 'location' | null>(null);
 
+  // ── C3 recurrence state (Task 1) ─────────────────────────────────────────────
+  // Explicit recurrence type — replaces old implicit birthday/yahrzeit => yearly behavior.
+  // Init from existing note when editing; 'none' for new notes.
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
+  // Calendar anchor — only meaningful for 'yearly'. Shown only when yearly is selected.
+  const [recurrenceCalendar, setRecurrenceCalendar] = useState<'hebrew' | 'gregorian'>('hebrew');
+
   // ── C2 time state ────────────────────────────────────────────────────────────
   // allDay: true = all-day event (legacy behavior). false = timed event.
   const [allDay, setAllDay] = useState(true);
@@ -198,9 +239,12 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   // reminderTime: user-picked clock time that anchors an all-day reminder.
   // Only used when allDay=true && reminderEnabled=true.
   const [reminderTime, setReminderTime] = useState<Date>(defaultStartTime);
-  // pendingSave: when true, we are waiting for the user to confirm a reminder time
-  // (allDay + reminder case) before actually calling onSave.
-  const [pendingSave, setPendingSave] = useState(false);
+  // pendingSaveTarget: non-null when we are waiting for the user to confirm a
+  // reminder time (allDay + reminder case) before calling onSave. It captures the
+  // RESOLVED save target ({id, date}) from doDirectSave so the deferred save uses
+  // the correct id/anchor — critical for the C3 "edit all" path, where id is the
+  // masterId and date is the series anchor (NOT the composite id / occurrence date).
+  const [pendingSaveTarget, setPendingSaveTarget] = useState<{ id?: string; date: Date } | null>(null);
 
   // Trigger flag for the deferred all-day+reminder save flow.
   // Declared before handleReminderTimeChange so the setter is in scope.
@@ -218,17 +262,16 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
   } = useTimeOfDayPicker(endTime ?? defaultStartTime(), useCallback((d: Date) => setEndTime(d), []), use24hTime);
 
   // Reminder time picker: when confirmed, store the picked time AND trigger the
-  // pending save (if pendingSave is true).
+  // pending save (if pendingSaveTarget is set).
   const handleReminderTimeChange = useCallback((d: Date) => {
     setReminderTime(d);
-    if (pendingSave) {
-      setPendingSave(false);
+    if (pendingSaveTarget) {
       // We do not call onSave here — the save is triggered by the effect below
-      // so React state has settled before we read it.
-      // Instead we set a flag that the effect will pick up.
+      // so React state has settled before we read it. The effect reads
+      // pendingSaveTarget for the correct id/anchor and clears it.
       setTriggerSaveWithReminderTime(d);
     }
-  }, [pendingSave]);
+  }, [pendingSaveTarget]);
 
   const {
     openPicker: openReminderTimePicker,
@@ -241,6 +284,10 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
     // Snapshot the time so we can clear the trigger immediately.
     const rTime = triggerSaveWithReminderTime;
     setTriggerSaveWithReminderTime(null);
+    // Resolved save target captured by doDirectSave (id + anchor). For edit-all
+    // this is the masterId + series anchor; for a normal save it's note?.id + date.
+    const target = pendingSaveTarget;
+    setPendingSaveTarget(null);
 
     const trimmed = summary.trim();
     if (!trimmed) return;
@@ -254,12 +301,12 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
     })();
 
     onSave({
-      id: note?.id,
+      id: target?.id,
       created: note?.created,
       summary: trimmed,
       noteType,
       calendarType,
-      date,
+      date: target?.date ?? date,
       hebrewDate,
       reminderMinutes: finalReminderMinutes,
       colorId,
@@ -268,8 +315,10 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       startTime: null,
       endTime: null,
       reminderTime: rTime,
+      recurrenceType,
+      recurrenceCalendar: recurrenceType === 'yearly' ? recurrenceCalendar : null,
     });
-    if (note?.id) {
+    if (target?.id) {
       setIsViewMode(true);
     } else {
       onClose();
@@ -292,8 +341,23 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       setColorId(note?.colorId ?? null);
       setLocation(note?.location ?? '');
       setIsViewMode(!!note);
-      setPendingSave(false);
+      setPendingSaveTarget(null);
       setTriggerSaveWithReminderTime(null);
+
+      // C3: init recurrence picker from existing note; default to 'none' for new notes.
+      const initRecurrenceType: RecurrenceType = note?.recurrenceType ?? 'none';
+      setRecurrenceType(initRecurrenceType);
+      // Init recurrence calendar:
+      //   - from existing note when editing
+      //   - for new notes: birthday/yahrzeit default to 'hebrew'; others default to 'gregorian'
+      if (note?.recurrenceCalendar) {
+        setRecurrenceCalendar(note.recurrenceCalendar);
+      } else {
+        const nt = note?.noteType ?? 'note';
+        setRecurrenceCalendar(
+          nt === 'birthday' || nt === 'yahrzeit' ? 'hebrew' : 'gregorian'
+        );
+      }
 
       // Time fields
       const isTimedNote = note ? !note.isAllDay : false;
@@ -314,36 +378,58 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
     }
   }, [isViewMode, focusTarget]);
 
-  // ── Save handler ─────────────────────────────────────────────────────────────
-  const handleSave = () => {
+  // ── C3: helper to compute finalReminderMinutes (used in multiple save paths) ─
+  const computeFinalReminderMinutes = (): number | null => {
+    if (!reminderEnabled) return null;
+    if (reminderMinutes === -1) {
+      const parsed = parseInt(customMinutes, 10);
+      return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    }
+    return reminderMinutes;
+  };
+
+  // ── C3: build ISO start/end strings for the occurrence-exception save path ───
+  // Returns { startISO, endISO } matching what the data layer expects.
+  const buildTimedISO = (): { startISO: string | null; endISO: string | null } => {
+    if (allDay) return { startISO: null, endISO: null };
+    const mergedStart = new Date(
+      date.getFullYear(), date.getMonth(), date.getDate(),
+      startTime.getHours(), startTime.getMinutes(), 0, 0,
+    );
+    const startISO = mergedStart.toISOString();
+    let endISO: string | null = null;
+    if (endTime) {
+      const mergedEnd = new Date(
+        date.getFullYear(), date.getMonth(), date.getDate(),
+        endTime.getHours(), endTime.getMinutes(), 0, 0,
+      );
+      endISO = mergedEnd.toISOString();
+    }
+    return { startISO, endISO };
+  };
+
+  // ── C3: perform the actual save (no dialog) — used by both direct and edit-all paths ──
+  const doDirectSave = (overrideId?: string, anchorDate?: Date) => {
     const trimmed = summary.trim();
     if (!trimmed) return;
+    const finalReminderMinutes = computeFinalReminderMinutes();
 
-    const finalReminderMinutes: number | null = (() => {
-      if (!reminderEnabled) return null;
-      if (reminderMinutes === -1) {
-        const parsed = parseInt(customMinutes, 10);
-        return isNaN(parsed) || parsed < 0 ? 0 : parsed;
-      }
-      return reminderMinutes;
-    })();
-
-    // All-day + reminder: must pick a clock time before saving.
-    // Do NOT silently default — the data layer has a defensive 09:00 fallback,
-    // but the UI contract is to always supply reminderTime for all-day reminders.
+    // All-day + reminder: must pick a clock time before saving. Capture the
+    // resolved save target so the deferred save uses the correct id/anchor
+    // (masterId + series anchor on the C3 edit-all path).
     if (allDay && reminderEnabled && finalReminderMinutes !== null) {
-      setPendingSave(true);
+      setPendingSaveTarget({ id: overrideId, date: anchorDate ?? date });
       openReminderTimePicker();
       return;
     }
 
     onSave({
-      id: note?.id,
+      id: overrideId,
       created: note?.created,
       summary: trimmed,
       noteType,
       calendarType,
-      date,
+      date: anchorDate ?? date,
       hebrewDate,
       reminderMinutes: finalReminderMinutes,
       colorId,
@@ -351,14 +437,120 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
       allDay,
       startTime: allDay ? null : startTime,
       endTime: allDay ? null : endTime,
-      // Timed events: data layer anchors reminder to startDateTime automatically.
-      // All-day without reminder: no reminderTime needed.
       reminderTime: undefined,
+      recurrenceType,
+      recurrenceCalendar: recurrenceType === 'yearly' ? recurrenceCalendar : null,
     });
     if (note?.id) {
       setIsViewMode(true);
     } else {
       onClose();
+    }
+  };
+
+  // ── Save handler ─────────────────────────────────────────────────────────────
+  const handleSave = () => {
+    const trimmed = summary.trim();
+    if (!trimmed) return;
+
+    // C3 Task 2: If editing an existing recurring instance, show choice dialog.
+    if (note) {
+      const { masterId, occurrenceDate } = splitInstanceId(note.id);
+      if (occurrenceDate !== null) {
+        // This is a recurring instance — show edit dialog.
+        Alert.alert(
+          'ערוך אירוע זה',
+          undefined,
+          [
+            { text: 'ביטול', style: 'cancel' },
+            {
+              text: 'לתאריך זה בלבד',
+              onPress: () => {
+                const finalReminderMinutes = computeFinalReminderMinutes();
+                const { startISO, endISO } = buildTimedISO();
+                onSaveOccurrenceException?.(masterId, occurrenceDate, {
+                  summary: trimmed,
+                  location: location.trim() || null,
+                  colorId,
+                  category: noteType as NoteCategory,
+                  allDay,
+                  startDateTime: startISO,
+                  endDateTime: endISO,
+                  reminderMinutes: finalReminderMinutes,
+                });
+                setIsViewMode(true);
+              },
+            },
+            {
+              text: 'לכל התאריכים',
+              onPress: () => {
+                // Use the MASTER's original anchor date (gregorianDateStr), NOT the
+                // displayed occurrence date prop — or the series shifts its anchor.
+                let anchorDate = date; // fallback
+                if (note.gregorianDateStr) {
+                  const [y, m, d2] = note.gregorianDateStr.split('-').map(Number);
+                  anchorDate = new Date(y, m - 1, d2);
+                }
+                doDirectSave(masterId, anchorDate);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    }
+
+    // New note or non-recurring existing note — save directly.
+    doDirectSave(note?.id, date);
+  };
+
+  // ── C3: delete handler (Task 3) ───────────────────────────────────────────────
+  const handleDeletePress = () => {
+    if (!note) return;
+    const { masterId, occurrenceDate } = splitInstanceId(note.id);
+
+    if (occurrenceDate !== null) {
+      // Recurring instance — show choice dialog.
+      Alert.alert(
+        'מחק אירוע זה',
+        undefined,
+        [
+          { text: 'ביטול', style: 'cancel' },
+          {
+            text: 'לתאריך זה בלבד',
+            style: 'destructive',
+            onPress: () => {
+              onDeleteOccurrence?.(masterId, occurrenceDate);
+              onClose();
+            },
+          },
+          {
+            text: 'לכל התאריכים',
+            style: 'destructive',
+            onPress: () => {
+              onDelete?.(masterId);
+              onClose();
+            },
+          },
+        ]
+      );
+    } else {
+      // Non-recurring — single confirm.
+      Alert.alert(
+        'מחק אירוע',
+        'האם למחוק את האירוע לצמיתות?',
+        [
+          { text: 'ביטול', style: 'cancel' },
+          {
+            text: 'מחק',
+            style: 'destructive',
+            onPress: () => {
+              onDelete?.(note.id);
+              onClose();
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -383,30 +575,13 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
 
   const hebDateLabel = `${toHebrewNumeral(hebrewDate.day)} ${hebrewDate.monthName} ${toHebrewYear(hebrewDate.year)}`;
   const gregDateLabel = date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' });
+  // isRecurring: used for the view-mode anchor display only (not to drive recurrence).
   const isRecurring = noteType !== 'note';
   const noteTypeInfo = NOTE_TYPES.find((t) => t.type === noteType);
 
   const enterEdit = (target: 'summary' | 'location' | null) => {
     setFocusTarget(target);
     setIsViewMode(false);
-  };
-
-  const handleDeletePress = () => {
-    Alert.alert(
-      'מחק אירוע',
-      'האם למחוק את האירוע לצמיתות?',
-      [
-        { text: 'ביטול', style: 'cancel' },
-        {
-          text: 'מחק',
-          style: 'destructive',
-          onPress: () => {
-            onDelete?.(note!.id);
-            onClose();
-          },
-        },
-      ]
-    );
   };
 
   return (
@@ -475,7 +650,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                       </Pressable>
                     )}
 
-                    {/* recurring anchor */}
+                    {/* recurring anchor (view mode) */}
                     {isRecurring && (
                       <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
                         <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
@@ -600,24 +775,52 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
                       colors={colors}
                     />
 
-                    {isRecurring && (
+                    {/* C3 Task 1: Explicit recurrence picker — shown for ALL note types */}
+                    <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>חזרה</Text>
+                    <View style={s.recurrenceRow}>
+                      {RECURRENCE_OPTIONS.map(({ label, value }) => {
+                        const active = recurrenceType === value;
+                        return (
+                          <Pressable
+                            key={value}
+                            onPress={() => setRecurrenceType(value)}
+                            style={[
+                              s.recurrenceChip,
+                              { borderColor: colors.border, backgroundColor: colors.background },
+                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                            ]}
+                            accessibilityLabel={label}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[s.recurrenceChipLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                              {label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {/* C3 Task 1: Calendar anchor chips — ONLY for yearly recurrence */}
+                    {recurrenceType === 'yearly' && (
                       <>
                         <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
                         <View style={s.anchorRow}>
                           {(['hebrew', 'gregorian'] as const).map((ct) => {
-                            const active = calendarType === ct;
+                            const active = recurrenceCalendar === ct;
                             return (
                               <Pressable
                                 key={ct}
-                                onPress={() => setCalendarType(ct)}
+                                onPress={() => setRecurrenceCalendar(ct)}
                                 style={[
                                   s.anchorChip,
                                   { borderColor: colors.border, backgroundColor: colors.background },
                                   active && { backgroundColor: colors.accent, borderColor: colors.accent },
                                 ]}
+                                accessibilityLabel={ct === 'hebrew' ? 'לפי לוח עברי' : 'לפי לוח לועזי'}
+                                accessibilityRole="button"
                               >
                                 <Text style={[s.anchorLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
-                                  {ct === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
+                                  {ct === 'hebrew' ? 'לפי לוח עברי' : 'לפי לוח לועזי'}
                                 </Text>
                               </Pressable>
                             );
@@ -823,6 +1026,24 @@ const s = StyleSheet.create({
   typeRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
   typeChip: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center', gap: 3 },
   typeLabel: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
+  // C3: recurrence chip row — wraps if needed (row-reverse + flexWrap)
+  recurrenceRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 16,
+  },
+  recurrenceChip: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  recurrenceChipLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // Calendar anchor chips (shown only for yearly)
   anchorRow: { gap: 8, marginBottom: 16 },
   anchorChip: { borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
   anchorLabel: { fontSize: 13, textAlign: 'center' },

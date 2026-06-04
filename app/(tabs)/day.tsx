@@ -103,7 +103,9 @@ export default function DayScreen() {
   //   1. Hour bucketing in the hourly grid (timed notes)
   //   2. NoteEditor for adding/editing from the grid
   // NoteList has its own internal useNotes — that's the existing pattern; not refactored here.
-  const { notes, saveNote } = useNotes(selectedDate);
+  // C3: also destructure deleteOccurrence + saveOccurrenceException so the grid NoteEditor
+  // can handle per-occurrence edit/delete dialogs on recurring timed events.
+  const { notes, saveNote, deleteNote, deleteOccurrence, saveOccurrenceException } = useNotes(selectedDate);
 
   // NoteEditor visibility — NoteEditor is Modal-based, not BottomSheet.
   // Controlled via visible boolean prop instead of a ref.
@@ -389,6 +391,9 @@ export default function DayScreen() {
             internally). saveNote (async → Promise<void>) is assignable to
             onSave (→ void) because void in callback position means the caller
             does not use the return value. */}
+        {/* C3: onDelete, onDeleteOccurrence, onSaveOccurrenceException wired so that
+            editing or deleting a recurring timed instance from the hourly grid
+            correctly shows the per-occurrence / all-series choice dialogs. */}
         <NoteEditor
           visible={editorVisible}
           note={gridEditNote}
@@ -397,6 +402,9 @@ export default function DayScreen() {
           colors={colors}
           onClose={closeNoteEditor}
           onSave={saveNote}
+          onDelete={deleteNote}
+          onDeleteOccurrence={deleteOccurrence}
+          onSaveOccurrenceException={saveOccurrenceException}
         />
 
         {/* Date picker — Phase 4.4; rendered outside ScrollView */}
