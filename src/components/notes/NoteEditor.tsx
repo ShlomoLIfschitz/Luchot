@@ -575,8 +575,6 @@ export function NoteEditor({
 
   const hebDateLabel = `${toHebrewNumeral(hebrewDate.day)} ${hebrewDate.monthName} ${toHebrewYear(hebrewDate.year)}`;
   const gregDateLabel = date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' });
-  // isRecurring: used for the view-mode anchor display only (not to drive recurrence).
-  const isRecurring = noteType !== 'note';
   const noteTypeInfo = NOTE_TYPES.find((t) => t.type === noteType);
 
   const enterEdit = (target: 'summary' | 'location' | null) => {
@@ -650,12 +648,15 @@ export function NoteEditor({
                       </Pressable>
                     )}
 
-                    {/* recurring anchor (view mode) */}
-                    {isRecurring && (
+                    {/* recurring anchor (view mode) — ONLY for yearly recurrence,
+                        keyed off the recurrence calendar (not noteType / calendarType).
+                        Bug fix: the old `isRecurring` gate both over-showed (non-yearly
+                        birthday/yahrzeit) and under-showed (yearly 'note'-type events). */}
+                    {recurrenceType === 'yearly' && recurrenceCalendar != null && (
                       <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
                         <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
                         <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
-                          {calendarType === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
+                          {recurrenceCalendar === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
                         </Text>
                       </Pressable>
                     )}

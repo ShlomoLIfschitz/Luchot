@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-06-05 — Session: Gal C — C3 follow-up bugfix (recurrence anchor gate)
+
+**Phase:** Phase 5 (Gal C, C3 follow-up bug fix)
+**Commits:** (this session) the NoteEditor anchor-gate fix + this docs note
+**Sub-agents:** none — single-file targeted fix applied directly by the orchestrator (exact change pre-diagnosed; cold sub-agent spawn for one gate is the expensive path).
+**Status:** Complete. DoD: typecheck 0 errors. JS-only — OTA pushed.
+
+### What was done
+
+- **`src/components/notes/NoteEditor.tsx` — view-mode recurrence anchor gate.** Root cause (both reported symptoms, one gate): the view-mode "עוגן תאריך" block was gated on `isRecurring` (`noteType !== 'note'`). That over-showed the calendar label for any birthday/yahrzeit/anniversary regardless of `recurrenceType` (reported "label shows for all events"), AND under-showed it for a plain `note`-type event set to yearly (`isRecurring` is false for `note`, reported "anchor chips don't appear for yearly"). It also read the legacy `calendarType` instead of `recurrenceCalendar`. Fix: gate on `recurrenceType === 'yearly' && recurrenceCalendar != null` and display `recurrenceCalendar`. Removed the now-orphaned `const isRecurring` (its sole consumer). The EDIT-mode anchor chips (gated on local `recurrenceType === 'yearly'`) were already correct — no change needed there.
+
+### Open issues / blocked
+
+- None new. C4 (notifications + renewal) remains the next Gal C session.
+
+### Next steps
+
+- On-device confirm: a yearly `note`-type event now shows its anchor in view mode; a birthday with non-yearly (or none) recurrence no longer shows the anchor; edit-mode עברי/לועזי chips appear when yearly.
+
+---
+
 ## 2026-06-05 — Session: Gal C — C3 recurrence UI + per-occurrence edit/delete
 
 **Phase:** Phase 5 (Gal C, session 3 of 4 — recurrence UI; C4 notifications + renewal follow)
