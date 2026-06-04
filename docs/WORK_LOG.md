@@ -6,6 +6,38 @@
 
 ---
 
+## 2026-06-04 — Session: swipe direction (RTL) + horizontal-only gesture constraint
+
+**Phase:** Phase 5 (navigation bug fixes — Session A of a 2-session split)
+**Commits:** 2c929d4 (layout.ts), 098fdee (5 gesture handlers) + this docs entry (3)
+**Sub-agents:** mobile-ui-builder (both tasks, one round, per Architect ownership assignment).
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+- **Task 1 — `src/constants/layout.ts` (mobile-ui-builder, new file).** Single source of truth for swipe-to-time direction: `SWIPE_RTL_FORWARD = true` + `swipeDirection(velocityX): 1 | -1`. RTL convention — swipe right (vx>0) = forward in time (+1). Future LTR language support flips exactly one flag (or wires it to the language setting). Satisfies the "swipe direction easy to flip from one place" architecture requirement.
+- **Task 2 — swipe direction fix + horizontal constraint on all 5 gesture handlers (mobile-ui-builder).** `MonthGrid.tsx`, `WeekGrid.tsx`, `app/(tabs)/day.tsx`, `app/(tabs)/zmanim.tsx`, `app/details.tsx`. Each: (a) imports `swipeDirection`; (b) gains an `onSwipe` JS callback (`useCallback((vx) => navigateXxx(swipeDirection(vx)))`); (c) the Pan gains `.activeOffsetX([-15,15]).failOffsetY([-15,15])` and the `.onEnd` worklet now calls `runOnJS(onSwipe)(e.velocityX)`. This (1) corrects the previously inverted mapping (was left→next/right→prev; now right→next/left→prev per the locked RTL rule) via the single `swipeDirection` source, and (2) restricts activation to horizontal so vertical gestures pass through to the ScrollView (Bug 2 + Bug 3 from the navigation diagnosis). `swipeDirection` is called inside the JS callback, never inside the worklet — preserves the locked runOnJS-not-direct-Zustand pattern.
+
+### Decisions made
+
+- None new. Implements the locked direction rule (swipe right = forward in time) and the "single-source RTL constant" architecture requirement.
+
+### Open issues / blocked
+
+- **Bug 1 (Hebrew-month navigation skips months) — deferred to Session B.** It's the heavier, architectural fix: `DateService.getHebrewMonthData` + a Hebrew cursor in CalendarProvider (HDate month arithmetic, Adar I/II + Tishrei rollover), then MonthGrid wiring. Diagnosed and planned; not yet implemented. Open question for that session: whether navigating the Hebrew month leaves `selectedDate` put (recommended) — confirm with Architect.
+- **Header chevrons** (`‹` → navigateMonth(1), `›` → navigateMonth(-1)) are separate from swipe and were left unchanged; worth an on-device consistency check that arrows and the corrected swipe agree.
+
+### Deviations
+
+- Added a 3rd commit (this WORK_LOG entry) beyond the Architect's 2-commit strategy, per CLAUDE.md end-of-session state discipline. Code commits match the spec exactly.
+
+### Next steps
+
+- On-device confirm (see session report checklist): swipe right = next, swipe left = previous on all 5 screens; vertical swipes scroll (or no-op on the calendar tabs) instead of changing month/day.
+- Session B: Bug 1 Hebrew-month navigation.
+
+---
+
 ## 2026-06-04 — Session: swipe-crash fix + hebrewOnTop toggle + GPS Nominatim
 
 **Phase:** Phase 5 (bug fixes + the first network exception)
