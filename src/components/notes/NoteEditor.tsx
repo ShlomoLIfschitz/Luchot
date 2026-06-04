@@ -15,6 +15,30 @@ import type { HebrewDateInfo } from '../../services/DateService';
 import { toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
 
+async function reverseGeocodeNominatim(lat: number, lng: number): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=he`,
+      { headers: { 'User-Agent': 'Luchot-App/1.0' }, signal: controller.signal }
+    );
+    clearTimeout(timer);
+    if (!res.ok) return '';
+    const data = await res.json();
+    const a = data.address ?? {};
+    const parts = [
+      a.amenity ?? a.shop ?? a.tourism,
+      a.road,
+      a.suburb ?? a.neighbourhood,
+      a.city ?? a.town ?? a.village ?? a.county,
+    ].filter(Boolean);
+    return parts.join(', ');
+  } catch {
+    return '';
+  }
+}
+
 const LEAD_TIME_OPTIONS: { label: string; minutes: number }[] = [
   { label: 'בזמן האירוע', minutes: 0 },
   { label: '10 דקות לפני', minutes: 10 },
@@ -207,35 +231,7 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      console.log('[GPS] coords:', JSON.stringify(pos.coords)); // TEMP DIAGNOSTIC
-
-      // Reverse geocode is best-effort: the Android platform Geocoder can
-      // return [] (or null street/city) WITHOUT throwing, which previously
-      // left the field silently blank. Isolate it so a geocoder miss falls
-      // back to raw coordinates instead of producing an empty result.
-      let label = '';
-      try {
-        const results = await Location.reverseGeocodeAsync({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-        console.log('[GPS] reverseGeocode results:', JSON.stringify(results)); // TEMP DIAGNOSTIC
-        if (results.length > 0) {
-          const r = results[0];
-          const parts = [r.name, r.street, r.city ?? r.district ?? r.subregion ?? r.region]
-            .filter((p): p is string => Boolean(p));
-          if (parts.length > 0) {
-            label = parts.join(', ');
-          }
-        }
-      } catch (e) {
-        // Geocoder backend unavailable — fall through to coordinates.
-        console.log('[GPS] reverseGeocode threw:', e instanceof Error ? e.message : String(e)); // TEMP DIAGNOSTIC
-      }
-
-      if (!label) {
-        label = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-      }
+      const label = await reverseGeocodeNominatim(pos.coords.latitude, pos.coords.longitude);
       setLocation(label);
     } catch {
       Alert.alert('לא ניתן לקבל מיקום');
