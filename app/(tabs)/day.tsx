@@ -113,48 +113,54 @@ export default function DayScreen() {
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
         <ScreenHeader date={selectedDate} onDatePress={openPicker} />
+        {/* Date header — fixed above the scroll, always visible */}
+        <View style={styles.header}>
+          <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
+            {hebrewFormatted}
+          </Text>
+          <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
+            {gregFormatted}
+          </Text>
+        </View>
+
+        {/* Tab bar — fixed below the date header, always visible while scrolling.
+            Rendered OUTSIDE the ScrollView on purpose: a stickyHeaderIndices child
+            is re-parented into an internal Animated.View wrapper that, in this
+            RTL + nested-flex case, never gave the row a stable full-width context,
+            so the two tabs collapsed and stacked. As a normal flex-row child of the
+            root column it lays out reliably, and sitting outside the scroll viewport
+            keeps it permanently visible (functionally sticky). */}
+        <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+          {/* RTL: 'אירועים' first in JSX → renders on the right */}
+          <Pressable
+            onPress={() => setActiveTab('events')}
+            style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+            accessibilityRole="tab"
+            accessibilityLabel="אירועים"
+          >
+            <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
+              אירועים
+            </Text>
+          </Pressable>
+          {/* 'תורה וזמנים' second in JSX → renders on the left */}
+          <Pressable
+            onPress={() => setActiveTab('torah')}
+            style={[styles.tabItem, activeTab === 'torah' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+            accessibilityRole="tab"
+            accessibilityLabel="תורה וזמנים"
+          >
+            <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
+              תורה וזמנים
+            </Text>
+          </Pressable>
+        </View>
+
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          stickyHeaderIndices={[1]}
         >
-          {/* index 0 — date header */}
-          <View style={styles.header}>
-            <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-              {hebrewFormatted}
-            </Text>
-            <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-              {gregFormatted}
-            </Text>
-          </View>
-
-          {/* index 1 — tab bar (sticky) */}
-          <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-            {/* RTL: 'אירועים' first in JSX → renders on the right */}
-            <Pressable
-              onPress={() => setActiveTab('events')}
-              style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-              accessibilityRole="tab"
-              accessibilityLabel="אירועים"
-            >
-              <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
-                אירועים
-              </Text>
-            </Pressable>
-            {/* 'תורה וזמנים' second in JSX → renders on the left */}
-            <Pressable
-              onPress={() => setActiveTab('torah')}
-              style={[styles.tabItem, activeTab === 'torah' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-              accessibilityRole="tab"
-              accessibilityLabel="תורה וזמנים"
-            >
-              <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
-                תורה וזמנים
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* index 2 — single wrapper for active tab content */}
+          {/* active tab content */}
           <View>
             {activeTab === 'events' ? (
               <>
@@ -312,10 +318,11 @@ function DetailRow({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100 },
 
-  // Header
-  header: { alignItems: 'center', marginBottom: 16 },
+  // Header (fixed above the scroll)
+  header: { alignItems: 'center', paddingTop: 16, marginBottom: 12 },
   hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
   gregDate: { fontSize: 14, marginTop: 4, textAlign: 'center' },
 
