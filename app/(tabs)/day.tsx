@@ -22,10 +22,12 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
+import { useLocationStore } from '../../src/providers/LocationProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
 import { useNotes, type CalendarNote } from '../../src/hooks/useNotes';
 import { ZmanimList } from '../../src/components/zmanim/ZmanimList';
+import { ShabbatCard } from '../../src/components/zmanim/ShabbatCard';
 import { NoteEditor } from '../../src/components/notes/NoteEditor';
 import { NoteList } from '../../src/components/notes/NoteList';
 import {
@@ -34,7 +36,10 @@ import {
   toHebrewYear,
   type DayData,
 } from '../../src/services/DateService';
+import { getZmanim } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
+import { findCityByKey } from '../../src/constants/cities';
+import { findNearestCity } from '../../src/utils/locationLookup';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
 import { swipeDirection } from '../../src/constants/layout';
@@ -46,6 +51,12 @@ export default function DayScreen() {
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
+  const use24hTime = useSettingsStore((s) => s.use24hTime);
+  const candleLightingPlaceName = useSettingsStore((s) => s.candleLightingPlaceName);
+  const candleLightingCity = useSettingsStore((s) => s.candleLightingCity);
+  const candleLightingLat = useSettingsStore((s) => s.candleLightingLat);
+  const candleLightingLng = useSettingsStore((s) => s.candleLightingLng);
+  const { cityHebcalKey, latitude: locationLat, longitude: locationLng } = useLocationStore();
 
   // Derive DayData for the selected date — month is cached, so cheap.
   const dayData = useMemo<DayData>(
@@ -54,6 +65,35 @@ export default function DayScreen() {
   );
 
   const zmanim = useZmanim(selectedDate);
+
+  // Resolved location name for ShabbatCard — first non-null wins:
+  // 1. candleLightingPlaceName (GPS reverse-geocoded name from settings)
+  // 2. candleLightingCity key → Hebrew city name from curated list
+  // 3. location-store city key → Hebrew city name (or nearest city fallback)
+  // 4. null (card renders without location row)
+  const resolvedLocationName = useMemo<string | null>(() => {
+    if (candleLightingPlaceName) return candleLightingPlaceName;
+    if (candleLightingCity) {
+      const entry = findCityByKey(candleLightingCity);
+      if (entry) return entry.nameHe;
+    }
+    if (cityHebcalKey) {
+      const entry = findCityByKey(cityHebcalKey);
+      if (entry) return entry.nameHe;
+    }
+    const { city } = findNearestCity(locationLat, locationLng);
+    return city.nameHe;
+  }, [candleLightingPlaceName, candleLightingCity, cityHebcalKey, locationLat, locationLng]);
+
+  // Zmanim for ShabbatCard — use candle-lighting GPS coords when available,
+  // fall back to the existing location-store zmanim otherwise.
+  const cardZmanim = useMemo(
+    () =>
+      candleLightingLat !== null && candleLightingLng !== null
+        ? getZmanim(selectedDate, candleLightingLat, candleLightingLng)
+        : zmanim,
+    [selectedDate.getTime(), candleLightingLat, candleLightingLng, zmanim],
+  );
 
   // Date picker — Phase 4.4
   const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
@@ -182,6 +222,16 @@ export default function DayScreen() {
               </>
             ) : (
               <>
+                {/* Shabbat Card — returns null on non-Fri/Sat days */}
+                <ShabbatCard
+                  selectedDate={selectedDate}
+                  candleLightingTime={cardZmanim.candleLighting}
+                  tzaisTime={cardZmanim.tzeitHakochavim}
+                  rabbeinuTamTime={cardZmanim.tzeitRabbeinu}
+                  locationName={resolvedLocationName}
+                  use24h={use24hTime}
+                />
+
                 {/* Holiday Banner */}
                 {isHoliday && primaryHoliday && (
                   <View style={[styles.holidayBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
