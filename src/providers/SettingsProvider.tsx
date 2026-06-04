@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import type { ZmanimMethod } from '../services/ZmanimService';
+import { isIsraelCoords } from '../utils/isIsraelCoords';
 
 // Re-export so existing consumers that import ZmanimMethod from SettingsProvider
 // continue to work without changes.
@@ -43,6 +44,9 @@ interface SettingsState {
   candleLightingRemindersEnabled: boolean;
   candleLightingLeadMinutes: number;
   candleLightingCity: string | null;
+  candleLightingLat: number | null;
+  candleLightingLng: number | null;
+  candleLightingPlaceName: string | null;
 
   // Ready gate — false until loadFromStorage() completes
   settingsReady: boolean;
@@ -59,8 +63,28 @@ interface SettingsState {
   setCandleLightingRemindersEnabled: (v: boolean) => void;
   setCandleLightingLeadMinutes: (m: number) => void;
   setCandleLightingCity: (c: string | null) => void;
+  setCandleLightingLocation: (lat: number, lng: number, placeName: string) => void;
   loadFromStorage: () => Promise<void>;
   save: (key: string, value: string) => Promise<void>;
+}
+
+/**
+ * Builds the coordinate override for ensureCandleLightingReminders from the
+ * current GPS settings, or undefined when no GPS location is stored. Without
+ * this, a GPS-only user (candleLightingCity === null) who toggles the reminder
+ * or changes lead-minutes would re-enter the city-key path with a null city —
+ * cancelling their reminders and rescheduling nothing.
+ */
+function buildCandleOverride(
+  s: Pick<SettingsState, 'candleLightingLat' | 'candleLightingLng' | 'candleLightingPlaceName'>,
+): { lat: number; lng: number; placeName: string; il: boolean } | undefined {
+  if (s.candleLightingLat == null || s.candleLightingLng == null) return undefined;
+  return {
+    lat: s.candleLightingLat,
+    lng: s.candleLightingLng,
+    placeName: s.candleLightingPlaceName ?? '',
+    il: isIsraelCoords(s.candleLightingLat, s.candleLightingLng),
+  };
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -77,6 +101,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   candleLightingRemindersEnabled: false,
   candleLightingLeadMinutes: 15,
   candleLightingCity: null,
+  candleLightingLat: null,
+  candleLightingLng: null,
+  candleLightingPlaceName: null,
 
   toggleHebrewOnTop: () => { const v = !get().hebrewOnTop; set({ hebrewOnTop: v }); get().save('hebrewOnTop', String(v)); },
   setDarkMode:          (m) => { set({ darkMode: m });          get().save('darkMode', m); },
@@ -98,19 +125,45 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ candleLightingRemindersEnabled: v });
     get().save('candleLightingRemindersEnabled', String(v));
     const { candleLightingLeadMinutes, candleLightingCity } = get();
-    void NotificationService.ensureCandleLightingReminders(v, candleLightingLeadMinutes, candleLightingCity);
+    void NotificationService.ensureCandleLightingReminders(
+      v,
+      candleLightingLeadMinutes,
+      candleLightingCity,
+      buildCandleOverride(get()),
+    );
   },
   setCandleLightingLeadMinutes: (m) => {
     set({ candleLightingLeadMinutes: m });
     get().save('candleLightingLeadMinutes', String(m));
     const { candleLightingRemindersEnabled, candleLightingCity } = get();
-    void NotificationService.ensureCandleLightingReminders(candleLightingRemindersEnabled, m, candleLightingCity);
+    void NotificationService.ensureCandleLightingReminders(
+      candleLightingRemindersEnabled,
+      m,
+      candleLightingCity,
+      buildCandleOverride(get()),
+    );
   },
   setCandleLightingCity: (c) => {
-    set({ candleLightingCity: c });
+    set({ candleLightingCity: c, candleLightingLat: null, candleLightingLng: null, candleLightingPlaceName: null });
     get().save('candleLightingCity', c ?? '');
+    get().save('candleLightingLat', '');
+    get().save('candleLightingLng', '');
+    get().save('candleLightingPlaceName', '');
     const { candleLightingRemindersEnabled, candleLightingLeadMinutes } = get();
-    void NotificationService.ensureCandleLightingReminders(candleLightingRemindersEnabled, candleLightingLeadMinutes, c);
+    void NotificationService.ensureCandleLightingReminders(candleLightingRemindersEnabled, candleLightingLeadMinutes, c, undefined);
+  },
+  setCandleLightingLocation: (lat, lng, placeName) => {
+    set({ candleLightingLat: lat, candleLightingLng: lng, candleLightingPlaceName: placeName });
+    get().save('candleLightingLat', String(lat));
+    get().save('candleLightingLng', String(lng));
+    get().save('candleLightingPlaceName', placeName);
+    const { candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity } = get();
+    void NotificationService.ensureCandleLightingReminders(
+      candleLightingRemindersEnabled,
+      candleLightingLeadMinutes,
+      candleLightingCity,
+      { lat, lng, placeName, il: isIsraelCoords(lat, lng) },
+    );
   },
 
   loadFromStorage: async () => {
@@ -135,6 +188,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         candleLightingRemindersEnabled: (p.candleLightingRemindersEnabled ?? 'false') === 'true',
         candleLightingLeadMinutes: parseInt(p.candleLightingLeadMinutes ?? '15', 10) || 15,
         candleLightingCity:  p.candleLightingCity || null,
+        candleLightingLat:   p.candleLightingLat ? parseFloat(p.candleLightingLat) : null,
+        candleLightingLng:   p.candleLightingLng ? parseFloat(p.candleLightingLng) : null,
+        candleLightingPlaceName: p.candleLightingPlaceName || null,
       });
     } catch (e) {
       console.error('[SettingsProvider] loadFromStorage failed:', e);
