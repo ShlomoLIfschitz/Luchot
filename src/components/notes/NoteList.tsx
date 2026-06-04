@@ -75,25 +75,28 @@ export function NoteList({ date, hebrewDate, hideAddButton }: Props) {
         <Text style={[s.empty, { color: colors.textTertiary }]}>אין הערות ליום זה</Text>
       ) : (
         notes.map((note) => (
-          <Pressable
-            key={note.id}
-            onPress={() => openEdit(note)}
-            style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-          >
-            {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
-            <View style={s.noteBody}>
-              <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
-              {note.recurring && (
-                <Text style={[s.noteTag, { color: colors.textTertiary }]}>
-                  {note.calendarType === 'hebrew' ? '↺ עברי' : '↺ לועזי'}
-                </Text>
-              )}
-            </View>
-            <Pressable onPress={() => confirmDelete(note)} hitSlop={10} style={s.deleteBtn}>
-              <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
-            </Pressable>
+          <View key={note.id} style={s.noteRowWrapper}>
+            {/* bar — JSX-first = renders on RIGHT, outside the capsule */}
             <View style={[s.colorBar, { backgroundColor: resolveHexColor(note) }]} />
-          </Pressable>
+            {/* capsule — JSX-second = renders on LEFT */}
+            <Pressable
+              onPress={() => openEdit(note)}
+              style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
+              <View style={s.noteBody}>
+                <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
+                {note.recurring && (
+                  <Text style={[s.noteTag, { color: colors.textTertiary }]}>
+                    {note.calendarType === 'hebrew' ? '↺ עברי' : '↺ לועזי'}
+                  </Text>
+                )}
+              </View>
+              <Pressable onPress={() => confirmDelete(note)} hitSlop={10} style={s.deleteBtn}>
+                <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
+              </Pressable>
+            </Pressable>
+          </View>
         ))
       )}
 
@@ -167,10 +170,17 @@ const s = StyleSheet.create({
   addBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   addBtnText: { fontSize: 13, fontWeight: '600' },
   empty: { fontSize: 13, textAlign: 'right', paddingVertical: 8 },
+  noteRowWrapper: {
+    flexDirection: 'row-reverse',
+    alignItems: 'stretch',
+    gap: 4,
+    marginBottom: 8,
+  },
   noteRow: {
+    flex: 1,
     flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
     paddingHorizontal: 12, paddingVertical: 10,
-    borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8,
+    borderRadius: 10, borderWidth: StyleSheet.hairlineWidth,
   },
   noteBody: { flex: 1 },
   noteSummary: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
@@ -181,7 +191,6 @@ const s = StyleSheet.create({
     width: 4,
     alignSelf: 'stretch',
     borderRadius: 2,
-    marginRight: 8,
   },
   colorModalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   colorModalSheet: { borderRadius: 16, padding: 20, elevation: 8 },
