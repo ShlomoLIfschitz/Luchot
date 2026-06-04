@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-06-04 — Session: follow-up — tab bar layout + GPS label priority
+
+**Phase:** Phase 5 (UX polish)
+**Commits:** 1ed3f0e, ca058f4 (2) + this docs entry
+**Sub-agents:** mobile-ui-builder (both UI edits, 1 round, per orchestrator authorization)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+- **Tab bar layout (mobile-ui-builder)** [1ed3f0e] — `app/(tabs)/day.tsx`: the two tabs were stacking instead of side by side. Right-aligned the `row-reverse` tab group (`alignSelf: 'flex-end'`), replaced `flex: 1` tabs with compact padding (`paddingHorizontal: 16, paddingVertical: 8`), and moved the active indicator from a separate `tabUnderline` View to a 2px `colors.accent` bottom-border on the active tab Pressable itself. Removed the `tabUnderline` style.
+- **GPS address label (mobile-ui-builder)** [ca058f4] — `src/components/notes/NoteEditor.tsx` `handleGPS`: changed only the label-building logic to `[name, street, locality]` where `locality = city || district || subregion || region`, joined with ', '. Coordinate fallback (results empty / label empty) and the try/catch flow unchanged.
+
+### Decisions made
+
+- None new — both implement the locked follow-up spec from the Architect.
+
+### Open issues / blocked
+
+- Watch on device: with `alignSelf: 'flex-end'`, the sticky tab bar's background + bottom border now span only the (right-aligned) tab group width, not the full screen width. This is per spec; confirm scrolled content doesn't visibly bleed through to the left of the tab group when the bar is stuck.
+
+### Next steps
+
+- On-device confirm the two fixes (see verification checklist in the session report).
+
+---
+
 ## 2026-06-04 — Session: Day screen tabs + view modal fixes + colored bars + GPS
 
 **Phase:** Phase 5 (UX redesign + bug fixes)
