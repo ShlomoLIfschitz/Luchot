@@ -6,6 +6,38 @@
 
 ---
 
+## 2026-06-04 — Session: Shabbat card in the Day "תורה וזמנים" tab
+
+**Phase:** Phase 5 (Feature 2 of the GPS/Shabbat-card pair — completes the pair)
+**Commits:** ae77c32 (extract reverseGeocode util), 81f5e81 (ShabbatCard component), 99539d7 (wire into day.tsx) + this docs entry (4)
+**Sub-agents:** mobile-ui-builder (all 3 steps, one round — single owner, interdependent). Orchestrator: caught + fixed a Rules-of-Hooks violation, ran the DoD gate, committed, pushed OTA.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline, no new deps). OTA pushed.
+
+### What was done
+
+- **Step 1 — extract reverseGeocode util (mobile-ui-builder).** Moved `reverseGeocodeNominatim(lat,lng)` verbatim out of `NoteEditor.tsx` into new `src/utils/reverseGeocode.ts` (one auditable network call, reusable). NoteEditor now imports it; behavior byte-for-byte unchanged.
+- **Step 2 — ShabbatCard component (mobile-ui-builder, new file `src/components/zmanim/ShabbatCard.tsx`).** Renders only on Friday (`getDay()===5`: location + הדלקת נרות) and Saturday (`getDay()===6`: location + צאת השבת + ר״ת); returns null otherwise. Pure presentation — all zmanim/location arrive as props, **no network call, no useEffect**. RTL `row-reverse` + explicit `gap`, title `colors.tagShabbat` (token confirmed present in light `#6A4FB8` / dark `#9C82DC`), `colors.surface`/`radius.lg`/hairline border, tokens only. Times via `formatZmanTime` (null → '—' placeholder).
+- **Step 3 — wire into day.tsx (mobile-ui-builder).** Inserted `<ShabbatCard>` as the FIRST child of the torah tab fragment, above the holiday banner. `resolvedLocationName` memo (first-non-null waterfall: `candleLightingPlaceName` → `candleLightingCity`→findCityByKey → location-store `cityHebcalKey`→findCityByKey → `findNearestCity` nearest). `cardZmanim` memo computes from the Settings candle-lighting coords (`getZmanim(selectedDate, candleLightingLat, candleLightingLng)`) when both are set, else falls back to the existing `useZmanim` result. Both memoized; existing `useZmanim`/`ZmanimList` usage untouched.
+
+### Decisions made
+
+- None new architecturally. Implements the locked session decisions (card location name from Settings offline — no auto-Nominatim; card zmanim from Settings candle-lighting coords for name/time consistency, with useLocationStore fallback; tzais = tzeitHakochavim 8.5°, ר״ת = tzeitRabbeinu/getTzais72; Fri/Sat only; RTL row-reverse + tokens).
+
+### Orchestrator fix (caught at the integration gate)
+
+- **Rules-of-Hooks violation in ShabbatCard.** The agent placed `useThemeColors()` AFTER the `if (day!==5 && day!==6) return null` guard, so the hook ran conditionally — on weekdays the component returned before calling it. Navigating Fri→weekday would crash with "rendered fewer hooks than expected." typecheck/expo-doctor cannot catch this (runtime/lint rule). This is the exact class LOCKED in DECISIONS.md (2026-06-01, "Drawer.tsx: all hook calls before any early return"). Moved `useThemeColors()` above the guard + added a comment citing the decision. Applied directly by the orchestrator (SendMessage to the warm agent is unavailable; a cold re-spawn for a one-hook reorder is the expensive path — consistent with the established small-fix precedent). typecheck re-verified 0 errors after.
+
+### Open issues / blocked
+
+- None. The GPS-in-Settings + Shabbat-card pair (Features 1 & 2) is complete.
+
+### Next steps
+
+- **On-device verification (this feature):** see the session report checklist — confirm the card shows on Fri (candle lighting) and Sat (tzais + ר״ת), is absent on weekdays, location row hidden when no name resolves, and the card's candle-lighting time matches Settings when GPS coords are set.
+- Remaining backlog: Gal C — event time + recurrence (SQLite migration), a separate future session.
+
+---
+
 ## 2026-06-04 — Session: GPS in Settings — Nominatim city + exact coords for candle lighting
 
 **Phase:** Phase 5 (Feature 1 of the GPS/Shabbat-card pair; Feature 2 deferred to next session)
