@@ -340,3 +340,29 @@
   masks an underlying load failure rather than fixing it; a persistent "settings
   revert" symptom means loadFromStorage is failing/hanging, not that the gate is
   wrong (see the runExclusive single-flight decision).
+
+## Nominatim reverse-geocoding — the single permitted network exception
+- Date: 2026-06-04
+- Context: `expo-location`'s `reverseGeocodeAsync` is broken on Android SDK 50+
+  (upstream NullPointerException in `getCountryCode`), so the GPS buttons in
+  NoteEditor and Settings could not turn coordinates into a human-readable
+  address. Every other geocoding path is either broken or unavailable offline.
+- Choice: A single user-triggered HTTP call to nominatim.openstreetmap.org
+  (OpenStreetMap reverse geocoding) is permitted ONLY when the user explicitly
+  taps the GPS button in NoteEditor or in Settings. The call fires only on that
+  explicit action (never automatic), sends only the coordinates (no other
+  personal data), has a 5-second timeout, and fails silently with a graceful
+  fallback (empty/editable field in NoteEditor; keep current city in Settings).
+  Request carries `User-Agent: Luchot-App/1.0` per Nominatim usage policy.
+  This is the ONLY network exception to the offline-first principle.
+- Alternatives considered: `reverseGeocodeAsync` (broken upstream — rejected);
+  bundling an offline geocoder dataset (heavy, no new deps allowed — rejected);
+  staying coordinates-only with no address (rejected — user explicitly wants a
+  readable location). A backend/proxy was rejected — it would reopen the
+  "no backend ever" decision; a direct user-triggered fetch does not, the same
+  way the .ics file decision did not.
+- Implications: This narrows, but does not revoke, "offline-first, no backend
+  ever" — there is still no backend, no account, no background/automatic network
+  traffic, and the app remains fully functional offline (the call degrades to a
+  silent no-op). Any FUTURE network call requires its own explicitly-reopened
+  decision; this exception is scoped to user-triggered reverse-geocoding only.

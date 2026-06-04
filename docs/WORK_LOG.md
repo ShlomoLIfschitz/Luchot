@@ -6,6 +6,39 @@
 
 ---
 
+## 2026-06-04 — Session: swipe-crash fix + hebrewOnTop toggle + GPS Nominatim
+
+**Phase:** Phase 5 (bug fixes + the first network exception)
+**Commits:** (this session) swipe/hebrewOnTop fix, NoteEditor Nominatim, docs (3 — see deviation re: commit count)
+**Sub-agents:** mobile-ui-builder (all code edits across Tasks 1–3, one round, per orchestrator authorization + Architect ownership assignment).
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+- **Task 1 — swipe-gesture crash fix (mobile-ui-builder).** Five `Gesture.Pan().onEnd()` worklet callbacks called Zustand setters directly without `runOnJS` — the exact pattern locked-forbidden in DECISIONS.md (2026-06-01, "Reanimated worklet callbacks must never call Zustand store actions directly"). Wrapped each, mirroring the Drawer.tsx `runOnJS(triggerClose)` pattern: `app/(tabs)/day.tsx`, `app/(tabs)/zmanim.tsx`, `app/details.tsx` (all `runOnJS(navigateDay)(dir)`), `src/components/calendar/MonthGrid.tsx` (`runOnJS(navigateMonth)(dir)`), `src/components/calendar/WeekGrid.tsx` (extracted the inline `setSelectedDate` body into a `navigateWeek(direction)` useCallback, then `runOnJS(navigateWeek)(dir)`). `runOnJS` imported from `react-native-reanimated` in each. Mechanical only — no other gesture logic changed. **This was the highest-priority item (confirmed hard crash on device).**
+- **Task 2 — hebrewOnTop toggle now visible (mobile-ui-builder).** Root cause (diagnosed prior session): the "עברית למעלה" setting only drove the small `ScreenHeader` two-line date (and the Week screen); but `day.tsx`, `zmanim.tsx`, and `details.tsx` each render a *second, prominent, hardcoded* big date header below ScreenHeader that always showed Hebrew-large-on-top, masking the setting. Fix: each of the three now reads `hebrewOnTop` from the settings store and swaps which date string is the large (primary) vs small (secondary) line. ScreenHeader untouched (already correct).
+- **Task 3 — NoteEditor GPS → Nominatim (mobile-ui-builder).** `src/components/notes/NoteEditor.tsx`: removed the 3 TEMP DIAGNOSTIC `[GPS]` console.logs (commit 1b9090b) and the entire broken `reverseGeocodeAsync` try/catch + raw-coordinate fallback. Added module-level `reverseGeocodeNominatim(lat, lng)`: 5s `AbortController` timeout, `User-Agent: Luchot-App/1.0`, builds a Hebrew label from `address` tiers (amenity/shop/tourism → road → suburb/neighbourhood → city/town/village/county), returns `''` on any error/timeout/non-200. `handleGPS` now `setLocation(label)` — empty label leaves the field blank and editable, no Alert. Permission flow + `getCurrentPositionAsync` + `import * as Location` unchanged.
+
+### Decisions made
+
+- **DECISIONS.md (orchestrator):** logged the Nominatim reverse-geocoding exception (2026-06-04) — the single permitted network call (user-triggered GPS tap only, 5s timeout, silent fallback, no automatic calls). Explicitly authorized by the user; narrows but does not revoke "offline-first, no backend ever" (still no backend, no account, no background traffic; app fully functional offline). This is the ONLY network exception; any future network call needs its own reopened decision.
+
+### Open issues / blocked
+
+- **Date-display redundancy (future cleanup, do NOT fix now):** day/zmanim/details each show the date *twice* — once in `ScreenHeader` (small, already hebrewOnTop-aware) and once in the big hardcoded header (now also hebrewOnTop-aware after this session). Flagged by the Architect as a future cleanup candidate (drop the big header and rely on ScreenHeader, a UX decision beyond this session's scope).
+- **Candle-lighting GPS + exact-coordinate storage (Nominatim in Settings)** remains open — deferred to a follow-up session (it's the heavier, schema-touching task: 3 new persisted SettingsProvider fields + NotificationService override + settings.tsx UI). The Nominatim exception logged this session already covers it.
+
+### Deviations
+
+- **3 commits instead of the Architect's 4.** The specified commit 1 (runOnJS) and commit 2 (hebrewOnTop) both edit `day.tsx`, `zmanim.tsx`, and `details.tsx` with interleaved hunks. Clean per-commit separation would need interactive `git add -p` (unavailable in this environment) or a revert-and-reapply dance on verified-working code (riskier). Merged into one commit covering both fixes; NoteEditor and docs remain their own commits as specified.
+
+### Next steps
+
+- On-device confirm (see session report checklist): swipe no longer crashes on all 5 screens; toggling "עברית למעלה" visibly flips the big date header on Day/Zmanim/Details; NoteEditor GPS fills a Hebrew address (or stays blank, never raw coords) and never crashes.
+- Follow-up session: candle-lighting GPS + exact-coordinate storage (the deferred half of the GPS work).
+
+---
+
 ## 2026-06-04 — Session: follow-up #3 — tab bar STRUCTURAL fix + GPS diagnostics
 
 **Phase:** Phase 5 (bug fix + diagnostics)
