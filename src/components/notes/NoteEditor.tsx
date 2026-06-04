@@ -188,15 +188,31 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const results = await Location.reverseGeocodeAsync({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      });
-      if (results.length > 0) {
-        const r = results[0];
-        const parts = [r.street, r.city].filter(Boolean);
-        setLocation(parts.join(', '));
+
+      // Reverse geocode is best-effort: the Android platform Geocoder can
+      // return [] (or null street/city) WITHOUT throwing, which previously
+      // left the field silently blank. Isolate it so a geocoder miss falls
+      // back to raw coordinates instead of producing an empty result.
+      let label = '';
+      try {
+        const results = await Location.reverseGeocodeAsync({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        if (results.length > 0) {
+          const r = results[0];
+          const parts = [r.name, r.street, r.city, r.district, r.subregion, r.region]
+            .filter((p): p is string => Boolean(p));
+          label = Array.from(new Set(parts)).slice(0, 2).join(', ');
+        }
+      } catch {
+        // Geocoder backend unavailable — fall through to coordinates.
       }
+
+      if (!label) {
+        label = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+      }
+      setLocation(label);
     } catch {
       Alert.alert('לא ניתן לקבל מיקום');
     } finally {
