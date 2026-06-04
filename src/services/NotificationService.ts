@@ -115,9 +115,11 @@ export class NotificationService {
    */
   static async ensureAnnualReminders(): Promise<void> {
     const events = await StorageService.getEventsWithReminders();
+    // Gal C orthogonal model: 'yearly' + recurrenceCalendar replaces the old
+    // compound 'yearly_hebrew'/'yearly_gregorian'. Behavior unchanged — only
+    // yearly events get annual reminders (daily/weekly/monthly are C4).
     const recurring = events.filter(e =>
-      e.hebrewExtensions.recurrenceType === 'yearly_hebrew' ||
-      e.hebrewExtensions.recurrenceType === 'yearly_gregorian',
+      e.hebrewExtensions.recurrenceType === 'yearly',
     );
 
     const scheduled = await NotificationService.getScheduled();
@@ -129,7 +131,7 @@ export class NotificationService {
 
       let occurrence: Date | undefined;
 
-      if (event.hebrewExtensions.recurrenceType === 'yearly_gregorian') {
+      if (event.hebrewExtensions.recurrenceCalendar === 'gregorian') {
         const [, monthStr, dayStr] = (event.start.date ?? '').split('-');
         const month = parseInt(monthStr, 10) - 1; // JS months are 0-indexed
         const day = parseInt(dayStr, 10);

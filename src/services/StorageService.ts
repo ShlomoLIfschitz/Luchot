@@ -16,7 +16,7 @@ import {
   type ResultSet,
 } from 'expo-sqlite/legacy';
 import { CalendarEvent } from '../schemas/EventSchema';
-import { formatDateKey } from '../utils/dateUtils';
+import { formatDateKey, generateUUID } from '../utils/dateUtils';
 
 // ── DB handle ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +25,7 @@ let schemaInitialized = false;
 let schemaV2Migrated = false;
 let schemaColorMigrated = false;
 let schemaLocationMigrated = false;
+let schemaV5Migrated = false;
 
 function getDb(): SQLiteDatabase {
   if (!db) {
@@ -70,7 +71,15 @@ async function doCreateSchema(): Promise<void> {
         color_id TEXT,
         created TEXT,
         updated TEXT,
-        notification_scheduled INTEGER DEFAULT 0
+        notification_scheduled INTEGER DEFAULT 0,
+        reminder_minutes INTEGER,
+        location TEXT,
+        recurrence_calendar TEXT,
+        recurrence_id TEXT,
+        is_exception INTEGER DEFAULT 0,
+        exception_date TEXT,
+        renewal_ask_suppressed INTEGER DEFAULT 0,
+        last_renewal_ask TEXT
       )`,
       [],
     );
@@ -107,6 +116,87 @@ async function doCreateSchema(): Promise<void> {
         // column already exists — no-op
       }
       schemaLocationMigrated = true;
+    }
+    // v5 migration: add recurrence/renewal columns, then remap legacy recurrence_type values.
+    // Each ALTER is wrapped individually — "column already exists" is a no-op on upgrade.
+    // The remap UPDATEs run AFTER the ALTERs (recurrence_calendar must exist before we write it).
+    // All statements run inside this same transaction, so either all succeed or all roll back.
+    // The UPDATEs are idempotent: after the first run, no rows hold the old compound enum values.
+    if (!schemaV5Migrated) {
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN recurrence_calendar TEXT',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN recurrence_id TEXT',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN is_exception INTEGER DEFAULT 0',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN exception_date TEXT',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN renewal_ask_suppressed INTEGER DEFAULT 0',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      try {
+        await txn.executeSqlAsync(
+          'ALTER TABLE events ADD COLUMN last_renewal_ask TEXT',
+          [],
+        );
+      } catch {
+        // column already exists — no-op
+      }
+      // Remap legacy compound recurrence_type values to the new orthogonal enum.
+      // recurrence_type now holds only: none | weekly | monthly | yearly
+      // recurrence_calendar holds: hebrew | gregorian | null
+      // These four UPDATE statements are idempotent — after the first run, no
+      // rows match the old compound values, so subsequent runs are no-ops.
+      await txn.executeSqlAsync(
+        `UPDATE events SET recurrence_type = 'yearly',  recurrence_calendar = 'hebrew'
+         WHERE recurrence_type = 'yearly_hebrew'`,
+        [],
+      );
+      await txn.executeSqlAsync(
+        `UPDATE events SET recurrence_type = 'yearly',  recurrence_calendar = 'gregorian'
+         WHERE recurrence_type = 'yearly_gregorian'`,
+        [],
+      );
+      await txn.executeSqlAsync(
+        `UPDATE events SET recurrence_type = 'monthly', recurrence_calendar = 'hebrew'
+         WHERE recurrence_type = 'monthly_hebrew'`,
+        [],
+      );
+      await txn.executeSqlAsync(
+        `UPDATE events SET recurrence_type = 'monthly', recurrence_calendar = 'gregorian'
+         WHERE recurrence_type = 'monthly_gregorian'`,
+        [],
+      );
+      schemaV5Migrated = true;
     }
   });
   schemaInitialized = true;
@@ -166,22 +256,51 @@ export class StorageService {
     await ensureSchema();
     const ext = event.hebrewExtensions;
     await dbRun(
-      `INSERT OR REPLACE INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT OR REPLACE INTO events (
+        id, summary, description,
+        start_date, start_datetime,
+        end_date, end_datetime,
+        status, recurrence,
+        calendar_type,
+        hebrew_day, hebrew_month, hebrew_year, hebrew_month_name,
+        recurrence_type, category,
+        after_sunset, color_id,
+        created, updated,
+        notification_scheduled, reminder_minutes, location,
+        recurrence_calendar, recurrence_id,
+        is_exception, exception_date,
+        renewal_ask_suppressed, last_renewal_ask
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        event.id, event.summary, event.description ?? null,
-        event.start.date ?? null, event.start.dateTime ?? null,
-        event.end.date ?? null, event.end.dateTime ?? null,
-        event.status, JSON.stringify(event.recurrence ?? []),
-        ext.calendarType,
-        ext.hebrewDate?.day ?? null, ext.hebrewDate?.month ?? null,
-        ext.hebrewDate?.year ?? null, ext.hebrewDate?.monthName ?? null,
-        ext.recurrenceType, ext.category,
-        ext.afterSunset ? 1 : 0,
-        event.colorId ?? null,
-        event.created, event.updated,
-        ext.notificationScheduled ? 1 : 0,
-        event.reminders?.overrides?.[0]?.minutes ?? null,
-        event.location ?? null,
+        event.id,                                        // 1  id
+        event.summary,                                   // 2  summary
+        event.description ?? null,                       // 3  description
+        event.start.date ?? null,                        // 4  start_date
+        event.start.dateTime ?? null,                    // 5  start_datetime
+        event.end.date ?? null,                          // 6  end_date
+        event.end.dateTime ?? null,                      // 7  end_datetime
+        event.status,                                    // 8  status
+        JSON.stringify(event.recurrence ?? []),          // 9  recurrence
+        ext.calendarType,                                // 10 calendar_type
+        ext.hebrewDate?.day ?? null,                     // 11 hebrew_day
+        ext.hebrewDate?.month ?? null,                   // 12 hebrew_month
+        ext.hebrewDate?.year ?? null,                    // 13 hebrew_year
+        ext.hebrewDate?.monthName ?? null,               // 14 hebrew_month_name
+        ext.recurrenceType,                              // 15 recurrence_type
+        ext.category,                                    // 16 category
+        ext.afterSunset ? 1 : 0,                        // 17 after_sunset
+        event.colorId ?? null,                           // 18 color_id
+        event.created,                                   // 19 created
+        event.updated,                                   // 20 updated
+        ext.notificationScheduled ? 1 : 0,              // 21 notification_scheduled
+        event.reminders?.overrides?.[0]?.minutes ?? null, // 22 reminder_minutes
+        event.location ?? null,                          // 23 location
+        ext.recurrenceCalendar ?? null,                  // 24 recurrence_calendar
+        ext.recurrenceId ?? null,                        // 25 recurrence_id
+        ext.isException ? 1 : 0,                        // 26 is_exception
+        ext.exceptionDate ?? null,                       // 27 exception_date
+        ext.renewalAskSuppressed ? 1 : 0,               // 28 renewal_ask_suppressed
+        ext.lastRenewalAsk ?? null,                      // 29 last_renewal_ask
       ],
     );
   }
@@ -190,7 +309,7 @@ export class StorageService {
     await ensureSchema();
     const dateStr = formatDateKey(date);
     const rows = await dbAll(
-      `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled'`,
+      `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled' AND is_exception = 0`,
       [dateStr],
     );
     return rows.map(StorageService.rowToEvent);
@@ -200,17 +319,40 @@ export class StorageService {
     await ensureSchema();
     const rows = await dbAll(
       `SELECT * FROM events WHERE hebrew_day = ? AND hebrew_month = ?
-       AND calendar_type = 'hebrew' AND status != 'cancelled'`,
+       AND calendar_type = 'hebrew' AND status != 'cancelled' AND is_exception = 0`,
       [hebrewDay, hebrewMonth],
     );
     return rows.map(StorageService.rowToEvent);
   }
 
+  /**
+   * Soft-cancels the event with the given id.
+   *
+   * Cascade: if the deleted event is a recurring master, its exception and
+   * tombstone children (rows with recurrence_id = id) are hard-deleted.
+   * Rationale: exception/tombstone rows are meaningless without their master —
+   * keeping them wastes space and could confuse future reads. The master itself
+   * is soft-cancelled (status='cancelled') so ICS export and audit trails still
+   * see it; the ephemeral children have no such need.
+   *
+   * Both statements run through the serialized runExclusive queue (each dbRun
+   * call acquires the gate in turn). Because exceptions/tombstones are a closed
+   * set keyed by recurrence_id, two sequential dbRun calls are sufficient and
+   * simpler than bundling them into one transaction.
+   */
   static async deleteEvent(id: string): Promise<void> {
     await ensureSchema();
+    // 1. Soft-cancel the target row (master or standalone).
     await dbRun(
       `UPDATE events SET status = 'cancelled', updated = ? WHERE id = ?`,
       [new Date().toISOString(), id],
+    );
+    // 2. Hard-delete any exception/tombstone children that belong to this master.
+    //    Safe for standalone (non-master) events: no rows have recurrence_id = their id,
+    //    so this DELETE is a no-op.
+    await dbRun(
+      `DELETE FROM events WHERE recurrence_id = ?`,
+      [id],
     );
   }
 
@@ -219,6 +361,10 @@ export class StorageService {
    * range [startDate, endDate]. Recurring events are excluded — they are
    * fetched separately via getAllRecurringNotes and expanded by the
    * expandRecurringNotes utility.
+   *
+   * is_exception = 0 guard: exception/tombstone rows must not surface as
+   * standalone notes. All existing rows have is_exception = 0 (column default),
+   * so this filter is a no-op for current data.
    *
    * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
    */
@@ -231,7 +377,8 @@ export class StorageService {
        WHERE start_date >= ?
          AND start_date <= ?
          AND recurrence_type = 'none'
-         AND status != 'cancelled'`,
+         AND status != 'cancelled'
+         AND is_exception = 0`,
       [startStr, endStr],
     );
     return rows.map(StorageService.rowToEvent);
@@ -255,6 +402,12 @@ export class StorageService {
    * of date. The caller (expandRecurringNotes utility) decides which
    * instances fall within a given range.
    *
+   * is_exception = 0 guard: exception rows have recurrence_type = 'none' by
+   * design (override rows are single-occurrence placeholders), so the
+   * recurrence_type != 'none' filter already excludes them. The extra
+   * is_exception = 0 is a defensive belt-and-suspenders in case a future write
+   * path ever produces a mis-classified row.
+   *
    * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
    */
   static async getAllRecurringNotes(): Promise<CalendarEvent[]> {
@@ -262,10 +415,146 @@ export class StorageService {
     const rows = await dbAll(
       `SELECT * FROM events
        WHERE recurrence_type != 'none'
-         AND status != 'cancelled'`,
+         AND status != 'cancelled'
+         AND is_exception = 0`,
       [],
     );
     return rows.map(StorageService.rowToEvent);
+  }
+
+  /**
+   * Returns ALL exception and tombstone rows (is_exception = 1).
+   *
+   * IMPORTANT: does NOT filter on status. Tombstone rows have status='cancelled'
+   * and are the mechanism for hiding a specific occurrence — returning only
+   * status='confirmed' would defeat the entire purpose.
+   *
+   * Callers map the results through rowToEvent so the full CalendarEvent shape
+   * is available, including recurrence_id, exception_date, and status.
+   *
+   * Used by useNotes and useDatesNotes to build the exception overlay that is
+   * passed into expandRecurringNotes.
+   */
+  static async getExceptions(): Promise<CalendarEvent[]> {
+    await ensureSchema();
+    const rows = await dbAll(
+      `SELECT * FROM events WHERE is_exception = 1`,
+      [],
+    );
+    return rows.map(StorageService.rowToEvent);
+  }
+
+  /**
+   * Saves an OVERRIDE row for a specific occurrence of a recurring series.
+   *
+   * The override is a new standalone CalendarEvent row with:
+   *   - A fresh UUID id (distinct from both the master and the composite slot id).
+   *   - is_exception = true, recurrence_id = masterId, exception_date = occurrenceDate.
+   *   - recurrence_type = 'none' (it is a single-occurrence stand-in, not itself recurring).
+   *   - status = 'confirmed'.
+   *   - start.date = occurrenceDate (the overridden date), unless startDateTime is supplied.
+   *   - All provided override fields merged in (summary, colorId, startDateTime, reminderMinutes).
+   *
+   * Routes through saveEvent so named-column INSERT is the single write path.
+   *
+   * Note for C3: to re-edit or re-delete a specific override later, query
+   * getExceptions() and filter by recurrence_id = masterId AND exception_date = date.
+   * The override's real UUID id is stored in the returned row; use that id for
+   * subsequent saveEvent or deleteEvent calls.
+   *
+   * @param masterId        The id of the master recurring event.
+   * @param occurrenceDate  ISO "YYYY-MM-DD" of the occurrence being overridden.
+   * @param overrides       Optional field overrides (summary, colorId, startDateTime, reminderMinutes).
+   */
+  static async saveExceptionForOccurrence(
+    masterId: string,
+    occurrenceDate: string,
+    overrides: {
+      summary?: string;
+      colorId?: string | null;
+      startDateTime?: string;
+      reminderMinutes?: number | null;
+    } = {},
+  ): Promise<void> {
+    await ensureSchema();
+    const now = new Date().toISOString();
+    const overrideEvent: CalendarEvent = {
+      id: generateUUID(),
+      summary: overrides.summary ?? '',
+      status: 'confirmed',
+      created: now,
+      updated: now,
+      colorId: overrides.colorId ?? undefined,
+      start: overrides.startDateTime
+        ? { dateTime: overrides.startDateTime }
+        : { date: occurrenceDate },
+      end: overrides.startDateTime
+        ? { dateTime: overrides.startDateTime }
+        : { date: occurrenceDate },
+      reminders: overrides.reminderMinutes != null
+        ? { useDefault: false, overrides: [{ method: 'popup', minutes: overrides.reminderMinutes }] }
+        : { useDefault: false },
+      hebrewExtensions: {
+        calendarType: 'gregorian',
+        recurrenceType: 'none',
+        category: 'personal',
+        afterSunset: false,
+        notificationScheduled: overrides.reminderMinutes != null,
+        recurrenceId: masterId,
+        isException: true,
+        exceptionDate: occurrenceDate,
+      },
+    };
+    await StorageService.saveEvent(overrideEvent);
+  }
+
+  /**
+   * Saves a TOMBSTONE row for a specific occurrence of a recurring series.
+   *
+   * The tombstone is a new CalendarEvent row with:
+   *   - A fresh UUID id.
+   *   - is_exception = true, recurrence_id = masterId, exception_date = occurrenceDate.
+   *   - status = 'cancelled' (the signal to expandRecurringNotes to skip this slot).
+   *   - summary = '' (tombstones never display; summary is irrelevant).
+   *   - recurrence_type = 'none'.
+   *
+   * Routes through saveEvent so named-column INSERT is the single write path.
+   *
+   * Note for C3: tombstones are retrieved by getExceptions() and matched in the
+   * expandRecurringNotes overlay by (recurrence_id, exception_date). To undo a
+   * tombstone (restore an occurrence), call deleteEvent(tombstoneId) where
+   * tombstoneId is obtained from getExceptions() filtered by recurrence_id + exception_date.
+   *
+   * @param masterId        The id of the master recurring event.
+   * @param occurrenceDate  ISO "YYYY-MM-DD" of the occurrence being cancelled.
+   */
+  static async saveTombstoneForOccurrence(
+    masterId: string,
+    occurrenceDate: string,
+  ): Promise<void> {
+    await ensureSchema();
+    const now = new Date().toISOString();
+    const tombstoneEvent: CalendarEvent = {
+      id: generateUUID(),
+      summary: '',
+      status: 'cancelled',
+      created: now,
+      updated: now,
+      start: { date: occurrenceDate },
+      end: { date: occurrenceDate },
+      reminders: { useDefault: false },
+      hebrewExtensions: {
+        calendarType: 'gregorian',
+        recurrenceType: 'none',
+        category: 'personal',
+        afterSunset: false,
+        notificationScheduled: false,
+        recurrenceId: masterId,
+        isException: true,
+        exceptionDate: occurrenceDate,
+      },
+    };
+    await StorageService.saveEvent(tombstoneEvent);
   }
 
   // ── Preferences ───────────────────────────────────────────
@@ -339,6 +628,12 @@ export class StorageService {
         category: row.category,
         afterSunset: row.after_sunset === 1,
         notificationScheduled: row.notification_scheduled === 1,
+        recurrenceCalendar: row.recurrence_calendar ?? undefined,
+        recurrenceId: row.recurrence_id ?? undefined,
+        isException: row.is_exception === 1,
+        exceptionDate: row.exception_date ?? undefined,
+        renewalAskSuppressed: row.renewal_ask_suppressed === 1,
+        lastRenewalAsk: row.last_renewal_ask ?? undefined,
       },
       reminders: row.reminder_minutes != null
         ? { useDefault: false, overrides: [{ method: 'popup' as const, minutes: row.reminder_minutes }] }

@@ -1,7 +1,7 @@
 // src/schemas/EventSchema.ts
 
 export type CalendarType = 'hebrew' | 'gregorian';
-export type RecurrenceType = 'none' | 'yearly_hebrew' | 'yearly_gregorian' | 'weekly' | 'monthly_hebrew' | 'monthly_gregorian';
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type NoteCategory = 'work' | 'personal' | 'holiday' | 'torah' | 'medical' | 'other' | 'birthday' | 'yahrzeit' | 'anniversary';
 
 /**
@@ -49,6 +49,12 @@ export interface CalendarEvent {
     category: NoteCategory;
     afterSunset?: boolean;             // Was created after sunset (next Hebrew day)
     notificationScheduled?: boolean;
+    recurrenceCalendar?: 'hebrew' | 'gregorian';  // only meaningful for monthly/yearly
+    recurrenceId?: string;             // links an exception/tombstone row to its master series
+    isException?: boolean;
+    exceptionDate?: string;            // ISO 8601 YYYY-MM-DD of the overridden occurrence
+    renewalAskSuppressed?: boolean;
+    lastRenewalAsk?: string;           // ISO 8601 date
   };
 }
 

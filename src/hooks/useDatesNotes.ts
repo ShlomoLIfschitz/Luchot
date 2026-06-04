@@ -51,9 +51,15 @@ export function useDatesNotes(
 
     async function load() {
       try {
-        const [rangeEvents, recurringEvents] = await Promise.all([
+        const [rangeEvents, recurringEvents, exceptionEvents] = await Promise.all([
           StorageService.getNotesInRange(rangeStart, rangeEnd),
           StorageService.getAllRecurringNotes(),
+          // Fetch exception/tombstone rows for the overlay.
+          // getNotesInRange and getAllRecurringNotes both filter is_exception = 0,
+          // so exception rows are only reachable here — they cannot leak as
+          // standalone notes through the other two queries.
+          // Existing installs have zero exception rows → overlay is a no-op.
+          StorageService.getExceptions(),
         ]);
 
         if (cancelled) return;
@@ -61,9 +67,11 @@ export function useDatesNotes(
         // Map raw CalendarEvents to CalendarNotes
         const rangeNotes     = rangeEvents.map(eventToCalendarNote);
         const recurringNotes = recurringEvents.map(eventToCalendarNote);
+        const exceptionNotes = exceptionEvents.map(eventToCalendarNote);
 
-        // Expand recurring notes into per-year instances within the range
-        const instances = expandRecurringNotes(recurringNotes, rangeStart, rangeEnd);
+        // Expand recurring notes into per-year instances within the range,
+        // applying the exception/tombstone overlay.
+        const instances = expandRecurringNotes(recurringNotes, rangeStart, rangeEnd, exceptionNotes);
 
         // Build the date-keyed map
         const map = new Map<string, CalendarNote[]>();
