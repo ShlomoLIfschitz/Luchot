@@ -366,3 +366,53 @@
   traffic, and the app remains fully functional offline (the call degrades to a
   silent no-op). Any FUTURE network call requires its own explicitly-reopened
   decision; this exception is scoped to user-triggered reverse-geocoding only.
+
+## Gal C recurrence/time model (Session C1 data foundation)
+- Date: 2026-06-04
+- Context: Gal C adds event time + full recurrence (daily/weekly/monthly/yearly)
+  + per-occurrence edit/delete. C1 laid the data foundation; C2–C4 build UI,
+  time-end-to-end, and notifications on top. Five architectural choices were
+  locked by the Architect and are now implemented.
+- Choices:
+  1. **Time storage reuses existing `start_datetime`/`end_datetime`** (ISO 8601,
+     Google-Calendar `dateTime` vs `date` convention). NO `HH:MM` columns were
+     added — the all-day-vs-timed distinction already exists in the schema.
+  2. **Orthogonal recurrence model.** `recurrence_type ∈ {none,daily,weekly,
+     monthly,yearly}` + a SEPARATE `recurrence_calendar ∈ {hebrew,gregorian}`
+     (only meaningful for monthly/yearly; daily/weekly are always Gregorian).
+     This REPLACES the old compound enum (`yearly_hebrew`/`yearly_gregorian`/
+     `monthly_hebrew`/`monthly_gregorian`), which the v5 migration remaps in
+     place. EventSchema.ts `RecurrenceType` was changed accordingly (architect-
+     approved, one-time exception to the EventSchema lock).
+  3. **Per-occurrence exceptions are separate rows**, not in-place edits of the
+     master. An OVERRIDE row = `is_exception=1`, `recurrence_id=<master>`,
+     `exception_date=<YYYY-MM-DD>`, `recurrence_type='none'`, `status='confirmed'`.
+     A TOMBSTONE ("delete this occurrence") = same but `status='cancelled'`.
+     Expansion overlays these onto the generated series (skip tombstone dates,
+     replace override dates). Normal queries filter `is_exception=0` so exception
+     rows never leak as standalone notes; they reach the UI only via the overlay.
+  4. **Virtual recurring instances carry a composite id** `${masterId}:${YYYY-MM-DD}`
+     (shallow-copied note, master never mutated) so a single occurrence is
+     individually addressable. The master's real UUID still owns the DB row and
+     all reminder scheduling. Delete/edit of an occurrence must extract the master
+     id (C3 concern — flagged).
+  5. **Named-column INSERT** in `StorageService.saveEvent` replaced the positional
+     `VALUES(?,…)`. From now on every migration just adds a column with a DEFAULT
+     and the INSERT keeps working — the positional-order fragility class is retired.
+  6. **Cascade delete:** deleting a master soft-cancels the master (audit/ICS
+     integrity) and HARD-deletes its exception/tombstone children
+     (`DELETE … WHERE recurrence_id=?`) — children are meaningless without the master.
+- Alternatives considered: HH:MM columns (rejected — duplicates start_datetime);
+  compound recurrence enum kept (rejected — can't express daily; couples two axes);
+  pre-generating all recurring instances as rows (rejected — breaks id-keyed dedup,
+  multiplies writes, fights "runs forever"); editing the master in place for "this
+  occurrence" (rejected — loses the series); positional INSERT kept (rejected — the
+  recurring footgun that bit color_id/location).
+- Implications: C2 (time UI + hourly schedule), C3 (recurrence picker + edit/delete
+  dialogs that call `saveExceptionForOccurrence`/`saveTombstoneForOccurrence`), and
+  C4 (daily/weekly/monthly reminders + yearly renewal prompt) build on this. The two
+  write methods + renewal columns (`renewal_ask_suppressed`, `last_renewal_ask`) are
+  schema/plumbing-ready but UNCALLED until C3/C4. Yearly renewal dialog hosts in root
+  `_layout` (locked). Reminder-without-time = user picks the time explicitly, no
+  silent 09:00 fallback for that case (locked; the 09:00 all-day policy remains for
+  reminders where the user does NOT pick a time).

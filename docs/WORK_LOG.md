@@ -6,6 +6,46 @@
 
 ---
 
+## 2026-06-04 — Session: Gal C — C1 schema + data foundation (event time + recurrence)
+
+**Phase:** Phase 5 (Gal C, session 1 of 4 — DATA ONLY; C2 time UI, C3 recurrence UI, C4 notifications follow)
+**Commits:** (this session) C1 data-layer foundation + this docs entry
+**Sub-agents:** database-architect (Wave 1: v5 migration + SCHEMA.md), local-data-builder (Wave 2: EventSchema enum + named-column INSERT + rowToEvent; Wave 3: expandRecurringNotes daily/weekly/monthly + composite ids + dedup; Wave 4: exception/tombstone read+write + cascade + caller audit). Orchestrator: verified the migration empirically (node:sqlite upgrade simulation), applied two forced type-compat fixes, ran the DoD gate.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline, no new deps). NOT yet OTA-pushed — data-only, no user-visible change; hold for C2. No UI, no notification changes.
+
+### What was done
+
+- **Wave 1 — v5 migration (database-architect).** `StorageService.doCreateSchema` gains a `schemaV5Migrated`-gated block: 6 idempotent ALTERs (`recurrence_calendar`, `recurrence_id`, `is_exception` DEFAULT 0, `exception_date`, `renewal_ask_suppressed` DEFAULT 0, `last_renewal_ask`), all also added to CREATE TABLE for fresh installs. Then 4 in-transaction remap UPDATEs (`yearly_hebrew`→`yearly`+`hebrew`, etc.) ordered AFTER the ALTERs (recurrence_calendar must exist before it's written). `reminder_minutes`/`location` also back-filled into CREATE TABLE (harmless cleanup so fresh == upgraded). New `docs/SCHEMA.md` created.
+- **Wave 2 — schema + INSERT (local-data-builder).** `EventSchema.RecurrenceType` → orthogonal `none|daily|weekly|monthly|yearly`; added optional `recurrenceCalendar`, `recurrenceId`, `isException`, `exceptionDate`, `renewalAskSuppressed`, `lastRenewalAsk` to `hebrewExtensions` (Google-Calendar core shape preserved). `saveEvent` positional `VALUES(?,…)` → **explicit named-column INSERT** (29 cols) — the key hygiene fix. `rowToEvent` null-safe-maps the 6 new columns.
+- **Wave 3 — recurrence engine (local-data-builder).** `expandRecurringNotes` extended from yearly-only to daily/weekly/monthly/yearly; monthly/yearly honor `recurrenceCalendar` (HDate for hebrew, local-midnight JS Date for gregorian, skipping non-existent days in both); daily/weekly Gregorian-only with anchor lower-bound; yearly behavior preserved exactly. Virtual instances now carry composite id `${masterId}:${YYYY-MM-DD}` (shallow copy). `CalendarNote` gained `recurrenceType`/`recurrenceCalendar`. `useNotes` dedup fixed for composite ids (recurring masters excluded from the primary path; instances are authoritative — avoids the master-id/composite-id double-count).
+- **Wave 4 — exceptions + audit (local-data-builder).** `getExceptions()` (returns is_exception=1 rows INCLUDING tombstones — no status filter). Overlay in `expandRecurringNotes` (optional 4th arg, no-op when empty): tombstone date → skip, override date → emit override content in-slot. Normal queries (`getEventsForGregorianDate/HebrewDate`, `getNotesInRange`, `getAllRecurringNotes`) gained `AND is_exception=0` so exception rows never leak as standalone notes. `useNotes`/`useDatesNotes` fetch + pass exceptions. New write methods `saveExceptionForOccurrence` / `saveTombstoneForOccurrence` (route through saveEvent; UNCALLED until C3). `deleteEvent` cascades: soft-cancel master + hard-delete `WHERE recurrence_id=?` children.
+
+### Decisions made
+
+- Logged the **Gal C recurrence/time model** in DECISIONS.md (2026-06-04): reuse start_datetime (no HH:MM cols); orthogonal recurrence_type + recurrence_calendar; per-occurrence exceptions as separate override/tombstone rows; composite instance ids; named-column INSERT; cascade-delete children. All architect-locked; the EventSchema enum change was an explicitly-approved one-time exception to the EventSchema lock.
+
+### Orchestrator fixes (forced by the approved enum change)
+
+- **Type-compat translations in `useNotes.saveNote` and `NotificationService.ensureAnnualReminders`** (applied directly, ~6 lines, behavior-preserving). Narrowing `RecurrenceType` broke `useNotes` (built `yearly_hebrew`/`yearly_gregorian`) and `NotificationService` (compared against them). Translated to `recurrenceType='yearly'` + `recurrenceCalendar` discrimination. Exact same runtime behavior (only yearly events get annual reminders; calendar from `recurrenceCalendar`, which the v5 remap populated for every existing yearly row). Done by orchestrator rather than a cold re-spawn for a forced 6-line consequence — consistent with the small-fix precedent. Documented as the only deviation.
+
+### Migration verification (orchestrator, empirical)
+
+- Built a pre-v5 events table in `node:sqlite`, inserted legacy `yearly_hebrew` birthday / `yearly_gregorian` yahrzeit / `monthly_hebrew` / `weekly` / `none` rows, ran the EXACT v5 ALTER+remap SQL: all legacy values remapped correctly, `weekly`/`none` untouched, remap idempotent (0 rows on re-run), named-column INSERT round-tripped the remapped birthday (29 cols=29 vals) with no loss and no duplicate rows. The on-device expo-sqlite run remains a user manual check (norm), but the SQL is proven.
+
+### Open issues / blocked
+
+- **Composite-id delete (C3 hand-off):** UI now receives notes with composite ids; `deleteNote`/edit must extract the master id before targeting the DB. Not a C1 regression (deleteNote still gets the master id from current call sites).
+- **NoteList color quick-pick drops `location` (pre-existing bug, C3):** the color-only save omits `location`, silently clearing it. Flagged by the Wave 4 audit; UI file, not editable in C1.
+- **`onSave`/`saveNote` need explicit `recurrenceType` (C3):** today recurrence is re-derived from `noteType` (birthday⇒yearly). The custom recurrence picker (C2/C3) must thread `recurrenceType`/`recurrenceCalendar` through `NoteEditor.onSave` and `saveNote` instead of re-deriving.
+- **Weekly DST edge (C2 verify):** weekly expansion steps by pure ms; near an Israel DST transition a candidate could drift by an hour off local midnight. Daily re-extracts local parts (safe). Verify on device in C2.
+
+### Next steps
+
+- **C2 — time end-to-end:** NoteEditor all-day toggle + time picker writing `start.dateTime`; move the `לוח שעות` block to the אירועים tab with real hour bucketing from `start.dateTime`; time display in NoteList; fold in the activeTab-resets-on-date-change pending bug. Address the weekly DST verify.
+- On-device upgrade smoke test (existing birthdays/yahrzeits still show on their anniversary; no data loss).
+
+---
+
 ## 2026-06-04 — Session: Shabbat card in the Day "תורה וזמנים" tab
 
 **Phase:** Phase 5 (Feature 2 of the GPS/Shabbat-card pair — completes the pair)
