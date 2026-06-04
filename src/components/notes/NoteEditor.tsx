@@ -220,12 +220,11 @@ export function NoteEditor({ visible, note, date, hebrewDate, colors, onSave, on
         });
         if (results.length > 0) {
           const r = results[0];
-          // Priority: named place (venue/landmark) → street → first available
-          // locality (city → district → subregion → region).
-          const locality = r.city || r.district || r.subregion || r.region || null;
-          label = [r.name, r.street, locality]
-            .filter((p): p is string => Boolean(p))
-            .join(', ');
+          const parts = [r.name, r.street, r.city ?? r.district ?? r.subregion ?? r.region]
+            .filter((p): p is string => Boolean(p));
+          if (parts.length > 0) {
+            label = parts.join(', ');
+          }
         }
       } catch {
         // Geocoder backend unavailable — fall through to coordinates.
