@@ -176,6 +176,187 @@ export class NotificationService {
   }
 
   /**
+   * Sweep-on-init model for daily/weekly/monthly recurring reminders.
+   *
+   * For each master recurring event (recurrence_type IN daily/weekly/monthly)
+   * with a reminder set:
+   *   1. Compute occurrences in a 60-day forward window (local midnight today ..
+   *      today+60d), capped at 20 per event.
+   *   2. Cancel all previously scheduled notifications whose id starts with
+   *      `evt-{eventId}-` (handles reminderMinutes/time edits and prevents
+   *      duplicates).
+   *   3. Schedule fresh notifications for the computed window.
+   *
+   * Occurrence rules (Gregorian JS Date arithmetic, anchored at start_date):
+   *   - daily:   every day from max(anchor, today) through today+60.
+   *   - weekly:  every 7 days from anchor that falls in the window.
+   *   - monthly: same day-of-month each month; months where that day does not
+   *              exist (e.g. day 31 in February) are skipped via a
+   *              getDate/getMonth normalization guard.
+   *   All occurrences must be >= anchor (no pre-existence instances) and >= today.
+   *
+   * Fire-time anchor (locked):
+   *   - Timed event (start.dateTime present): HH:MM from start.dateTime applied
+   *     to the occurrence date in local time, then minus reminderMinutes.
+   *   - All-day (no start.dateTime): 09:00 local on the occurrence date, then
+   *     minus reminderMinutes.
+   *   Any fire time <= now is skipped.
+   *
+   * Notification id namespace: `evt-{eventId}-{YYYYMMDD}` (occurrence date).
+   *
+   * Does NOT touch yearly events (owned by ensureAnnualReminders).
+   * Does NOT import useNotes / expandRecurringNotes (circular-import constraint).
+   * Does NOT apply exception/tombstone overlays (C4 scope: master series only).
+   */
+  static async ensureRecurringReminders(): Promise<void> {
+    const events = await StorageService.getRecurringRemindableEvents();
+    if (events.length === 0) return;
+
+    // Snapshot of all currently scheduled notifications — used to build
+    // per-event cancel sets without re-calling getScheduled() in every loop.
+    const scheduled = await NotificationService.getScheduled();
+
+    // Build a map: eventId -> Set<notificationId> for ids matching evt-{eventId}-
+    const scheduledByEvent = new Map<string, Set<string>>();
+    for (const n of scheduled) {
+      if (!n.identifier.startsWith('evt-')) continue;
+      // id format: evt-{eventId}-{YYYYMMDD}
+      // eventId itself may contain hyphens, so we split on '-' only at the last 8 chars.
+      // Safer: strip the known prefix 'evt-' then find the trailing '-YYYYMMDD' (9 chars).
+      const withoutPrefix = n.identifier.slice(4); // remove 'evt-'
+      const dashPos = withoutPrefix.lastIndexOf('-');
+      if (dashPos < 0) continue;
+      const evtId = withoutPrefix.slice(0, dashPos);
+      if (!scheduledByEvent.has(evtId)) scheduledByEvent.set(evtId, new Set());
+      scheduledByEvent.get(evtId)!.add(n.identifier);
+    }
+
+    const now      = new Date();
+    const WINDOW   = 60; // days forward
+    const MAX_OCC  = 20; // safety cap per event
+
+    // Local midnight today — all occurrence generation is relative to this.
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    for (const event of events) {
+      const reminderMinutes = event.reminders?.overrides?.[0]?.minutes;
+      if (reminderMinutes == null) continue;
+
+      const startDateStr = event.start.date; // YYYY-MM-DD
+      if (!startDateStr) continue;
+
+      const [sy, sm, sd] = startDateStr.split('-').map(Number);
+      // Anchor = event creation date, parsed as LOCAL midnight.
+      const anchor = new Date(sy, sm - 1, sd);
+
+      const recurrenceType = event.hebrewExtensions.recurrenceType; // 'daily'|'weekly'|'monthly'
+
+      // Extract HH:MM from start.dateTime if this is a timed event.
+      let timedHour: number | null   = null;
+      let timedMinute: number | null = null;
+      if (event.start.dateTime) {
+        const dt = new Date(event.start.dateTime);
+        timedHour   = dt.getHours();
+        timedMinute = dt.getMinutes();
+      }
+
+      // ── 1. Compute occurrences ─────────────────────────────────────────────
+      const occurrences: Date[] = [];
+
+      if (recurrenceType === 'daily') {
+        // Start from max(anchor, today).
+        const startFrom = anchor > todayMidnight ? anchor : todayMidnight;
+        let cursor = new Date(startFrom);
+        while (cursor <= new Date(todayMidnight.getFullYear(), todayMidnight.getMonth(), todayMidnight.getDate() + WINDOW)
+               && occurrences.length < MAX_OCC) {
+          if (cursor >= anchor) {
+            occurrences.push(new Date(cursor));
+          }
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+      } else if (recurrenceType === 'weekly') {
+        // Every 7 days from anchor; include only occurrences in [today, today+60].
+        const windowEnd = new Date(todayMidnight.getFullYear(), todayMidnight.getMonth(), todayMidnight.getDate() + WINDOW);
+        let cursor = new Date(anchor);
+        // Advance to the first occurrence >= today.
+        while (cursor < todayMidnight) {
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
+        }
+        while (cursor <= windowEnd && occurrences.length < MAX_OCC) {
+          occurrences.push(new Date(cursor));
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
+        }
+
+      } else if (recurrenceType === 'monthly') {
+        // Same day-of-month each month; skip months where that day doesn't exist.
+        const targetDay = anchor.getDate();
+        const windowEnd = new Date(todayMidnight.getFullYear(), todayMidnight.getMonth(), todayMidnight.getDate() + WINDOW);
+
+        // Start from the month of max(anchor, today).
+        const startRef = anchor > todayMidnight ? anchor : todayMidnight;
+        let curYear  = startRef.getFullYear();
+        let curMonth = startRef.getMonth();
+
+        // Walk forward month by month until we pass the window end.
+        while (occurrences.length < MAX_OCC) {
+          const candidate = new Date(curYear, curMonth, targetDay);
+          // Normalization guard: if day doesn't exist in this month, JS rolls
+          // over (e.g. Feb 31 -> Mar 2/3). Check getDate() equals targetDay.
+          if (candidate.getDate() === targetDay) {
+            if (candidate >= todayMidnight && candidate >= anchor && candidate <= windowEnd) {
+              occurrences.push(candidate);
+            }
+          }
+          // Advance to the next month.
+          curMonth++;
+          if (curMonth > 11) { curMonth = 0; curYear++; }
+          // Break if the first day of the new month is already past the window.
+          if (new Date(curYear, curMonth, 1) > windowEnd) break;
+        }
+      }
+
+      // ── 2. Cancel existing scheduled notifications for this event ──────────
+      const existingIds = scheduledByEvent.get(event.id) ?? new Set<string>();
+      for (const nid of existingIds) {
+        await NotificationService.cancelNotification(nid);
+      }
+
+      // ── 3. Schedule fresh notifications ────────────────────────────────────
+      for (const occ of occurrences) {
+        // Build the fire date.
+        let fireDate: Date;
+        if (timedHour !== null && timedMinute !== null) {
+          // Timed event: apply the master's HH:MM to the occurrence date (local).
+          fireDate = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), timedHour, timedMinute, 0, 0);
+        } else {
+          // All-day event: 09:00 local on the occurrence date.
+          fireDate = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), 9, 0, 0, 0);
+        }
+        // Subtract reminder lead time.
+        fireDate = new Date(fireDate.getTime() - reminderMinutes * 60_000);
+
+        // Skip if fire time is in the past.
+        if (fireDate <= now) continue;
+
+        // Build occurrence date string for the id (YYYYMMDD).
+        const occDateStr =
+          `${occ.getFullYear()}` +
+          `${String(occ.getMonth() + 1).padStart(2, '0')}` +
+          `${String(occ.getDate()).padStart(2, '0')}`;
+        const notifId = `evt-${event.id}-${occDateStr}`;
+
+        await NotificationService.scheduleLocalNotification({
+          id: notifId,
+          title: event.summary,
+          body: `תזכורת: ${event.summary}`,
+          triggerDate: fireDate,
+        });
+      }
+    }
+  }
+
+  /**
    * Sweep-on-init model for Sefirat HaOmer reminders.
    * Schedules omer notifications for the next 10 calendar days at the user-
    * selected time. Idempotent — skips any id already in the scheduled set.

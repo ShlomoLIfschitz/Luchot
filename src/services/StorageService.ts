@@ -15,6 +15,7 @@ import {
   type SQLStatementArg,
   type ResultSet,
 } from 'expo-sqlite/legacy';
+import { HDate } from '@hebcal/core';
 import { CalendarEvent, NoteCategory } from '../schemas/EventSchema';
 import { formatDateKey, generateUUID } from '../utils/dateUtils';
 
@@ -716,5 +717,162 @@ export class StorageService {
       [],
     );
     return rows.map(StorageService.rowToEvent);
+  }
+
+  /**
+   * Returns master recurring events (daily/weekly/monthly) that have a
+   * reminder_minutes set and are not cancelled.  Exception/tombstone rows
+   * (is_exception = 1) are excluded — only master series rows are swept.
+   *
+   * Used by NotificationService.ensureRecurringReminders().
+   */
+  static async getRecurringRemindableEvents(): Promise<CalendarEvent[]> {
+    await ensureSchema();
+    const rows = await dbAll(
+      `SELECT * FROM events
+       WHERE reminder_minutes IS NOT NULL
+         AND recurrence_type IN ('daily', 'weekly', 'monthly')
+         AND status != 'cancelled'
+         AND is_exception = 0`,
+      [],
+    );
+    return rows.map(StorageService.rowToEvent);
+  }
+
+  /**
+   * Returns yearly recurring events that are candidates for the renewal prompt.
+   *
+   * SQL pre-filter:
+   *   - recurrence_type = 'yearly'
+   *   - reminder_minutes IS NOT NULL (event has a reminder set)
+   *   - renewal_ask_suppressed = 0 (user has not permanently suppressed)
+   *   - status != 'cancelled'
+   *   - last_renewal_ask IS NULL OR last_renewal_ask < date('now','-11 months')
+   *     (no ask in the past ~11 months — grace window before the anniversary)
+   *
+   * JS post-filter: include only events where the most-recent past occurrence
+   * (on or before today) exists AND is >= the event's created date.  This
+   * ensures brand-new yearly events whose first anniversary has not yet arrived
+   * are excluded.
+   *
+   * Gregorian yearly: occurrence = (month, day) of start_date in the current
+   *   year; if that falls after today, use the prior year.
+   * Hebrew yearly: derive the most-recent Gregorian date of (hebrewDate.day,
+   *   hebrewDate.month) at or before today using @hebcal/core HDate.  Try the
+   *   current Hebrew year; if its greg() is after today, try the prior year.
+   *   Skip if HDate construction fails (invalid / non-existent date).
+   */
+  static async getEventsNeedingRenewal(): Promise<CalendarEvent[]> {
+    await ensureSchema();
+    const rows = await dbAll(
+      `SELECT * FROM events
+       WHERE recurrence_type = 'yearly'
+         AND reminder_minutes IS NOT NULL
+         AND renewal_ask_suppressed = 0
+         AND status != 'cancelled'
+         AND (last_renewal_ask IS NULL OR last_renewal_ask < date('now', '-11 months'))`,
+      [],
+    );
+
+    const events = rows.map(StorageService.rowToEvent);
+
+    const today = new Date();
+    // Local midnight today — used for "is occurrence on or before today?" check.
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const result: CalendarEvent[] = [];
+
+    for (const event of events) {
+      const startDate = event.start.date; // YYYY-MM-DD
+      const created   = event.created;    // ISO string
+
+      if (!startDate || !created) continue;
+
+      // Parse created date to local midnight for comparison.
+      const [cy, cm, cd] = created.split('T')[0].split('-').map(Number);
+      const createdMidnight = new Date(cy, cm - 1, cd);
+
+      let mostRecentOccurrence: Date | null = null;
+      const recCal = event.hebrewExtensions.recurrenceCalendar;
+
+      if (recCal === 'hebrew') {
+        // Hebrew yearly: use hebrewDate fields.
+        const heb = event.hebrewExtensions.hebrewDate;
+        if (!heb) continue; // malformed — skip
+
+        const currentHYear = new HDate(today).getFullYear();
+        for (const tryYear of [currentHYear, currentHYear - 1]) {
+          try {
+            const hdate = new HDate(heb.day, heb.month, tryYear);
+            const greg = hdate.greg(); // Returns a JS Date (local midnight)
+            const occMidnight = new Date(
+              greg.getFullYear(), greg.getMonth(), greg.getDate(),
+            );
+            if (occMidnight <= todayMidnight) {
+              mostRecentOccurrence = occMidnight;
+              break;
+            }
+          } catch {
+            // Invalid hebrew date for this year (e.g. Adar in non-leap) — try prior.
+            continue;
+          }
+        }
+      } else {
+        // Gregorian yearly (recurrenceCalendar = 'gregorian' or null).
+        const [, mStr, dStr] = startDate.split('-');
+        const month = parseInt(mStr, 10) - 1; // JS 0-indexed
+        const day   = parseInt(dStr, 10);
+
+        // Try this year's occurrence; if it's in the future, use last year's.
+        const thisYear = new Date(todayMidnight.getFullYear(), month, day);
+        if (thisYear <= todayMidnight) {
+          mostRecentOccurrence = thisYear;
+        } else {
+          mostRecentOccurrence = new Date(todayMidnight.getFullYear() - 1, month, day);
+        }
+      }
+
+      // Post-filter: most-recent occurrence must exist and be >= created date.
+      if (!mostRecentOccurrence) continue;
+      if (mostRecentOccurrence < createdMidnight) continue;
+
+      result.push(event);
+    }
+
+    return result;
+  }
+
+  /**
+   * Records that the renewal prompt was shown (or acted on) for the given event.
+   * Sets last_renewal_ask to today's date (YYYY-MM-DD) so the SQL grace window
+   * (`last_renewal_ask < date('now','-11 months')`) won't re-surface this event
+   * for ~11 months.
+   *
+   * Date format: YYYY-MM-DD — matches the SQLite date() function comparisons
+   * used in getEventsNeedingRenewal.
+   */
+  static async confirmRenewal(eventId: string): Promise<void> {
+    await ensureSchema();
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    await dbRun(
+      `UPDATE events SET last_renewal_ask = ?, updated = ? WHERE id = ?`,
+      [todayStr, new Date().toISOString(), eventId],
+    );
+  }
+
+  /**
+   * Permanently suppresses the renewal prompt for the given event.
+   * Sets renewal_ask_suppressed = 1 so the event is excluded from future
+   * getEventsNeedingRenewal() results regardless of last_renewal_ask.
+   *
+   * Per spec: suppressing does NOT cancel the reminder — notifications continue.
+   */
+  static async suppressRenewal(eventId: string): Promise<void> {
+    await ensureSchema();
+    await dbRun(
+      `UPDATE events SET renewal_ask_suppressed = 1, updated = ? WHERE id = ?`,
+      [new Date().toISOString(), eventId],
+    );
   }
 }

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useColorScheme, I18nManager } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, useColorScheme, I18nManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -38,6 +38,7 @@ export default function RootLayout() {
       dateService.setDiaspora(diaspora);
       useCalendarStore.getState().refreshMonth();
       await NotificationService.ensureAnnualReminders();
+      await NotificationService.ensureRecurringReminders();
       const { omerRemindersEnabled, omerReminderTime } = useSettingsStore.getState();
       await NotificationService.ensureOmerReminders(omerRemindersEnabled, omerReminderTime);
       const { candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity } =
@@ -58,6 +59,50 @@ export default function RootLayout() {
     const t = setTimeout(() => setForceReady(true), 3000);
     return () => clearTimeout(t);
   }, []);
+
+  // Yearly renewal prompt — runs AT MOST ONCE per launch, after settings load.
+  const renewalRanRef = useRef(false);
+  useEffect(() => {
+    if (!settingsReady) return;
+    if (renewalRanRef.current) return;
+    renewalRanRef.current = true;
+
+    async function runRenewalPrompts() {
+      const due = await StorageService.getEventsNeedingRenewal();
+      if (due.length === 0) return;
+
+      function showAt(index: number) {
+        if (index >= due.length) return;
+        const event = due[index];
+        Alert.alert(
+          'תזכורת שנתית',
+          `האם להמשיך לקבל תזכורת עבור ${event.summary}?`,
+          [
+            {
+              text: 'המשך',
+              onPress: async () => {
+                await StorageService.confirmRenewal(event.id);
+                showAt(index + 1);
+              },
+            },
+            {
+              text: 'אל תשאל שוב',
+              style: 'destructive',
+              onPress: async () => {
+                await StorageService.suppressRenewal(event.id);
+                showAt(index + 1);
+              },
+            },
+          ],
+          { cancelable: true, onDismiss: () => showAt(index + 1) },
+        );
+      }
+
+      showAt(0);
+    }
+
+    runRenewalPrompts().catch(console.error);
+  }, [settingsReady]);
 
   // All hooks are declared above this point — safe to early-return here.
   // Render nothing until persisted settings are loaded so the UI never
