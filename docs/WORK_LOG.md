@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-06-04 — Session: Day screen tabs + view modal fixes + colored bars + GPS
+
+**Phase:** Phase 5 (UX redesign + bug fixes)
+**Commits:** c39e70b, 6e28a23, 9cca8cd, 8d36f2b (4) + this docs entry
+**Sub-agents:** mobile-ui-builder (all UI edits, 3 rounds, per orchestrator authorization)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+**Pre-flight — lucide icons + GPS diagnosis (orchestrator)**
+- Confirmed `Cake`, `Flame`, `Gem`, `FileText` exist in `lucide-react-native@1.16.0` before importing.
+- GPS diagnosis: coordinate acquisition is NOT broken (NoteEditor uses the same `getCurrentPositionAsync` call that works in `app/locationPicker.tsx`). The silent failure was in result handling — `reverseGeocodeAsync` on Android can return `[]` (or an entry with null `street`/`city`) WITHOUT throwing, so the old `[r.street, r.city]` label was empty and the field silently stayed blank with no error.
+
+**Issue 1 — GPS location (mobile-ui-builder)** [c39e70b]
+- `src/components/notes/NoteEditor.tsx` `handleGPS` — isolated `reverseGeocodeAsync` in its own try/catch, widened candidate fields to `[name, street, city, district, subregion, region]`, de-dup via Set, and added a raw `lat,long` coordinate fallback so the field always populates. Existing GPS flow unchanged.
+
+**Issue 2 — View modal fixes + icons (mobile-ui-builder)** [6e28a23]
+- `NoteEditor.tsx` — removed the redundant "ערוך הערה" title from the VIEW-MODE header (kept ✕). Edit-mode title untouched.
+- Tap-to-edit: each view-mode field is now a Pressable; summary/location rows focus their TextInput via refs + a `focusTarget` effect, others just switch to edit mode.
+- Replaced emoji type icons with lucide (`note→FileText, birthday→Cake, yahrzeit→Flame, anniversary→Gem`, size 20 / textSecondary) in NoteEditor type chips + view row AND NoteList rows.
+
+**Issue 3 — Colored left bar (mobile-ui-builder)** [9cca8cd]
+- `src/components/notes/NoteList.tsx` — replaced the round color dot with a 4dp full-height vertical bar on the left edge of each row (last child in the `row-reverse` row; color = `resolveHexColor`). Style `colorBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, marginRight: 8 }`.
+
+**Issue 4 — Day screen two-tab layout (mobile-ui-builder)** [8d36f2b]
+- `app/(tabs)/day.tsx` — split into two internal tabs below the date header via `stickyHeaderIndices={[1]}`: **אירועים** (default — NoteList + a static "+ הוסף אירוע" button) and **תורה וזמנים** (read-only: holiday banner, Torah details, zmanim, hourly schedule). Removed the floating FAB and its now-unused `Plus`/`I18nManager` imports and `fab`/`bottomSpacer` styles. NoteEditor modal + `saveNote` retained (add button opens it).
+
+### Decisions made
+
+- None new — all changes implement the locked design decisions from the Architect prompt (two tabs, static add button, view-modal tap-to-edit, left color bar, GPS fix-not-replace, Option-style icon mapping).
+
+### Open issues / blocked
+
+- **Side effect of Issue 3:** the color dot doubled as the quick color-picker trigger. With the dot removed, the `colorPickerNote` Modal + state in NoteList are now **inert** (left in place per "do not refactor beyond spec"). Color is now edited via tapping a row → view mode → edit. Candidate for a future cleanup (remove the dead modal) or re-wire (make the bar tappable) if the Architect wants the shortcut back.
+- Minor dead code retained per spec: `notesByHour` memo in day.tsx, and a few unused styles (`noteRow`, `noteText`, `hourNote`, `hourNoteText`). Harmless; tsc green (`noUnusedLocals` off).
+- On-device verification needed (see Next steps).
+
+### Next steps
+
+- On-device confirm: (a) Day screen opens on "אירועים" tab; tab bar stays pinned while scrolling; (b) tapping a note → view modal with NO title, delete/edit/share toolbar; (c) tapping a field in view mode enters edit mode (summary/location focused); (d) GPS button fills the location field (address or lat,long fallback) and never silently no-ops; (e) lucide type icons render on chips + rows; (f) colored vertical bar on the left of each event row; (g) "+ הוסף אירוע" button sits below the list and never overlaps; (h) "תורה וזמנים" tab shows Torah/zmanim/hourly, read-only.
+
+---
+
 ## 2026-06-04 — Session: bugfix wave — delete reachability, Rosh Chodesh dedup, scrollbar
 
 **Phase:** Phase 5 (bug fixes)
