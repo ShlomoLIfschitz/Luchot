@@ -11,10 +11,10 @@ import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 
 export default function HebrewCalendarScreen() {
   const colors = useThemeColors();
-  const refreshMonth = useCalendarStore((s) => s.refreshMonth);
+  const refreshHebrewMonth = useCalendarStore((s) => s.refreshHebrewMonth);
 
-  // Populate initial month data — store initialises with monthData: [].
-  useEffect(() => { refreshMonth(); }, [refreshMonth]);
+  // Populate initial Hebrew month data — store initialises with hebrewMonthData: [].
+  useEffect(() => { refreshHebrewMonth(); }, [refreshHebrewMonth]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>

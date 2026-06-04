@@ -55,14 +55,21 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const router = useRouter();
   const {
     monthData,
+    hebrewMonthData,
     selectedDate,
     today,
     navigateMonth,
+    navigateHebrewMonth,
     navigateToMonth,
     setSelectedDate,
     currentMonth,
     currentYear,
   } = useCalendarStore();
+
+  // Mode-aware aliases — all grid construction and navigation use these.
+  const isHebrew = mode === 'hebrew';
+  const gridData = isHebrew ? hebrewMonthData : monthData;
+  const navigate = isHebrew ? navigateHebrewMonth : navigateMonth;
   const firstDayOfWeek = useSettingsStore((s) => s.firstDayOfWeek);
 
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -84,7 +91,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   // ── Layout direction ───────────────────────────────────────────────────────
   // Hebrew mode: row-reverse → Sunday at right edge, Shabbat at left edge.
   // Gregorian mode: row (LTR) → Sunday at left edge, Saturday at right edge.
-  const isRtl = mode === 'hebrew';
+  const isRtl = isHebrew;
 
   // ── Day name selection ─────────────────────────────────────────────────────
   const dayNames = mode === 'hebrew'
@@ -97,15 +104,15 @@ export function MonthGrid({ mode }: MonthGridProps) {
   // handled by flexDirection on the row container — the offset itself is
   // the same for both modes.
   const startDayOffset = useMemo(() => {
-    if (!monthData.length) return 0;
-    const firstDay = monthData[0].gregorianDate.getDay();
+    if (!gridData.length) return 0;
+    const firstDay = gridData[0].gregorianDate.getDay();
     return firstDayOfWeek === 1 ? (firstDay + 6) % 7 : firstDay;
-  }, [monthData, firstDayOfWeek]);
+  }, [gridData, firstDayOfWeek]);
 
   // Build a 2-D array of weeks: each inner array has exactly 7 entries
   // (null for padding cells, DayData for real days).
   const weeks = useMemo<(DayData | null)[][]>(() => {
-    if (!monthData.length) return [];
+    if (!gridData.length) return [];
     const result: (DayData | null)[][] = [];
     let currentWeek: (DayData | null)[] = [];
 
@@ -114,7 +121,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
       currentWeek.push(null);
     }
     // Days of the month
-    for (const day of monthData) {
+    for (const day of gridData) {
       currentWeek.push(day);
       if (currentWeek.length === 7) {
         result.push(currentWeek);
@@ -128,16 +135,16 @@ export function MonthGrid({ mode }: MonthGridProps) {
     if (currentWeek.length === 7) result.push(currentWeek);
 
     return result;
-  }, [monthData, startDayOffset]);
+  }, [gridData, startDayOffset]);
 
   // ── Notes for the displayed month ─────────────────────────────────────────
   const gridStart = useMemo(
-    () => (monthData.length ? monthData[0].gregorianDate : new Date()),
-    [monthData],
+    () => (gridData.length ? gridData[0].gregorianDate : new Date()),
+    [gridData],
   );
   const gridEnd = useMemo(
-    () => (monthData.length ? monthData[monthData.length - 1].gregorianDate : new Date()),
-    [monthData],
+    () => (gridData.length ? gridData[gridData.length - 1].gregorianDate : new Date()),
+    [gridData],
   );
   const notesByDate = useDatesNotes(gridStart, gridEnd, refreshKey);
 
@@ -198,7 +205,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   );
 
   // ── Swipe gesture ──────────────────────────────────────────────────────────
-  const onSwipe = useCallback((vx: number) => navigateMonth(swipeDirection(vx)), [navigateMonth]);
+  const onSwipe = useCallback((vx: number) => navigate(swipeDirection(vx)), [navigate]);
 
   const swipeGesture = Gesture.Pan()
     .activeOffsetX([-15, 15])
@@ -214,13 +221,23 @@ export function MonthGrid({ mode }: MonthGridProps) {
   }, [currentMonth, currentYear]);
 
   const hebrewMonthTitle = useMemo(() => {
-    if (!monthData.length) return '';
-    const anchor = monthData[Math.min(14, monthData.length - 1)];
-    return `${anchor.hebrewDate.monthName} ${toHebrewYear(anchor.hebrewDate.year)}`;
-  }, [monthData]);
+    if (!gridData.length) return '';
+    return `${gridData[0].hebrewDate.monthName} ${toHebrewYear(gridData[0].hebrewDate.year)}`;
+  }, [gridData]);
 
-  const primaryTitle   = mode === 'hebrew' ? hebrewMonthTitle : gregMonthName;
-  const secondaryTitle = mode === 'hebrew' ? gregMonthName    : hebrewMonthTitle;
+  // Gregorian subtitle for the Hebrew tab. A Hebrew month spans ~2 Gregorian
+  // months, so label it by the Gregorian month of the Hebrew month's midpoint.
+  // gregMonthName (currentMonth/currentYear) tracks only the Gregorian cursor,
+  // which the Hebrew tab never navigates — using it here would freeze the
+  // subtitle as the user swipes through Hebrew months.
+  const hebrewGregSubtitle = useMemo(() => {
+    if (!gridData.length) return '';
+    const mid = gridData[Math.floor(gridData.length / 2)].gregorianDate;
+    return mid.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+  }, [gridData]);
+
+  const primaryTitle   = mode === 'hebrew' ? hebrewMonthTitle  : gregMonthName;
+  const secondaryTitle = mode === 'hebrew' ? hebrewGregSubtitle : hebrewMonthTitle;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -229,7 +246,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
 
         {/* Month Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => navigateMonth(1)} hitSlop={12}>
+          <Pressable onPress={() => navigate(1)} hitSlop={12}>
             <Text style={[styles.navArrow, { color: colors.accent }]}>‹</Text>
           </Pressable>
 
@@ -245,7 +262,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
             </Text>
           </Pressable>
 
-          <Pressable onPress={() => navigateMonth(-1)} hitSlop={12}>
+          <Pressable onPress={() => navigate(-1)} hitSlop={12}>
             <Text style={[styles.navArrow, { color: colors.accent }]}>›</Text>
           </Pressable>
         </View>
