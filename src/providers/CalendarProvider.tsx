@@ -1,6 +1,7 @@
 // src/providers/CalendarProvider.tsx
 
 import { create } from 'zustand';
+import { HDate } from '@hebcal/core';
 import { dateService, DayData } from '../services/DateService';
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -14,6 +15,9 @@ interface CalendarState {
   monthData: DayData[];
   diaspora: boolean;
   notesVersion: number;
+  currentHebrewYear: number;
+  currentHebrewMonth: number;
+  hebrewMonthData: DayData[];
 
   setViewMode: (mode: ViewMode) => void;
   setSelectedDate: (date: Date) => void;
@@ -22,7 +26,12 @@ interface CalendarState {
   setDiaspora: (value: boolean) => void;
   refreshMonth: () => void;
   incrementNotesVersion: () => void;
+  navigateHebrewMonth: (direction: 1 | -1) => void;
+  refreshHebrewMonth: () => void;
 }
+
+// Compute today's Hebrew date once at store creation
+const _todayHD = new HDate();
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
   viewMode: 'month',
@@ -33,6 +42,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   monthData: [],
   diaspora: false,
   notesVersion: 0,
+  currentHebrewYear: _todayHD.getFullYear(),
+  currentHebrewMonth: _todayHD.getMonth(),
+  hebrewMonthData: [],
 
   setViewMode: (mode) => set({ viewMode: mode }),
 
@@ -65,4 +77,19 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   },
 
   incrementNotesVersion: () => set((s) => ({ notesVersion: s.notesVersion + 1 })),
+
+  navigateHebrewMonth: (direction) => {
+    const { currentHebrewMonth, currentHebrewYear } = get();
+    const stepped = new HDate(1, currentHebrewMonth, currentHebrewYear).add(direction, 'months');
+    const newMonth = stepped.getMonth();
+    const newYear = stepped.getFullYear();
+    const hebrewMonthData = dateService.getHebrewMonthData(newYear, newMonth);
+    set({ currentHebrewMonth: newMonth, currentHebrewYear: newYear, hebrewMonthData });
+  },
+
+  refreshHebrewMonth: () => {
+    const { currentHebrewMonth, currentHebrewYear } = get();
+    const hebrewMonthData = dateService.getHebrewMonthData(currentHebrewYear, currentHebrewMonth);
+    set({ hebrewMonthData });
+  },
 }));
