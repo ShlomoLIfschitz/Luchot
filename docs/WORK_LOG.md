@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-06-04 — Session: bugfix wave — delete reachability, Rosh Chodesh dedup, scrollbar
+
+**Phase:** Phase 5 (bug fixes)
+**Commits:** d8dd5f4, 65ec66c, 02d4975 (3) + this docs entry
+**Sub-agents:** mobile-ui-builder (all UI edits, per orchestrator authorization)
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 16/17 baseline). OTA pushed.
+
+### What was done
+
+**Pre-flight — StorageService positional INSERT audit (orchestrator)**
+- The `INSERT OR REPLACE INTO events VALUES(?…)` is positional (23 `?`). Audited physical column order vs. saveEvent's argument array across install histories. Git confirms `color_id` was in CREATE TABLE since the **initial commit** (b38efee, position 18) — never appended via ALTER, so the v3 ALTER guard always no-ops. `reminder_minutes` (v2) and `location` (v4) were appended at the end in the same order the INSERT lists them. **Result: slots match for both fresh and upgraded installs — no mismatch.** (My earlier "latent risk" flag from the diagnosis session was over-cautious; git disproves it.)
+
+**Issue 5 — Settings scrollbar (mobile-ui-builder)** [d8dd5f4]
+- `app/settings.tsx` — added `showsVerticalScrollIndicator={false}` to the one remaining ScrollView (all other screens already had it).
+
+**Issue 2 — Rosh Chodesh double tag (mobile-ui-builder)** [65ec66c]
+- `src/utils/tagMapper.ts` — Rosh Chodesh was tagged twice: once from `dayData.holidays[]` ("ראש חודש סיון", rendered as a holiday tag) and once from the `isRoshChodesh` boolean (generic "ראש חודש"). Added a guard `hasRoshChodeshHoliday = dayData.holidaysEn.some(h => h.startsWith('Rosh Chodesh'))`; the boolean tag is skipped when that's true. Display-side fix only — Option A; DateService.ts / holidays[] untouched (locked).
+
+**Issue 1 + 3 — Delete/view modal + colored dot on Day screen (mobile-ui-builder)** [02d4975]
+- Root cause (from diagnosis): existing notes were static `<Text>` rows on the Day screen → never opened NoteEditor in view mode → the delete/edit/share toolbar (the only delete affordance in the editor) never rendered. The fully-wired `NoteList` (tap-to-open, colored dot, inline ✕ delete, `note` + `onDelete` passed to NoteEditor) was **never mounted anywhere**.
+- `src/components/notes/NoteList.tsx` — added optional `hideAddButton?: boolean`; suppresses its built-in "+ הוסף הערה" button when true (keeps the "הערות" title). All existing delete/dot/editor wiring untouched.
+- `app/(tabs)/day.tsx` — imported and mounted `<NoteList date={selectedDate} hebrewDate={dayData.hebrewDate} hideAddButton />` in place of the static "אירועי היום" rows; removed the (always-empty) per-hour note rendering from the hourly schedule. FAB and its create-new-note `NoteEditor` left unchanged. `notesByHour` memo left in place per spec (now unused; tsc passes — `noUnusedLocals` is off).
+
+**Issue 4 — FAB overlap (no change required)**
+- Verified geometry: bottom clearance = `bottomSpacer` 60 + `scrollContent.paddingBottom` 100 = 160px; FAB reaches 80px up (bottom 24 + height 56). NoteList now sits above the always-present 24-row hourly schedule, so note rows are never the bottom-most content and cannot be obscured. No code change made (see deviation note).
+
+### Decisions made
+
+- None new — all changes follow locked decisions (Option A for Issue 2; mobile-ui-builder owns UI; OTA for JS-only changes).
+
+### Open issues / blocked
+
+- **Deviation:** the plan anticipated a 4th commit for Issue 4 (FAB padding). With NoteList placed above the long hourly schedule and the existing 160px bottom clearance, no note row can be obscured by the FAB — so no edit was warranted. 3 issue-commits instead of 4; fabricating a padding change would be unnecessary churn.
+- Minor: `notesByHour` memo (and a few now-unused styles: `noteRow`, `noteText`, `hourNote`, `hourNoteText`) are dead in day.tsx. Left untouched per spec; harmless (tsc green). Candidate for a future cleanup pass.
+- On-device verification needed (see Next steps).
+
+### Next steps
+
+- On-device confirm: (a) tapping an existing note on the Day screen opens NoteEditor in **view mode** with the delete/edit/share toolbar; (b) delete from the toolbar removes the note and the list refreshes; (c) colored dot shows next to each note; (d) Rosh Chodesh shows a single tag in month/week grids; (e) Settings scrolls with no visible scrollbar; (f) FAB does not cover any note row.
+- Note: the **previous** session's WORK_LOG listed "view mode appears when tapping existing note from NoteList" as a verification item — that path was never reachable until this session mounted NoteList.
+
+---
+
 ## 2026-06-04 — Session: NoteEditor redesign — view/edit modes + toolbar + location field
 
 **Phase:** Phase 5 (UX enhancement)
