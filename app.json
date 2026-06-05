@@ -18,7 +18,7 @@
       "package": "app.luchot",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F8F7F4"
+        "backgroundColor": "#1E4BA2"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
