@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-06-17 — Session: NoteEditor UX fixes (keyboard scroll + inline reminder-time chip)
+
+**Phase:** Phase 5 (post-Gal-C cleanup)
+**Sub-agents:** mobile-ui-builder (both fixes in `src/components/notes/NoteEditor.tsx`). Orchestrator: read-only investigation, surfaced a locked-decision conflict for the user's call, ran the DoD gate, committed + OTA.
+**Status:** Complete. DoD passed (typecheck 0 errors, expo-doctor 17/17). JS-only — OTA pushed.
+
+### What was done
+
+- **Bug 5 — keyboard hid NoteEditor fields (mobile-ui-builder).** The bottom-sheet content was already inside a `KeyboardAvoidingView` but not scrollable, so opening the keyboard pushed the title off the top with no way to reach it. Fix: wrapped the view/edit mode ternary in a bounded `ScrollView` (`keyboardShouldPersistTaps="handled"`, `showsVerticalScrollIndicator={false}`) inside `View(s.sheet)` below the drag handle, and added `maxHeight: '85%'` to `s.sheet` to give the ScrollView bounds. The KAV got **no** `flex:1` (that would unpin the bottom sheet); both `TouchableWithoutFeedback` close-guards and all `row-reverse` rows preserved.
+- **Bug 4 — reminder time prompt re-fired on every save (mobile-ui-builder).** Previously, saving an all-day event with a reminder fired the time picker as a modal prompt every time (deferred-save via `pendingSaveTarget` + `triggerSaveWithReminderTime`). Replaced with an **always-visible inline "שעת תזכורת" chip** shown when `allDay && reminderEnabled`, directly below the reminder toggle; tapping it opens the existing `useTimeOfDayPicker`. Removed the `pendingSaveTarget`/`triggerSaveWithReminderTime` state, the deferred-save effect, and the save-time auto-prompt branch in `doDirectSave`; `onSave` now always passes a concrete `reminderTime` (`allDay ? reminderTime : null`), so the locked C2 defensive-09:00 path never fires silently. `reminderTime` default stays 09:00 — now the honest displayed default rather than a hidden fallback.
+
+### Decisions made
+
+- **Approach chosen by user: inline time chip (UI-only)** over (a) full end-to-end persistence of the clock-time or (b) implementing the brief's "guard the prompt" literally. Rationale: option (b) would have hit the C2 defensive-09:00 fallback on every re-save of an existing all-day reminder (the clock-time is not persisted in `CalendarNote`), silently resetting the user's chosen time — a regression. The inline chip kills the repeating prompt while always supplying a concrete time. No new DECISIONS.md entry (no new architectural lock; respects the existing C2 contract).
+
+### Open issues / blocked
+
+- **KNOWN CAVEAT (accepted) — reminder clock-time is not persisted.** Re-editing an existing all-day reminder shows 09:00 in the chip, not the originally-picked time, because `CalendarNote` stores only `reminderMinutes` (the lead), never the clock anchor. Acceptable for now. True fix = persist `reminderClockTime` end-to-end (database-architect migration + local-data-builder save/load + UI) — a separate future task.
+- Pre-existing post-Gal-C backlog unchanged: exception-aware recurring reminders; LocationProvider+SettingsProvider unify; Holiday card; Hebrew month/year picker; weekly-DST verify.
+
+### Next steps
+
+- **On-device verification (this feature):** open NoteEditor, tap title → keyboard no longer hides it, can scroll to all fields; create an all-day birthday with a reminder → "שעת תזכורת" chip appears showing 09:00, no auto modal on save; tap chip → picker opens, picked time persists in the chip and is used for the notification; edit an existing all-day reminder → chip shows 09:00 (the accepted caveat), saving does not silently break the reminder; timed events still anchor off start time (no chip).
+
+---
+
 ## 2026-06-17 — Micro-entry: expo-doctor baseline 16/17 → 17/17
 
 - Committed the standalone `POST_NOTIFICATIONS` permission gate on the event-reminder toggle in NoteEditor (`acf610c`).

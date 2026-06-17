@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { MapPin, Pencil, Trash2, Share2, Cake, Flame, Gem, FileText, type LucideIcon } from 'lucide-react-native';
@@ -240,16 +241,6 @@ export function NoteEditor({
   // reminderTime: user-picked clock time that anchors an all-day reminder.
   // Only used when allDay=true && reminderEnabled=true.
   const [reminderTime, setReminderTime] = useState<Date>(defaultStartTime);
-  // pendingSaveTarget: non-null when we are waiting for the user to confirm a
-  // reminder time (allDay + reminder case) before calling onSave. It captures the
-  // RESOLVED save target ({id, date}) from doDirectSave so the deferred save uses
-  // the correct id/anchor — critical for the C3 "edit all" path, where id is the
-  // masterId and date is the series anchor (NOT the composite id / occurrence date).
-  const [pendingSaveTarget, setPendingSaveTarget] = useState<{ id?: string; date: Date } | null>(null);
-
-  // Trigger flag for the deferred all-day+reminder save flow.
-  // Declared before handleReminderTimeChange so the setter is in scope.
-  const [triggerSaveWithReminderTime, setTriggerSaveWithReminderTime] = useState<Date | null>(null);
 
   // ── Time pickers (all three hooks BEFORE any early return — Rules of Hooks) ──
   const {
@@ -262,17 +253,10 @@ export function NoteEditor({
     picker: endPicker,
   } = useTimeOfDayPicker(endTime ?? defaultStartTime(), useCallback((d: Date) => setEndTime(d), []), use24hTime);
 
-  // Reminder time picker: when confirmed, store the picked time AND trigger the
-  // pending save (if pendingSaveTarget is set).
+  // Reminder time picker: when confirmed, store the picked time.
   const handleReminderTimeChange = useCallback((d: Date) => {
     setReminderTime(d);
-    if (pendingSaveTarget) {
-      // We do not call onSave here — the save is triggered by the effect below
-      // so React state has settled before we read it. The effect reads
-      // pendingSaveTarget for the correct id/anchor and clears it.
-      setTriggerSaveWithReminderTime(d);
-    }
-  }, [pendingSaveTarget]);
+  }, []);
 
   const handleReminderToggle = useCallback(async (next: boolean) => {
     // Turning OFF — no permission needed.
@@ -305,55 +289,6 @@ export function NoteEditor({
     picker: reminderTimePicker,
   } = useTimeOfDayPicker(reminderTime, handleReminderTimeChange, use24hTime);
 
-  // ── Effect: execute deferred save once reminder time is committed ─────────────
-  useEffect(() => {
-    if (triggerSaveWithReminderTime === null) return;
-    // Snapshot the time so we can clear the trigger immediately.
-    const rTime = triggerSaveWithReminderTime;
-    setTriggerSaveWithReminderTime(null);
-    // Resolved save target captured by doDirectSave (id + anchor). For edit-all
-    // this is the masterId + series anchor; for a normal save it's note?.id + date.
-    const target = pendingSaveTarget;
-    setPendingSaveTarget(null);
-
-    const trimmed = summary.trim();
-    if (!trimmed) return;
-    const finalReminderMinutes: number | null = (() => {
-      if (!reminderEnabled) return null;
-      if (reminderMinutes === -1) {
-        const parsed = parseInt(customMinutes, 10);
-        return isNaN(parsed) || parsed < 0 ? 0 : parsed;
-      }
-      return reminderMinutes;
-    })();
-
-    onSave({
-      id: target?.id,
-      created: note?.created,
-      summary: trimmed,
-      noteType,
-      calendarType,
-      date: target?.date ?? date,
-      hebrewDate,
-      reminderMinutes: finalReminderMinutes,
-      colorId,
-      location: location.trim() || null,
-      allDay: true,
-      startTime: null,
-      endTime: null,
-      reminderTime: rTime,
-      recurrenceType,
-      recurrenceCalendar: recurrenceType === 'yearly' ? recurrenceCalendar : null,
-    });
-    if (target?.id) {
-      setIsViewMode(true);
-    } else {
-      onClose();
-    }
-  // We intentionally only depend on triggerSaveWithReminderTime so this fires
-  // exactly once per committed reminder-time, not on every state change.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerSaveWithReminderTime]);
 
   // ── Reset state when modal opens / note changes ───────────────────────────────
   useEffect(() => {
@@ -368,8 +303,6 @@ export function NoteEditor({
       setColorId(note?.colorId ?? null);
       setLocation(note?.location ?? '');
       setIsViewMode(!!note);
-      setPendingSaveTarget(null);
-      setTriggerSaveWithReminderTime(null);
 
       // C3: init recurrence picker from existing note; default to 'none' for new notes.
       const initRecurrenceType: RecurrenceType = note?.recurrenceType ?? 'none';
@@ -441,15 +374,6 @@ export function NoteEditor({
     if (!trimmed) return;
     const finalReminderMinutes = computeFinalReminderMinutes();
 
-    // All-day + reminder: must pick a clock time before saving. Capture the
-    // resolved save target so the deferred save uses the correct id/anchor
-    // (masterId + series anchor on the C3 edit-all path).
-    if (allDay && reminderEnabled && finalReminderMinutes !== null) {
-      setPendingSaveTarget({ id: overrideId, date: anchorDate ?? date });
-      openReminderTimePicker();
-      return;
-    }
-
     onSave({
       id: overrideId,
       created: note?.created,
@@ -464,7 +388,7 @@ export function NoteEditor({
       allDay,
       startTime: allDay ? null : startTime,
       endTime: allDay ? null : endTime,
-      reminderTime: undefined,
+      reminderTime: allDay ? reminderTime : null,
       recurrenceType,
       recurrenceCalendar: recurrenceType === 'yearly' ? recurrenceCalendar : null,
     });
@@ -623,6 +547,10 @@ export function NoteEditor({
               <View style={[s.sheet, { backgroundColor: colors.surface }]}>
                 <View style={[s.handle, { backgroundColor: colors.border }]} />
 
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
                 {isViewMode ? (
                   // ── VIEW MODE ──────────────────────────────────────────────
                   <>
@@ -972,6 +900,25 @@ export function NoteEditor({
                       />
                     </View>
 
+                    {/* Inline reminder time chip — shown only for all-day events with reminder on */}
+                    {allDay && reminderEnabled && (
+                      <View style={s.timeFieldRow}>
+                        {/* label — JSX-first = rightmost (row-reverse) */}
+                        <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>שעת תזכורת</Text>
+                        {/* chip — JSX-last = leftmost */}
+                        <Pressable
+                          onPress={openReminderTimePicker}
+                          style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`שעת תזכורת: ${formatHM(reminderTime, use24hTime)}`}
+                        >
+                          <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
+                            {formatHM(reminderTime, use24hTime)}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    )}
+
                     {reminderEnabled && (
                       <>
                         <View style={s.leadTimeRow}>
@@ -1030,6 +977,7 @@ export function NoteEditor({
                     </View>
                   </>
                 )}
+                </ScrollView>
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
@@ -1041,7 +989,7 @@ export function NoteEditor({
 
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36 },
+  sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36, maxHeight: '85%' },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
   title: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'right' },
