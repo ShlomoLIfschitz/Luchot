@@ -19,6 +19,7 @@ import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useTimeOfDayPicker } from '../../hooks/useTimeOfDayPicker';
 import { splitInstanceId } from '../../utils/recurringId';
 import type { RecurrenceType, NoteCategory } from '../../schemas/EventSchema';
+import * as Notifications from 'expo-notifications';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -272,6 +273,32 @@ export function NoteEditor({
       setTriggerSaveWithReminderTime(d);
     }
   }, [pendingSaveTarget]);
+
+  const handleReminderToggle = useCallback(async (next: boolean) => {
+    // Turning OFF — no permission needed.
+    if (!next) {
+      setReminderEnabled(false);
+      return;
+    }
+    // Turning ON — ensure POST_NOTIFICATIONS before enabling, so scheduled
+    // reminders are actually delivered (Android 13+). The switch stays OFF
+    // (controlled by reminderEnabled) until permission is confirmed granted.
+    let { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      const req = await Notifications.requestPermissionsAsync();
+      status = req.status;
+    }
+    if (status === 'granted') {
+      setReminderEnabled(true);
+    } else {
+      setReminderEnabled(false);
+      Alert.alert(
+        'נדרשת הרשאה',
+        'כדי לקבל תזכורות, יש לאפשר התראות בהגדרות המכשיר',
+        [{ text: 'אישור' }],
+      );
+    }
+  }, []);
 
   const {
     openPicker: openReminderTimePicker,
@@ -940,7 +967,7 @@ export function NoteEditor({
                       </Text>
                       <Switch
                         value={reminderEnabled}
-                        onValueChange={setReminderEnabled}
+                        onValueChange={handleReminderToggle}
                         trackColor={{ false: colors.border, true: colors.accent }}
                       />
                     </View>
