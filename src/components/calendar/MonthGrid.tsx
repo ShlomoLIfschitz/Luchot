@@ -7,9 +7,9 @@
 //               direction. Hebrew mode: row-reverse (Sunday right, Shabbat left).
 //               Gregorian mode: row (Sunday left, Saturday right).
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -75,6 +75,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [actionSheetDate, setActionSheetDate] = useState<Date | null>(null);
   const actionSheetRef = useRef<BottomSheet>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   // NoteEditor state — opened by addNote / addRecurring quick actions.
   const [noteEditorVisible, setNoteEditorVisible] = useState(false);
@@ -152,6 +153,20 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const isSameDay = useCallback((a: Date, b: Date) => {
     return a.toDateString() === b.toDateString();
   }, []);
+
+  // ── Scroll-grid derived values ─────────────────────────────────────────────
+  const weekCount = weeks.length;
+  const needsScroll = weekCount > 5;
+  const selectedRowIndex = useMemo(
+    () => weeks.findIndex((week) => week.some((day) => day != null && isSameDay(day.gregorianDate, selectedDate))),
+    [weeks, selectedDate, isSameDay],
+  );
+
+  useEffect(() => {
+    if (needsScroll && selectedRowIndex >= 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({ y: selectedRowIndex * 110, animated: true });
+    }
+  }, [needsScroll, selectedRowIndex]);
 
   // ── Label computation ──────────────────────────────────────────────────────
   const getLabels = useCallback(
@@ -240,6 +255,48 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const secondaryTitle = mode === 'hebrew' ? hebrewGregSubtitle : hebrewMonthTitle;
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  // Extract grid rows into a const so the conditional wrapper below doesn't
+  // duplicate the JSX. All variables (getLabels, today, selectedDate,
+  // notesByDate, handlers) are in scope here, above the return.
+  const gridRows = weeks.map((week, wIdx) => (
+    <View
+      key={wIdx}
+      style={[styles.weekRow, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}
+    >
+      {week.map((day, dIdx) => {
+        if (!day) {
+          return <View key={`e-${wIdx}-${dIdx}`} style={styles.emptyCell} />;
+        }
+
+        const { primary, secondary } = getLabels(day);
+        const isToday    = isSameDay(day.gregorianDate, today);
+        const isSelected = isSameDay(day.gregorianDate, selectedDate);
+        const isFriday   = day.gregorianDate.getDay() === 5;
+        const dayKey     = formatDateKey(day.gregorianDate);
+        const dayNotes   = notesByDate.get(dayKey) ?? [];
+        const tags       = buildDayTags(day, dayNotes);
+
+        return (
+          <View key={day.gregorianDate.toISOString()} style={styles.cellWrapper}>
+            <DayCell
+              primaryLabel={primary}
+              secondaryLabel={secondary}
+              isToday={isToday}
+              isSelected={isSelected}
+              isShabbat={day.hebrewDate.isShabbat}
+              isHoliday={day.isYomTov || day.holidays.length > 0}
+              isFriday={isFriday}
+              tags={tags}
+              onPress={() => handleDayPress(day)}
+              onLongPress={() => handleDayLongPress(day)}
+            />
+          </View>
+        );
+      })}
+    </View>
+  ));
+
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -267,7 +324,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
           </Pressable>
         </View>
 
-        {/* Day Name Headers — direction driven by mode */}
+        {/* Day Name Headers — direction driven by mode; always pinned above grid */}
         <View style={[styles.dayNames, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}>
           {dayNames.map((name, i) => (
             <Text key={i} style={[styles.dayName, { color: colors.textTertiary }]}>
@@ -277,47 +334,19 @@ export function MonthGrid({ mode }: MonthGridProps) {
         </View>
 
         {/* Calendar Grid — View-based 7-column layout.
-            Each week row uses the same direction as the day-name header.
-            DayCell is unchanged — flex: 1 on the wrapper distributes width. */}
-        <View>
-          {weeks.map((week, wIdx) => (
-            <View
-              key={wIdx}
-              style={[styles.weekRow, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}
-            >
-              {week.map((day, dIdx) => {
-                if (!day) {
-                  return <View key={`e-${wIdx}-${dIdx}`} style={styles.emptyCell} />;
-                }
-
-                const { primary, secondary } = getLabels(day);
-                const isToday    = isSameDay(day.gregorianDate, today);
-                const isSelected = isSameDay(day.gregorianDate, selectedDate);
-                const isFriday   = day.gregorianDate.getDay() === 5;
-                const dayKey     = formatDateKey(day.gregorianDate);
-                const dayNotes   = notesByDate.get(dayKey) ?? [];
-                const tags       = buildDayTags(day, dayNotes);
-
-                return (
-                  <View key={day.gregorianDate.toISOString()} style={styles.cellWrapper}>
-                    <DayCell
-                      primaryLabel={primary}
-                      secondaryLabel={secondary}
-                      isToday={isToday}
-                      isSelected={isSelected}
-                      isShabbat={day.hebrewDate.isShabbat}
-                      isHoliday={day.isYomTov || day.holidays.length > 0}
-                      isFriday={isFriday}
-                      tags={tags}
-                      onPress={() => handleDayPress(day)}
-                      onLongPress={() => handleDayLongPress(day)}
-                    />
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+            6-row months scroll vertically; ≤5-row months render as a static View. */}
+        {needsScroll ? (
+          <ScrollView
+            ref={scrollRef}
+            style={styles.gridScroll}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={true}
+          >
+            {gridRows}
+          </ScrollView>
+        ) : (
+          <View>{gridRows}</View>
+        )}
 
         {/* Month/Year Picker */}
         <MonthYearPicker
@@ -390,4 +419,8 @@ const styles = StyleSheet.create({
   // row height (110 px) so DayCell's flex:1 inside it expands correctly.
   cellWrapper: { flex: 1 },
   emptyCell:   { flex: 1 }, // height comes from weekRow stretch
+
+  // ScrollView wrapper for 6-row months. flex: 1 bounds it within the
+  // flex: 1 container so it can actually scroll rather than expanding freely.
+  gridScroll: { flex: 1 },
 });

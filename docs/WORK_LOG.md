@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-06-17 — Micro-entry: MonthGrid 6-row month scroll + auto-scroll
+
+**Sub-agents:** mobile-ui-builder (`src/components/calendar/MonthGrid.tsx`). Orchestrator: ran the pre-flight (parent-screen ScrollView check), DoD gate, commit + OTA.
+**Status:** Complete. DoD passed (typecheck 0, expo-doctor 17/17). JS-only — OTA pushed.
+
+- **Problem:** 6-week-row months render 660px (6×110) and the last row was clipped behind the bottom tab bar — unreachable. MonthGrid is a locked manual `View` grid (NOT a FlatList).
+- **Pre-flight:** confirmed neither parent screen (`app/(tabs)/index.tsx`, `app/(tabs)/gregorian.tsx`) has a ScrollView, so wrapping the grid internally introduces no nested-ScrollView conflict. Also noted the wrapping `GestureDetector` Pan uses `.failOffsetY([-15,15])` → it yields to vertical drags, so the new vertical ScrollView coexists with month-swipe.
+- **Fix:** the week-rows block is extracted into a `gridRows` const and rendered conditionally — `weekCount > 5` (i.e. 6-row months) wraps it in a `ScrollView` (`ref`, `style={styles.gridScroll}` = `flex:1`, no scroll indicator); ≤5-row months keep the byte-for-byte-unchanged static `<View>` (the common path, no behavior change). The day-name header stays pinned above the conditional. A `useEffect([needsScroll, selectedRowIndex])` auto-scrolls to `selectedRowIndex * 110` when a 6-row month mounts/changes, with a `selectedRowIndex >= 0` guard (no scroll when selectedDate isn't in the displayed month). `weekRow` height stays 110; no FlatList; RTL untouched; new `gridScroll` style is a StyleSheet token (no inline).
+
+### Next steps (on-device verification)
+- A 6-row month (e.g. a month starting late in the week) shows all 6 rows and scrolls to the selected day's row; month-swipe (horizontal) still works alongside vertical scroll; a 5-row month renders unchanged (no scroll, no jump); both Hebrew (RTL) and Gregorian tabs.
+
+---
+
 ## 2026-06-17 — Micro-entry: NoteEditor Android scroll-blocking fix
 
 **Sub-agents:** mobile-ui-builder (restructure in `src/components/notes/NoteEditor.tsx`). Orchestrator: diagnosed the root cause, ran the DoD gate, removed the now-dead `TouchableWithoutFeedback` import, committed + OTA.
