@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-06-17 — Micro-entry: expo-doctor baseline 16/17 → 17/17
+
+- Committed the standalone `POST_NOTIFICATIONS` permission gate on the event-reminder toggle in NoteEditor (`acf610c`).
+- During that commit's DoD gate, `npx expo-doctor` reported **17/17 checks passed** — the long-standing metro.config.js custom-config warning (which had held the baseline at 16/17 since a4889c3) resolved itself automatically. No config was touched to achieve this.
+- **expo-doctor baseline upgraded 16/17 → 17/17.** Updated CLAUDE.md (English DoD code-comment block, the build-gate paragraph, the react-native-svg known-issue note, and the Hebrew DoD summary) to drop the metro.config.js warning as a known/accepted failure. Docs-only change; no OTA.
+
+---
+
 ## 2026-06-05 — Session: Gal C — C4 recurring reminders + yearly renewal (Gal C closes)
 
 **Phase:** Phase 5 (Gal C, session 4 of 4 — closes Gal C: event time + full recurrence)

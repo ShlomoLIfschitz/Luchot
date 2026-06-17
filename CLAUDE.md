@@ -143,15 +143,14 @@ Before declaring ANY task complete, run via Bash and confirm exit code 0:
 npm run typecheck      # tsc --noEmit — the contract validator. MUST pass.
 npm run lint           # if a lint script exists; skip if not configured
 npx expo-doctor        # MUST NOT introduce any NEW failing checks beyond the
-                       # documented baseline. Current baseline: 16/17 — the one
-                       # known failure is the pre-existing metro.config.js custom-
-                       # config warning (see WORK_LOG, a4889c3), which is accepted
-                       # and NOT to be "fixed" — do not touch metro.config.js to
-                       # chase it. A task is blocked only if expo-doctor shows a
-                       # NEW failure (e.g. a missing peer dep — the react-native-svg
-                       # class of bug). If the metro warning is ever resolved, the
-                       # baseline becomes 17/17 and the same rule applies: no new
-                       # failures. Runs every task, even when deps were not touched.
+                       # documented baseline. Current baseline: 17/17 (all checks
+                       # pass). The pre-existing metro.config.js custom-config
+                       # warning that previously held the baseline at 16/17 (see
+                       # WORK_LOG, a4889c3) resolved itself as of acf610c — there is
+                       # no longer any accepted/known failure. A task is blocked if
+                       # expo-doctor shows ANY failure (e.g. a missing peer dep — the
+                       # react-native-svg class of bug). Runs every task, even when
+                       # deps were not touched.
 # npm test             # ONLY when test-engineer is active (currently dormant)
 ```
 
@@ -175,7 +174,7 @@ For **data-layer / schema changes**, add manual verification:
 - Run the app with existing data present (upgrade scenario), confirm migration applies cleanly and no data loss.
 - Confirm queries return expected shapes (validation doesn't throw).
 
-For **anything touching the build** (rare; user-approved): the EAS preview build must show no new `expo-doctor` failures beyond the documented baseline (currently 16/17 — the known metro.config.js warning is non-fatal for the build) before queuing. A NEW failure — e.g. a missing native peer dep like `react-native-svg` — must block the build, since it will crash the standalone APK.
+For **anything touching the build** (rare; user-approved): the EAS preview build must show no new `expo-doctor` failures beyond the documented baseline (currently 17/17 — all checks pass; the formerly-known metro.config.js warning resolved itself as of acf610c) before queuing. A NEW failure — e.g. a missing native peer dep like `react-native-svg` — must block the build, since it will crash the standalone APK.
 
 If any check fails: identify the owner from the ownership table, delegate the fix with the **exact error text**, re-run the failing check. Do not proceed until green.
 
@@ -348,7 +347,7 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 
 - `kosher-zmanim` 0.9.x ships extensionless ESM imports. `scripts/patch-expo-sqlite-imports.cjs` (postinstall) handles `expo-sqlite`. Similar new deps may need similar patches.
 - SQLite uses the **`expo-sqlite/legacy`** entry point (classic v13 path: `openDatabase` + `transactionAsync`/`executeSqlAsync`). The non-legacy v14 API (`openDatabaseAsync`/`openDatabaseSync`) routes through a native module not present in Expo Go and will crash there. (Locked — DECISIONS.md.)
-- `react-native-svg` is a required peer dep of `lucide-react-native`. Expo Go bundles its own copy, which masks the dependency — but a standalone APK needs it installed explicitly, or it crashes on first icon render. `expo doctor` must show no new failures beyond baseline (16/17) before any EAS build.
+- `react-native-svg` is a required peer dep of `lucide-react-native`. Expo Go bundles its own copy, which masks the dependency — but a standalone APK needs it installed explicitly, or it crashes on first icon render. `expo doctor` must show no new failures beyond baseline (17/17 — all checks pass) before any EAS build.
 - `@gorhom/bottom-sheet` v4 does NOT handle the Android hardware back button. Always wire `BackHandler` manually (see SCREENS.md).
 - New settings must be referenced in **both** `save()` and `loadFromStorage()` (the `use24hTime` persistence bug). Watch for this whenever adding a setting.
 - All SQLite access is serialized through `runExclusive` (single-flight queue) in StorageService. `expo-sqlite/legacy` deadlocks if two `transactionAsync` calls overlap on the one shared connection — the gate makes overlap impossible, so callers may use `Promise.all` / fire-and-forget freely. Do not bypass it. (Locked — DECISIONS.md, 2026-06-03.)
@@ -409,7 +408,7 @@ WORK_LOG.md + ROADMAP.md ממשיכים כרגיל. **אין** PROGRESS.md. נו
 offline-first ללא backend לעולם · EventSchema תואם Google Calendar · 4 טאבים + drawer · hebcal v5.x · `row-reverse` ל-RTL · `expo-sqlite/legacy`.
 
 ### Definition of Done (אתה מריץ, לא ה-agents)
-`npm run typecheck` חייב לעבור. lint אם קיים. **`npx expo-doctor` — אסור שיופיעו כשלונות חדשים מעבר ל-baseline המתועד** — ה-baseline הנוכחי הוא 16/17: הכשל היחיד הוא warning קיים על metro.config.js (ראה WORK_LOG, a4889c3) — מקובל, אין "לתקן" אותו, ואין לגעת ב-metro.config.js בגללו. משימה חסומה רק אם מופיע כשל חדש (למשל peer dependency חסר — באג מסוג react-native-svg). אם נגעו ב-deps — גם `npx expo install --check`. `npm test` רק כש-test-engineer פעיל (כרגע רדום). לשינויי data — אימות ידני של migration על data קיים. לבנייה — `expo doctor` כבר חלק מה-DoD.
+`npm run typecheck` חייב לעבור. lint אם קיים. **`npx expo-doctor` — אסור שיופיעו כשלונות חדשים מעבר ל-baseline המתועד** — ה-baseline הנוכחי הוא 17/17 (כל הבדיקות עוברות): ה-warning שהיה על metro.config.js (ראה WORK_LOG, a4889c3) — שהחזיק את ה-baseline על 16/17 — נפתר מעצמו החל מ-acf610c, ואין יותר כשל ידוע/מקובל. משימה חסומה אם מופיע כל כשל (למשל peer dependency חסר — באג מסוג react-native-svg). אם נגעו ב-deps — גם `npx expo install --check`. `npm test` רק כש-test-engineer פעיל (כרגע רדום). לשינויי data — אימות ידני של migration על data קיים. לבנייה — `expo doctor` כבר חלק מה-DoD.
 
 ### דברים שאסור (תוספות מעל הקיים)
 אל תפעיל agents רדומים. אל תתקין peer deps בשקט — הצף ושאל. שאר ה-do-nots בקטע האנגלי.
