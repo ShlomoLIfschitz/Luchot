@@ -6,6 +6,16 @@
 
 ---
 
+## 2026-06-17 — Micro-entry: NoteEditor Android scroll-blocking fix
+
+**Sub-agents:** mobile-ui-builder (restructure in `src/components/notes/NoteEditor.tsx`). Orchestrator: diagnosed the root cause, ran the DoD gate, removed the now-dead `TouchableWithoutFeedback` import, committed + OTA.
+**Status:** Complete. DoD passed (typecheck 0, expo-doctor 17/17). JS-only — OTA pushed.
+
+- **Follow-up to the keyboard-scroll fix earlier today.** The `ScrollView` added for keyboard handling scrolled "stickily" and snapped back to 0 on Android. Root cause: the ScrollView was nested inside two `TouchableWithoutFeedback` wrappers (the backdrop `onClose` TWFB and an empty "swallow taps" guard); on Android a wrapping TWFB wins the move-responder mid-drag and cancels the native scroll (canonical anti-pattern). Fix: removed BOTH TWFB wrappers; the backdrop tap-to-dismiss is now a sibling `Pressable onPress={onClose} style={StyleSheet.absoluteFill}`, rendered JSX-first inside `View(s.overlay)` so the sheet paints on top. The `ScrollView` now has no touchable ancestor → uncontested responder chain. KAV, ScrollView props, sheet styles, and all RTL rows unchanged. Removed the orphaned `TouchableWithoutFeedback` import.
+- Final nesting: `Modal → View(s.overlay) → [Pressable(backdrop) | KeyboardAvoidingView → View(s.sheet) → ScrollView]` (Pressable and KAV are siblings).
+
+---
+
 ## 2026-06-17 — Session: NoteEditor UX fixes (keyboard scroll + inline reminder-time chip)
 
 **Phase:** Phase 5 (post-Gal-C cleanup)

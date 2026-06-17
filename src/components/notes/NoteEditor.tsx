@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
-  TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
   ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
@@ -540,10 +540,9 @@ export function NoteEditor({
       {endPicker}
       {reminderTimePicker}
 
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={s.overlay}>
+      <View style={s.overlay}>
+          <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <TouchableWithoutFeedback>
               <View style={[s.sheet, { backgroundColor: colors.surface }]}>
                 <View style={[s.handle, { backgroundColor: colors.border }]} />
 
@@ -979,10 +978,8 @@ export function NoteEditor({
                 )}
                 </ScrollView>
               </View>
-            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 }
