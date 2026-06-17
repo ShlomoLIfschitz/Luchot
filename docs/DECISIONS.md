@@ -581,3 +581,42 @@
   `HebrewDatePicker`. The wheel + sheet are the reusable primitives. Year wheel is
   bounded to ±50 years around the opening year (no infinite drum). `getHebrewDaysInMonth`
   exists for the Slice-2 day column's length + clamping.
+
+## Shabbat 4-city table: per-city minhag, Geonim 8.5° havdalah, Saturday-night anchor
+- Date: 2026-06-17
+- Context: The day-screen ShabbatCard was extended from a single-location candle row to
+  a 4-fixed-city table (ירושלים, תל אביב, חיפה, באר שבע) + a user-location row, each
+  showing הדלקת נרות + צאת שבת. The original spec had three errors that the user
+  resolved (clarifying questions): `zmanim.getTzeit()` does not exist in kosher-zmanim;
+  a flat 18-min candle offset; and using `candleLightingLeadMinutes` (a notification
+  lead) as the halachic offset.
+- Choices (user-locked):
+  1. **צאת שבת / havdalah = Geonim 8.5° tzeit** (`getTzaisGeonim8Point5Degrees`, exposed
+     as `ZmanimResult.tzeitHakochavim`) — the standard Israeli tzeit, NOT `getTzais72`
+     / Rabbeinu Tam.
+  2. **Per-city minhag candle offset** via the existing `getCandleLightingOffset(lat,lng)`
+     (Jerusalem 40, Haifa 30, Safed 40, else 18). The user row uses its own coords'
+     offset. NOT a flat 18, NOT the Settings notification lead.
+  3. **Havdalah is anchored to SATURDAY NIGHT (date+1)**, candle to the Friday `date`.
+     `getCandleAndHavdalah` REUSES `getZmanim` for both days (no new kosher-zmanim
+     instance): candle = `getZmanim(friday).candleLighting` (per-city offset already
+     baked in), havdalah = `getZmanim(saturday).tzeitHakochavim`.
+  4. **User row sourced from `LocationProvider`** (the zmanim location), gated on
+     `source !== 'default'` (so the untouched-Jerusalem default doesn't duplicate the
+     fixed Jerusalem row). Label resolved from `cityHebcalKey` via `findCityByKey().nameHe`,
+     fallback 'המיקום שלי'. This is deliberately NOT the SettingsProvider candle-lighting
+     city override (which drives notifications) — a user with a separate candle-lighting
+     city will see the table user row reflect their main location.
+  5. **ShabbatCard enhanced in place** at `src/components/zmanim/ShabbatCard.tsx` (not a
+     new `calendar/` file): Friday → table; Saturday branch (צאת השבת + ר״ת, prop-driven)
+     unchanged; the existing Props interface is kept so day.tsx needs no change.
+- Alternatives considered: `getTzais72`/R"T (rejected — not the Israeli minhag, contradicts
+  "no 72"); flat-18 or notification-lead offset (rejected — halachically wrong per city);
+  re-instantiating kosher-zmanim (rejected — `getZmanim` already does per-city offset +
+  Geonim 8.5° tzeit + caching); new duplicate ShabbatCard in calendar/ (rejected — the
+  component already exists in zmanim/).
+- Implications: any future multi-city / table zmanim view should reuse `getShabbatTable`
+  / `getCandleAndHavdalah` and the per-city `getCandleLightingOffset`, and remember the
+  Saturday-night anchor for havdalah. The "user location = LocationProvider, candle-lighting
+  city = SettingsProvider override" split is intentional and may surface as a future
+  unification task.

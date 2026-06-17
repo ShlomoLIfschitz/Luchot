@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-06-17 — Session: Shabbat card — 4-city table + user location row
+
+**Phase:** Phase 5 (Shabbat card enhancement)
+**Sub-agents:** local-data-builder (Wave 1: ZmanimService `getCandleAndHavdalah`/`getShabbatTable`/`FIXED_CITIES` + `useShabbatTable` hook), mobile-ui-builder (Wave 2: ShabbatCard Friday-table rewrite). Orchestrator: read-only investigation that surfaced 4 spec-vs-code conflicts → user clarified 3 decisions; two-wave sequencing; integration gate; docs; commit + OTA.
+**Status:** Complete. DoD passed (typecheck 0, expo-doctor 17/17). JS-only — OTA pushed.
+
+### Conflicts caught before building (user-resolved)
+- The spec's `zmanim.getTzeit()` **does not exist** in kosher-zmanim (node-verified). The spec also self-contradicted ("tzeit hakochavim (R״T)" vs "do not use 72"). → **Geonim 8.5°** (`getTzaisGeonim8Point5Degrees`), not R״T/72.
+- Spec's flat 18-min / `candleLightingLeadMinutes` candle offset would be halachically wrong. → **Per-city minhag** via existing `getCandleLightingOffset` (ירושלים 40, חיפה 30, else 18).
+- Spec said create `src/components/calendar/ShabbatCard.tsx`, but a ShabbatCard already exists in `zmanim/`. → **Rewrite in place**, keep Saturday behavior, day.tsx untouched.
+
+### What was done
+- **Wave 1 (local-data-builder).** ZmanimService: `getCandleAndHavdalah(date, lat, lng)` REUSES `getZmanim` — candle = Friday `getZmanim(date).candleLighting` (per-city offset baked in), **havdalah = Saturday `getZmanim(date+1).tzeitHakochavim`** (Geonim 8.5°; correct Saturday-night anchor). `getShabbatTable(date, userLat?, userLng?, userLabel?)` → 4 fixed cities + optional user row (last, `isUserRow`). `FIXED_CITIES` exported. New `useShabbatTable(date)` hook: pulls LocationProvider coords/source/cityHebcalKey; gates the user row on `source !== 'default'` (no duplicate Jerusalem); label via `findCityByKey().nameHe` fallback 'המיקום שלי'; memoized; does NOT read SettingsProvider.
+- **Wave 2 (mobile-ui-builder).** `src/components/zmanim/ShabbatCard.tsx` rewritten in place: Friday → header (הדלקת נרות / צאת שבת) + per-row table (city name flex:1 rightmost, two 72px centered time cells, `row-reverse`), user row bold + `colors.accent`, divider only when `rows.length > 4`; `useShabbatTable` called before the early return (Rules of Hooks). Saturday branch (צאת השבת + ר״ת) and the Props interface UNCHANGED → day.tsx needed no edit (Task 4 was a no-op; ShabbatCard was already wired there). Title uses `colors.tagShabbat` (`colors.holiday` doesn't exist in ThemeColors).
+
+### Decisions made
+- Logged **Shabbat 4-city table** in DECISIONS.md (2026-06-17): Geonim 8.5° havdalah; per-city minhag offset; Saturday-night havdalah anchor via `getZmanim` reuse; user row from LocationProvider (gated on source≠default), distinct from the SettingsProvider candle-lighting override; ShabbatCard enhanced in place.
+
+### Orchestrator note (sample verification)
+- Node-verified Friday **2026-06-19** times: ירושלים 19:07 / 20:29 · תל אביב 19:31 / 20:32 · חיפה 19:20 / 20:34 · באר שבע 19:29 / 20:29 (הדלקה / צאת). Jerusalem candle (40-min minhag) correctly earlier than Tel Aviv (18-min). NOTE: the engine uses elevation=0 throughout, so the DoD's "Jerusalem later via elevation" does not manifest — candle ordering is driven by per-city offset + sunset, as designed.
+
+### Open issues / blocked
+- **Behavioral change:** Friday card's user row now reflects the **LocationProvider** location, not the SettingsProvider candle-lighting city override (per the locked decision). A user who set a separate candle-lighting city for notifications will see the table user row track their main location. Candidate for the future LocationProvider+SettingsProvider unification.
+- Device verification: confirm the table renders on a Friday with correct RTL column alignment and the user row + divider; non-Fri/Sat shows nothing; Saturday still shows צאת השבת + ר״ת.
+
+### Next steps
+- On-device Friday/Saturday check; consider Slice-2 of the Hebrew date picker (separate backlog).
+
+---
+
 ## 2026-06-17 — Session: Hebrew drum date picker — Slice 1 (header tap, month+year)
 
 **Phase:** Phase 5 (Hebrew date picker, slice 1 of 2 — header tap; Slice 2 = NoteEditor date row, separate session)

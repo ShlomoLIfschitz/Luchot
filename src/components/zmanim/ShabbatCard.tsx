@@ -1,11 +1,13 @@
 // src/components/zmanim/ShabbatCard.tsx
 // Phase 5 — Shabbat summary card shown on Friday and Saturday in the Day screen.
-// Friday: candle-lighting time. Saturday: tzeis + Rabbeinu Tam.
+// Friday:   4-city candle-lighting / havdalah table + optional user-location row.
+// Saturday: tzeis + Rabbeinu Tam (single-location, prop-driven — unchanged).
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { formatZmanTime } from '../../services/ZmanimService';
+import { formatZmanTime, type ShabbatRow } from '../../services/ZmanimService';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useShabbatTable } from '../../hooks/useShabbatTable';
 import { radius } from '../../constants/radius';
 
 interface Props {
@@ -25,9 +27,11 @@ export function ShabbatCard({
   locationName,
   use24h,
 }: Props) {
-  // All hooks must run before any early return (Rules of Hooks — see
-  // DECISIONS.md "Drawer.tsx: all hook calls before any early return").
+  // ALL hooks before any early return (Rules of Hooks).
   const colors = useThemeColors();
+  // useShabbatTable expects the Friday date; on Saturday we still call it
+  // (hooks must not be conditional) but the result is only rendered on Friday.
+  const rows = useShabbatTable(selectedDate);
 
   const day = selectedDate.getDay();
   if (day !== 5 && day !== 6) return null;
@@ -42,29 +46,80 @@ export function ShabbatCard({
         },
       ]}
     >
+      {/* Title — colors.tagShabbat (purple). colors.holiday does not exist in
+          ThemeColors (the token set only has tagShabbat for Shabbat-purple). */}
       <Text style={[styles.title, { color: colors.tagShabbat }]}>שבת קודש</Text>
 
-      {/* Location row — only when locationName is provided */}
-      {!!locationName && (
-        <View style={styles.row}>
-          {/* label on the right (first child in row-reverse) */}
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {`מיקום: ${locationName}`}
-          </Text>
-        </View>
-      )}
-
       {day === 5 ? (
-        /* Friday — candle lighting */
-        <View style={styles.row}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>הדלקת נרות</Text>
-          <Text style={[styles.value, { color: colors.textPrimary }]}>
-            {formatZmanTime(candleLightingTime, use24h)}
-          </Text>
+        /* ── Friday branch — 4-city + user-row table ───────────────────── */
+        <View>
+          {/* Header row */}
+          <View style={styles.tableHeader}>
+            {/* Column order JSX-first → rightmost (row-reverse):
+                (a) empty spacer for the city-name column (right)
+                (b) הדלקת נרות (center)
+                (c) צאת שבת  (left)                                     */}
+            <View style={styles.nameCell} />
+            <Text style={[styles.headerLabel, { color: colors.textTertiary }]}>
+              הדלקת נרות
+            </Text>
+            <Text style={[styles.headerLabel, { color: colors.textTertiary }]}>
+              צאת שבת
+            </Text>
+          </View>
+
+          {/* Data rows */}
+          {rows.map((row: ShabbatRow) => {
+            // Render a divider before the user row (index 4) only when there
+            // is a 5th row — i.e. rows.length > 4.
+            const showDivider = row.isUserRow === true && rows.length > 4;
+
+            return (
+              <React.Fragment key={row.isUserRow ? 'user' : row.nameHe}>
+                {showDivider && (
+                  <View
+                    style={[styles.divider, { backgroundColor: colors.border }]}
+                  />
+                )}
+                <View style={styles.tableRow}>
+                  {/* (a) City name — flex: 1, rightmost */}
+                  <Text
+                    style={[
+                      styles.nameCell,
+                      {
+                        color: row.isUserRow ? colors.accent : colors.textPrimary,
+                        fontWeight: row.isUserRow ? '700' : '400',
+                      },
+                    ]}
+                  >
+                    {row.nameHe}
+                  </Text>
+                  {/* (b) Candle lighting — fixed width, center */}
+                  <Text style={[styles.timeCell, { color: colors.textPrimary }]}>
+                    {formatZmanTime(row.candleLighting, use24h)}
+                  </Text>
+                  {/* (c) Havdalah — fixed width, center */}
+                  <Text style={[styles.timeCell, { color: colors.textPrimary }]}>
+                    {formatZmanTime(row.havdalah, use24h)}
+                  </Text>
+                </View>
+              </React.Fragment>
+            );
+          })}
         </View>
       ) : (
-        /* Saturday — tzeis + Rabbeinu Tam */
+        /* ── Saturday branch — UNCHANGED ───────────────────────────────── */
         <>
+          {/* Location row — only when locationName is provided */}
+          {!!locationName && (
+            <View style={styles.row}>
+              {/* label on the right (first child in row-reverse) */}
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {`מיקום: ${locationName}`}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.row}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>צאת השבת</Text>
             <Text style={[styles.value, { color: colors.textPrimary }]}>
@@ -84,6 +139,7 @@ export function ShabbatCard({
 }
 
 const styles = StyleSheet.create({
+  // ── Card shell ──────────────────────────────────────────────────────────
   card: {
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
@@ -96,6 +152,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
+
+  // ── Saturday branch (row/label/value — kept exactly as before) ──────────
   row: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -110,5 +168,42 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 14,
     fontWeight: '500',
+  },
+
+  // ── Friday table ─────────────────────────────────────────────────────────
+  // Header row: same column layout as data rows, RTL.
+  tableHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  // Data row: RTL, columns align with header.
+  tableRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginVertical: 3,
+  },
+  // (a) City-name cell — flex: 1, rightmost in the row-reverse layout.
+  nameCell: {
+    flex: 1,
+    fontSize: 14,
+    textAlign: 'right',
+  },
+  // (b)/(c) Time cells — fixed width, centered.
+  timeCell: {
+    width: 72,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  // Header labels sit above (b)/(c); same fixed width as timeCell.
+  headerLabel: {
+    width: 72,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  // Divider between the 4 fixed-city rows and the user row.
+  divider: {
+    height: 1,
+    marginVertical: 8,
   },
 });

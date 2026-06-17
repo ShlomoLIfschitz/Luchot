@@ -134,6 +134,74 @@ export function getZmanim(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shabbat table helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ShabbatTimes {
+  candleLighting: Date | null; // Friday candle lighting (per-city offset)
+  havdalah: Date | null;       // Saturday-night tzeit (Geonim 8.5°)
+}
+
+export interface ShabbatRow {
+  nameHe: string;
+  candleLighting: Date | null;
+  havdalah: Date | null;
+  isUserRow?: boolean;
+}
+
+export const FIXED_CITIES = [
+  { nameHe: 'ירושלים', lat: 31.7683, lng: 35.2137, il: true },
+  { nameHe: 'תל אביב', lat: 32.0853, lng: 34.7818, il: true },
+  { nameHe: 'חיפה',    lat: 32.7940, lng: 34.9896, il: true },
+  { nameHe: 'באר שבע', lat: 31.2518, lng: 34.7913, il: true },
+] as const;
+
+/**
+ * Given a FRIDAY date and coords, returns candle-lighting (that Friday,
+ * per-city minhag offset) and havdalah (the following Saturday night,
+ * Geonim 8.5° tzeit). Reuses `getZmanim` — no new kosher-zmanim instances.
+ */
+export function getCandleAndHavdalah(date: Date, lat: number, lng: number): ShabbatTimes {
+  const friday = getZmanim(date, lat, lng);
+  const sat = new Date(date);
+  sat.setDate(sat.getDate() + 1); // Saturday
+  const saturday = getZmanim(sat, lat, lng);
+  return {
+    candleLighting: friday.candleLighting,  // Friday-only, per-city offset (already correct)
+    havdalah: saturday.tzeitHakochavim,     // Saturday-night Geonim 8.5° tzeit
+  };
+}
+
+/**
+ * Returns a Shabbat times table for the 4 fixed Israeli cities, optionally
+ * followed by a user-location row. `date` must be the FRIDAY of the Shabbat.
+ *
+ * User row is included only when `userLat` and `userLng` are both provided.
+ * When `userLabel` is omitted, the row is labelled 'המיקום שלי'.
+ */
+export function getShabbatTable(
+  date: Date,
+  userLat?: number,
+  userLng?: number,
+  userLabel?: string,
+): ShabbatRow[] {
+  const rows: ShabbatRow[] = FIXED_CITIES.map((c) => {
+    const t = getCandleAndHavdalah(date, c.lat, c.lng);
+    return { nameHe: c.nameHe, candleLighting: t.candleLighting, havdalah: t.havdalah };
+  });
+  if (userLat != null && userLng != null) {
+    const t = getCandleAndHavdalah(date, userLat, userLng);
+    rows.push({
+      nameHe: userLabel ?? 'המיקום שלי',
+      candleLighting: t.candleLighting,
+      havdalah: t.havdalah,
+      isUserRow: true,
+    });
+  }
+  return rows;
+}
+
 export function isAfterSunset(zmanim: ZmanimResult): boolean {
   if (!zmanim.shkia) return false;
   return new Date() > zmanim.shkia;
