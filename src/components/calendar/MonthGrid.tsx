@@ -20,6 +20,7 @@ import { DayCell } from './DayCell';
 import { MonthYearPicker } from './MonthYearPicker';
 import { QuickActionSheet, QuickAction } from './QuickActionSheet';
 import { DayData, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
+import { HebrewDatePicker } from './HebrewDatePicker';
 import { buildDayTags } from '../../utils/tagMapper';
 import { NoteEditor } from '../notes/NoteEditor';
 import { useNotes } from '../../hooks/useNotes';
@@ -61,9 +62,12 @@ export function MonthGrid({ mode }: MonthGridProps) {
     navigateMonth,
     navigateHebrewMonth,
     navigateToMonth,
+    navigateToHebrewMonth,
     setSelectedDate,
     currentMonth,
     currentYear,
+    currentHebrewYear,
+    currentHebrewMonth,
   } = useCalendarStore();
 
   // Mode-aware aliases — all grid construction and navigation use these.
@@ -73,6 +77,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const firstDayOfWeek = useSettingsStore((s) => s.firstDayOfWeek);
 
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [hebrewPickerVisible, setHebrewPickerVisible] = useState(false);
   const [actionSheetDate, setActionSheetDate] = useState<Date | null>(null);
   const actionSheetRef = useRef<BottomSheet>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -308,7 +313,10 @@ export function MonthGrid({ mode }: MonthGridProps) {
           </Pressable>
 
           <Pressable
-            onPress={() => setPickerVisible(true)}
+            onPress={() => {
+              if (mode === 'hebrew') setHebrewPickerVisible(true);
+              else setPickerVisible(true);
+            }}
             style={styles.headerCenter}
           >
             <Text style={[styles.monthTitle, { color: colors.textPrimary }]}>
@@ -348,7 +356,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
           <View>{gridRows}</View>
         )}
 
-        {/* Month/Year Picker */}
+        {/* Month/Year Picker — Gregorian mode only */}
         <MonthYearPicker
           visible={pickerVisible}
           currentYear={currentYear}
@@ -357,6 +365,20 @@ export function MonthGrid({ mode }: MonthGridProps) {
           onSelect={navigateToMonth}
           onClose={() => setPickerVisible(false)}
         />
+
+        {/* Hebrew date drum picker — Hebrew mode only */}
+        {mode === 'hebrew' && (
+          <HebrewDatePicker
+            visible={hebrewPickerVisible}
+            initialHYear={currentHebrewYear}
+            initialHMonth={currentHebrewMonth}
+            onConfirm={(hYear, hMonth) => {
+              navigateToHebrewMonth(hYear, hMonth);
+              setHebrewPickerVisible(false);
+            }}
+            onDismiss={() => setHebrewPickerVisible(false)}
+          />
+        )}
 
         {/* NoteEditor — opened by addNote / addRecurring quick actions */}
         <NoteEditor

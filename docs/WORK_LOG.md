@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-06-17 — Session: Hebrew drum date picker — Slice 1 (header tap, month+year)
+
+**Phase:** Phase 5 (Hebrew date picker, slice 1 of 2 — header tap; Slice 2 = NoteEditor date row, separate session)
+**Sub-agents:** local-data-builder (Wave 1: DateService `getHebrewMonthsForYear`/`getHebrewDaysInMonth` + CalendarProvider `navigateToHebrewMonth`), mobile-ui-builder (Wave 2: `HebrewDateWheel` + `HebrewDatePicker` + MonthGrid mode-aware wiring). Orchestrator: ran the pre-flight design consult, two-wave sequencing, integration gate (fixed a `.value`→`.month` typecheck error), DoD, docs, commit + OTA.
+**Status:** Complete. DoD passed (typecheck 0, expo-doctor 17/17). JS-only — OTA pushed.
+
+### What was done
+
+- **Wave 1 — data (local-data-builder).** `DateService.getHebrewMonthsForYear(hYear)` returns `{month, nameHe}[]` in **Tishrei-first** order, leap-aware (13 entries with אדר א׳ at pos 6 / אדר ב׳ at pos 7; common year 12 entries with single אדר at pos 6), Hebrew names from the existing name table. `DateService.getHebrewDaysInMonth(hMonth, hYear)` wraps `HDate.daysInMonth(month, year)`. `CalendarProvider.navigateToHebrewMonth(hYear, hMonth)` — day-15 anchor, sets Hebrew cursor, `refreshHebrewMonth()`, syncs `selectedDate` to the anchor's Gregorian date. `navigateHebrewMonth(±1)` untouched. Node-verified the leap/common month lists.
+- **Wave 2 — UI (mobile-ui-builder).** New `HebrewDateWheel` (pure presentational N-column drum: per-column `WheelColumn` with its own ref/effect, `ITEM_HEIGHT=44`, `snapToInterval`+`decelerationRate=fast`, centering via `contentContainerStyle.paddingVertical=2*ITEM_HEIGHT`, highlight band `pointerEvents=none`, `row-reverse` so month is rightmost). New `HebrewDatePicker` (bottom-sheet modal, sibling-`Pressable` backdrop, month+year columns, year range ±50, leap-aware month clamp on year change, Gregorian-equivalent caption, אישור/ביטול). MonthGrid title tap is now mode-aware: hebrew → `HebrewDatePicker` (→ `navigateToHebrewMonth` + close); gregorian → `MonthYearPicker` unchanged.
+
+### Decisions made
+
+- Logged **Hebrew drum date picker (Slice 1)** in DECISIONS.md (2026-06-17): Tishrei-first order; replace MonthYearPicker on the Hebrew tab; hand-rolled ScrollView drum with `paddingVertical` (not iOS-only `contentInset`) and sibling-Pressable backdrop; `navigateToHebrewMonth` jump action; DateService hebcal helpers.
+
+### Orchestrator fix (caught at the integration gate)
+
+- HebrewDatePicker's month/year `onIndexChange` handlers read `.value` off the `monthList`/`newMonths` arrays (shape `{month, nameHe}`, property is `.month`) — TS2339, two sites. Fixed `.value`→`.month` directly (one-symbol fix; cold re-spawn was the expensive path). typecheck re-verified 0.
+
+### Open issues / blocked
+
+- **Slice 2 not built:** NoteEditor editable date row (day+month+year) — reuses `HebrewDateWheel` (add a day column) + `HebrewDatePicker`; `getHebrewDaysInMonth` already exists for the day column length + clamp. Separate session.
+- **Device verification still needed** (the one thing static review can't prove): Android drum snapping with no scroll-steal/snap-back; first/last items reach center (the `paddingVertical` fix); month-swipe on the calendar still coexists with the modal; leap-year Adar I/II appear and clamp correctly.
+
+### Next steps
+
+- On-device test per the DoD checklist; then Slice 2 (NoteEditor date row).
+
+---
+
 ## 2026-06-17 — Micro-entry: MonthGrid 6-row month scroll + auto-scroll
 
 **Sub-agents:** mobile-ui-builder (`src/components/calendar/MonthGrid.tsx`). Orchestrator: ran the pre-flight (parent-screen ScrollView check), DoD gate, commit + OTA.

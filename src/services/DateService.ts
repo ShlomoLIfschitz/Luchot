@@ -315,6 +315,40 @@ export class DateService {
   }
 
   /**
+   * Returns months for a Hebrew year in Tishrei-first display order.
+   *
+   * Common year (12 months): 7,8,9,10,11,12,1,2,3,4,5,6
+   * Leap year   (13 months): 7,8,9,10,11,12,13,1,2,3,4,5,6
+   *
+   * nameHe is sourced from HEBREW_MONTH_NAMES. In a leap year, month 12
+   * (Adar I) is returned as "אדר א׳" to distinguish it from month 13
+   * (Adar II, "אדר ב׳"). In a common year, month 12 returns plain "אדר".
+   */
+  getHebrewMonthsForYear(hYear: number): { month: number; nameHe: string }[] {
+    const monthsInYear = HDate.monthsInYear(hYear);
+    const isLeap = HDate.isLeapYear(hYear);
+
+    const base = [7, 8, 9, 10, 11, 12];
+    if (monthsInYear === 13) base.push(13);
+    const order = [...base, 1, 2, 3, 4, 5, 6];
+
+    return order.map((month) => {
+      const entry = HEBREW_MONTH_NAMES[month] ?? { he: '', en: '' };
+      // In a leap year, month 12 is Adar I — override the plain "אדר" entry.
+      const nameHe = (isLeap && month === 12) ? 'אדר א׳' : entry.he;
+      return { month, nameHe };
+    });
+  }
+
+  /**
+   * Returns the number of days in a Hebrew month (29 or 30).
+   * Thin wrapper around HDate.daysInMonth — arg order is (month, year).
+   */
+  getHebrewDaysInMonth(hMonth: number, hYear: number): number {
+    return HDate.daysInMonth(hMonth, hYear);
+  }
+
+  /**
    * Get Hebrew date for "after sunset" — returns next Hebrew day
    */
   getAfterSunsetHebrewDate(date: Date): HebrewDateInfo {

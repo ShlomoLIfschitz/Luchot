@@ -540,3 +540,44 @@
   candidate (fetch exceptions + overlay in the sweep). Also: aggregate iOS 64-notif
   cap isn't enforced across events (only candle-lighting self-caps) — revisit if users
   hit it. With C4, **Gal C is complete (C1–C4).**
+
+## Hebrew drum/wheel date picker (Slice 1 — header tap, month+year)
+- Date: 2026-06-17
+- Context: The Hebrew calendar tab's month-title tap opened `MonthYearPicker`, a
+  GREGORIAN-month grid that drove the Gregorian cursor (`currentMonth/Year`) — but
+  the Hebrew grid is driven by `currentHebrewMonth/Year`, so the picker did not
+  correctly navigate the Hebrew tab (a latent mismatch). A true Hebrew month/year
+  picker was wanted, drum/wheel style.
+- Choices (locked by the Architect):
+  1. **Tishrei-first display order** for the month wheel: תשרי, חשוון, כסלו, טבת,
+     שבט, אדר (leap: אדר א׳ + אדר ב׳), ניסן, אייר, סיוון, תמוז, אב, אלול. Month-number
+     sequence `7,8,9,10,11,12,[13 if leap],1,2,3,4,5,6` from `HDate.monthsInYear`.
+     Leap-year month 12 is rendered "אדר א׳" (overriding the plain "אדר" name), 13 is
+     "אדר ב׳"; common-year month 12 is "אדר".
+  2. **Replace `MonthYearPicker` on the Hebrew tab** (not alongside). MonthGrid's
+     title tap is now mode-aware: hebrew → `HebrewDatePicker`; gregorian →
+     `MonthYearPicker` (UNCHANGED). MonthYearPicker still renders on the Hebrew tab
+     but `pickerVisible` is never set there, so it stays hidden.
+  3. **Hand-rolled ScrollView drum** (no new npm packages): `ITEM_HEIGHT=44`, 5
+     visible rows, `snapToInterval` + `decelerationRate="fast"`, centering via
+     `contentContainerStyle.paddingVertical = 2*ITEM_HEIGHT` (NOT `contentInset` —
+     that is iOS-only and a no-op on Android, the primary target), index resolved in
+     `onMomentumScrollEnd`. Sibling-`Pressable` backdrop (NEVER a
+     `TouchableWithoutFeedback` wrapping the drums — the Android scroll-steal
+     anti-pattern fixed earlier today).
+  4. **New provider jump action** `navigateToHebrewMonth(hYear, hMonth)` — anchors on
+     day 15 (like `navigateHebrewMonth(±1)`), sets the Hebrew cursor, calls
+     `refreshHebrewMonth()`, and syncs `selectedDate` to the anchor's Gregorian date.
+     `navigateHebrewMonth(±1)` left unchanged.
+  5. **Data helpers in DateService** (centralize hebcal): `getHebrewMonthsForYear`
+     (Tishrei-first, leap-aware, Hebrew names from the existing name table) and
+     `getHebrewDaysInMonth` (wraps `HDate.daysInMonth(month, year)` — month first).
+- Alternatives considered: keeping `MonthYearPicker` for both tabs (rejected — the
+  Gregorian-cursor mismatch); a native wheel-picker package (rejected — no new deps);
+  `contentInset` per the original spec (rejected — iOS-only, breaks Android centering);
+  `@hebcal/core` English `getMonthName` for display (rejected — needs Hebrew names).
+- Implications: Slice 2 (NoteEditor editable date row, day+month+year) reuses
+  `HebrewDateWheel` (it already accepts an N-column array; add a day column) and
+  `HebrewDatePicker`. The wheel + sheet are the reusable primitives. Year wheel is
+  bounded to ±50 years around the opening year (no infinite drum). `getHebrewDaysInMonth`
+  exists for the Slice-2 day column's length + clamping.

@@ -28,6 +28,7 @@ interface CalendarState {
   incrementNotesVersion: () => void;
   navigateHebrewMonth: (direction: 1 | -1) => void;
   refreshHebrewMonth: () => void;
+  navigateToHebrewMonth: (hYear: number, hMonth: number) => void;
 }
 
 // Compute today's Hebrew date once at store creation
@@ -92,5 +93,13 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     const { currentHebrewMonth, currentHebrewYear } = get();
     const hebrewMonthData = dateService.getHebrewMonthData(currentHebrewYear, currentHebrewMonth);
     set({ hebrewMonthData });
+  },
+
+  navigateToHebrewMonth: (hYear, hMonth) => {
+    // Anchor to day 15 — avoids month-boundary slip when converting to Gregorian.
+    const anchor = new HDate(15, hMonth, hYear);
+    set({ currentHebrewYear: hYear, currentHebrewMonth: hMonth });
+    get().refreshHebrewMonth();          // reads updated cursor via get()
+    get().setSelectedDate(anchor.greg()); // sync Gregorian selectedDate
   },
 }));
