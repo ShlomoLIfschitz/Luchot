@@ -33,6 +33,8 @@ without architect approval.
 | v4      | ADD COLUMN location TEXT                                                       |
 | v5      | ADD COLUMN recurrence_calendar, recurrence_id, is_exception, exception_date,   |
 |         | renewal_ask_suppressed, last_renewal_ask; remap legacy recurrence_type values  |
+| v6      | Backfill end_date = start_date where null; add index idx_events_daterange      |
+|         | (start_date, end_date) for range-overlap queries                               |
 
 ### Column definitions (physical order)
 
@@ -43,7 +45,7 @@ without architect approval.
 | 3 | description               | TEXT     |               | Free-text body / notes                                                                    |
 | 4 | start_date                | TEXT     | NOT NULL      | ISO 8601 date YYYY-MM-DD (all-day events)                                                 |
 | 5 | start_datetime            | TEXT     |               | ISO 8601 datetime (timed events); null for all-day                                        |
-| 6 | end_date                  | TEXT     |               | ISO 8601 date                                                                             |
+| 6 | end_date                  | TEXT     |               | ISO 8601 date. Guaranteed non-null for all rows as of v6 (backfilled to start_date).      |
 | 7 | end_datetime              | TEXT     |               | ISO 8601 datetime; null for all-day                                                       |
 | 8 | status                    | TEXT     | 'confirmed'   | confirmed / cancelled (soft-delete)                                                       |
 | 9 | recurrence                | TEXT     |               | JSON-serialized string[] (RRULE array, Google Calendar format)                            |
@@ -107,10 +109,19 @@ prompt rate-limit. Logic not yet built (schema-only as of v5); see DECISIONS.md
 
 ## Indexes
 
-No explicit indexes beyond PRIMARY KEY as of v5. Query patterns that may benefit from indexes
-in a future migration:
+| Index name              | Columns                   | Added | Purpose                                                                 |
+|-------------------------|---------------------------|-------|-------------------------------------------------------------------------|
+| (PRIMARY KEY)           | id                        | v1    | Row lookup by UUID                                                      |
+| idx_events_daterange    | start_date, end_date      | v6    | Range-overlap scan: `WHERE start_date <= ? AND end_date >= ?` used by   |
+|                         |                           |       | getNotesInRange and getEventsForGregorianDate (converting to overlap    |
+|                         |                           |       | semantics in the next agent slice). start_date leads so SQLite can      |
+|                         |                           |       | bound the scan on the upper side of the range (events that start on or  |
+|                         |                           |       | before the query end date); end_date in the same index lets it then     |
+|                         |                           |       | filter events that haven't ended yet.                                   |
 
-- `(start_date, status)` — getEventsForGregorianDate
+Query patterns that may benefit from additional indexes in a future migration:
+
+- `(start_date, status)` — getEventsForGregorianDate (point-day query, pre-overlap)
 - `(hebrew_day, hebrew_month, calendar_type, status)` — getEventsForHebrewDate
 - `(recurrence_type, status)` — getAllRecurringNotes
 

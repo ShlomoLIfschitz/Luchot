@@ -27,6 +27,7 @@ let schemaV2Migrated = false;
 let schemaColorMigrated = false;
 let schemaLocationMigrated = false;
 let schemaV5Migrated = false;
+let schemaV6Migrated = false;
 
 function getDb(): SQLiteDatabase {
   if (!db) {
@@ -199,6 +200,24 @@ async function doCreateSchema(): Promise<void> {
       );
       schemaV5Migrated = true;
     }
+    // v6 migration: backfill end_date and add range-overlap index.
+    // end_date is guaranteed non-null after this runs — the overlap query
+    // (getNotesInRange / getEventsForGregorianDate) can use plain
+    // `end_date >= ?` without COALESCE.
+    // The UPDATE is idempotent: rows already non-null are unchanged by
+    // the WHERE end_date IS NULL guard. The index uses IF NOT EXISTS,
+    // so re-running on subsequent launches is a no-op.
+    if (!schemaV6Migrated) {
+      await txn.executeSqlAsync(
+        `UPDATE events SET end_date = start_date WHERE end_date IS NULL`,
+        [],
+      );
+      await txn.executeSqlAsync(
+        `CREATE INDEX IF NOT EXISTS idx_events_daterange ON events (start_date, end_date)`,
+        [],
+      );
+      schemaV6Migrated = true;
+    }
   });
   schemaInitialized = true;
 }
@@ -309,9 +328,19 @@ export class StorageService {
   static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {
     await ensureSchema();
     const dateStr = formatDateKey(date);
+    // Multi-day overlap (Slice A): an event covers `date` if it starts on or
+    // before `date` AND ends on or after `date`. After the v6 migration
+    // end_date is guaranteed non-null, so no COALESCE is needed.
+    // Recurring events flow through getAllRecurringNotes → expandRecurringNotes
+    // and are dedup'd by the id-keyed merge in useNotes; they are NOT excluded
+    // here — the original query never excluded them and the merge handles it.
     const rows = await dbAll(
-      `SELECT * FROM events WHERE start_date = ? AND status != 'cancelled' AND is_exception = 0`,
-      [dateStr],
+      `SELECT * FROM events
+       WHERE start_date <= ?
+         AND end_date >= ?
+         AND status != 'cancelled'
+         AND is_exception = 0`,
+      [dateStr, dateStr],
     );
     return rows.map(StorageService.rowToEvent);
   }
@@ -358,16 +387,29 @@ export class StorageService {
   }
 
   /**
-   * Returns non-recurring events whose start_date falls in the inclusive
-   * range [startDate, endDate]. Recurring events are excluded — they are
+   * Returns non-recurring events that OVERLAP the inclusive window
+   * [startDate, endDate]. An event overlaps the window when it starts on or
+   * before the window end AND ends on or after the window start — the standard
+   * interval-overlap predicate.
+   *
+   * Multi-day support (Slice A): after the v6 migration end_date is guaranteed
+   * non-null, so `end_date >= ?` needs no COALESCE. A multi-day event whose
+   * start_date is before gridStart (e.g. a 3-day event starting the day before
+   * the month grid) is now correctly returned and will appear on the visible days
+   * that fall within its span.
+   *
+   * Arg order: first bind = gridEnd (formatDateKey(endDate)),
+   *            second bind = gridStart (formatDateKey(startDate)).
+   * This matches the predicate: start_date <= gridEnd AND end_date >= gridStart.
+   *
+   * Recurring events are excluded (recurrence_type = 'none') — they are
    * fetched separately via getAllRecurringNotes and expanded by the
    * expandRecurringNotes utility.
    *
    * is_exception = 0 guard: exception/tombstone rows must not surface as
-   * standalone notes. All existing rows have is_exception = 0 (column default),
-   * so this filter is a no-op for current data.
+   * standalone notes.
    *
-   * Used by useDatesNotes for batch grid rendering (Phase 4.2-1).
+   * Sole consumer: useDatesNotes (confirmed by repo-wide grep 2026-06-18).
    */
   static async getNotesInRange(startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
     await ensureSchema();
@@ -375,12 +417,12 @@ export class StorageService {
     const endStr   = formatDateKey(endDate);
     const rows = await dbAll(
       `SELECT * FROM events
-       WHERE start_date >= ?
-         AND start_date <= ?
+       WHERE start_date <= ?
+         AND end_date >= ?
          AND recurrence_type = 'none'
          AND status != 'cancelled'
          AND is_exception = 0`,
-      [startStr, endStr],
+      [endStr, startStr],   // arg1 = gridEnd, arg2 = gridStart (see predicate above)
     );
     return rows.map(StorageService.rowToEvent);
   }

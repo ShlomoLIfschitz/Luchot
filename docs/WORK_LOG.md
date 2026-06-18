@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-06-18 — Session: Multi-day events — Slice A (data foundation)
+
+**Phase:** Phase 5 (multi-day events)
+**Sub-agents:** database-architect (v6 migration: backfill `end_date` + index + SCHEMA.md), local-data-builder (CalendarNote `endDateStr`/`segment`, `saveNote(endDate)`, overlap queries, `useDatesNotes` per-day expansion). Orchestrator: read-only investigation + independent proposal; Slice A delegation plan (user-approved); sequencing (db-arch → data layer); integration gate; docs; commit.
+**Status:** Complete. DoD passed (typecheck 0, expo-doctor 17/17). JS+migration — no native change.
+
+### Key finding (investigation)
+The `events` table was **already multi-day-ready at the storage layer**: `end_date`/`end_datetime` columns exist since v1 and are written (`saveEvent`) and read (`rowToEvent`). The feature gap was never storage — it was that every write path collapsed `end` onto `start`, no query treated events as ranges, the UI dropped `end.date` at the `CalendarNote` mapping, and there is no span rendering / end-date editor. So Slice A needed **no structural migration** — only a backfill + index and a read/mapping/expansion layer.
+
+### Scope (locked for Slices A–C, user-confirmed)
+- **Non-recurring only** (`recurrence_type = 'none'`). Recurring expansion (`expandRecurringNotes`) stays single-day, untouched.
+- Rendering direction: **per-cell segment chips (Option A)**, NOT overlay bars — chosen to avoid the project's #1 risk area (RTL/overlay geometry).
+- Day view: a multi-day event shows on **every** day in its range (same title each day).
+- Slice order: **A (data) → B (editor) → C (rendering polish)**.
+
+### What was done
+- **database-architect — v6 migration.** New `schemaV6Migrated` block inside the existing `ensureSchema` transaction (after v5): `UPDATE events SET end_date = start_date WHERE end_date IS NULL` (guarantees `end_date` non-null → overlap query needs no COALESCE) + `CREATE INDEX IF NOT EXISTS idx_events_daterange ON events (start_date, end_date)`. Idempotent (flag + WHERE-guard + IF NOT EXISTS). `docs/SCHEMA.md` updated (migration history v6, `end_date` non-null note, Indexes section).
+- **local-data-builder — data layer.**
+  - `CalendarNote` (useNotes.ts): added `endDateStr?: string | null` (mapped `e.end?.date` in `eventToCalendarNote` — previously dropped) and transient `segment?: { isStart; isEnd }` (produced by expansion, **consumed in Slice C**, unused now).
+  - `saveNote`: added `endDate?: Date` param; all-day branch sets `end.date = formatDateKey(endDate ?? date)` with a defensive clamp (`end < start` → single-day). Timed branch unchanged. No caller wired yet (Slice B) — back-compat: omitting `endDate` = single-day, byte-identical.
+  - Overlap queries (StorageService.ts): `getEventsForGregorianDate` → `start_date <= ? AND end_date >= ?` (both args = day) so days 2…N show in Day view; `getNotesInRange` → interval-overlap (`start_date <= gridEnd AND end_date >= gridStart`) so spans straddling the grid boundary are caught. Sole caller of `getNotesInRange` confirmed = `useDatesNotes`.
+  - `useDatesNotes`: direct-notes loop now expands a multi-day note into each covered day (clamped to the grid), DST-safe ms-step iterator, stamping `segment` flags on shallow copies. Single-day path and the recurring `instances` loop unchanged.
+
+### Decisions made
+- Logged **Multi-day events (Slice A data foundation)** in DECISIONS.md (2026-06-18): storage was already range-capable; non-recurring scope; overlap-query semantics; `end_date` backfilled non-null + index; `segment` metadata produced in data layer / consumed in rendering; Option-A per-cell segment chips chosen over overlay bars.
+
+### Open issues / blocked
+- **No device verification yet** — Slice A ships no UI to create a multi-day event, so the full create→render loop is verifiable only after **Slice B** (end-date picker). Slice A verification was: SQL-overlap correctness trace (agent-provided, code-confirmed) + typecheck + expo-doctor. A hand-inserted `end_date > start_date` row is the only way to exercise rendering before Slice B.
+- **`.ics` export (Slice D):** `getAllEvents` already reads `end.date`, but iCal all-day `DTEND` is **exclusive** (must be last-day + 1). VEVENT export needs that adjustment — flagged, out of Slice A.
+- **Multi-day recurring:** explicitly deferred (separate future decision).
+
+### Next steps
+- **Slice B:** NoteEditor end-date picker (reuse `HebrewDateWheel`), validation (`end >= start`), thread `endDate` through `onSave` → `saveNote`. Then device-verify the create→render loop.
+- **Slice C:** segment-aware chip styling in DayCell/tagMapper (rounded start/end, square middle, RTL-correct) consuming `CalendarNote.segment`. Confirm Option A vs B visual with user at that point.
+
+---
+
 ## 2026-06-17 — Session: Shabbat card — 4-city table + user location row
 
 **Phase:** Phase 5 (Shabbat card enhancement)

@@ -28,6 +28,15 @@ export interface CalendarNote {
   startDateTime?: string | null;  // ISO 8601 with timezone (start.dateTime)
   endDateTime?: string | null;    // ISO 8601 with timezone (end.dateTime), optional
   isAllDay: boolean;              // true when start.dateTime is null (no precise time)
+  // Multi-day all-day range (Slice A). end.date from the stored event.
+  // For single-day events endDateStr === gregorianDateStr. null means unset
+  // (pre-migration rows; after v6 migration end_date is guaranteed non-null so
+  // this will only be null if the mapping source itself is null).
+  endDateStr?: string | null;
+  // Transient per-day segment flags — populated ONLY by useDatesNotes per-day
+  // expansion for multi-day events; undefined on single-day notes and recurring
+  // instances. Consumed by the rendering layer (later slices).
+  segment?: { isStart: boolean; isEnd: boolean };
   // Exception/tombstone overlay fields (C1). Present only on exception rows;
   // undefined on normal notes. status mirrors CalendarEvent.status.
   status?: 'confirmed' | 'tentative' | 'cancelled';
@@ -65,6 +74,11 @@ export function eventToCalendarNote(e: CalendarEvent): CalendarNote {
     startDateTime: e.start.dateTime ?? null,
     endDateTime: e.end?.dateTime ?? null,
     isAllDay: e.start.dateTime == null,
+    // Multi-day range: the all-day end date ("YYYY-MM-DD"). After the v6
+    // migration end_date is guaranteed non-null, so this will be a valid
+    // date string for all stored rows. null only if the source field itself
+    // is somehow null (defensive; should not occur post-migration).
+    endDateStr: e.end?.date ?? null,
     // Exception/tombstone fields — undefined on normal rows (is_exception = 0).
     status: e.status,
     recurrenceId: e.hebrewExtensions.recurrenceId,
@@ -156,6 +170,10 @@ export function useNotes(date: Date | null) {
     // pre-Wave-2) continue to get the old implicit behavior unchanged.
     recurrenceType?: RecurrenceType;
     recurrenceCalendar?: 'hebrew' | 'gregorian' | null;
+    // Slice A multi-day: optional end date for non-recurring all-day events.
+    // Omitting it (existing callers) → single-day (end = start). Back-compat.
+    // Only honoured for non-recurring all-day events; ignored for timed events.
+    endDate?: Date;
   }) => {
     const now = new Date().toISOString();
     const dateStr = formatDateKey(params.date);
@@ -235,8 +253,15 @@ export function useNotes(date: Date | null) {
 
     if (isAllDay) {
       // All-day: use date-only fields. start.date and end.date set; no dateTime.
+      // Multi-day (Slice A): if endDate is supplied, use it as end.date (clamped
+      // to start so backward string-compare guarantees start <= end).
+      // Omitting endDate → single-day (end = start), exactly the prior behavior.
+      const rawEndDateStr = params.endDate ? formatDateKey(params.endDate) : dateStr;
+      // Defensive clamp: if the supplied end is before start (malformed input),
+      // fall back to single-day rather than storing an invalid range.
+      const computedEndDateStr = rawEndDateStr >= dateStr ? rawEndDateStr : dateStr;
       eventStart = { date: dateStr };
-      eventEnd   = { date: dateStr };
+      eventEnd   = { date: computedEndDateStr };
     } else {
       // Timed event: merge params.date (calendar day) with startTime (hours/minutes).
       // We take year/month/day from the calendar date (local) and apply the hours/

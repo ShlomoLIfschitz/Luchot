@@ -620,3 +620,51 @@
   Saturday-night anchor for havdalah. The "user location = LocationProvider, candle-lighting
   city = SettingsProvider override" split is intentional and may surface as a future
   unification task.
+
+## Multi-day events — Slice A data foundation (non-recurring, overlap query, segment metadata)
+- Date: 2026-06-18
+- Context: Multi-day (start..end DAY range) events were requested. Investigation found the
+  `events` table was ALREADY range-capable: `end_date`/`end_datetime` exist since v1 and are
+  written (`saveEvent`) and read (`rowToEvent`). The real gap was that every write path
+  collapsed `end` onto `start`, no query treated events as ranges, the `CalendarNote` mapping
+  dropped `end.date`, and there is no span rendering or end-date editor. Built as Slice A
+  (data) of a three-slice plan: A data → B editor → C rendering.
+- Choices (user-locked):
+  1. **Non-recurring only** for Slices A–C (`recurrence_type = 'none'`). The recurrence engine
+     (yearly/monthly/weekly/daily expansion + exception/tombstone overlay + composite ids) ×
+     multi-day is a combinatorial explosion for rare value; `expandRecurringNotes` stays
+     SINGLE-DAY and untouched. Multi-day recurring is a separate, explicitly-reopened decision.
+  2. **No structural migration — backfill + index only (v6).** `UPDATE events SET end_date =
+     start_date WHERE end_date IS NULL` makes `end_date` guaranteed non-null, so the overlap
+     predicate uses plain `end_date >= ?` (no COALESCE, indexable). Added index
+     `idx_events_daterange (start_date, end_date)`. No column added (Google-Calendar shape lock
+     preserved).
+  3. **Range-overlap query semantics.** An event covers day D iff `start_date <= D AND end_date
+     >= D`. `getEventsForGregorianDate` uses this (both args = D) so a span shows on days 2…N in
+     the **Day view** (same title each day — user-confirmed). `getNotesInRange` uses interval
+     overlap (`start_date <= gridEnd AND end_date >= gridStart`) so a span straddling the grid
+     boundary (starting before gridStart) is caught.
+  4. **`segment` metadata produced in the data layer, consumed in rendering.** `CalendarNote`
+     gains `endDateStr` (the dropped `end.date`, now mapped) and transient
+     `segment?: { isStart; isEnd }`. `useDatesNotes` expands a multi-day note into each covered
+     day (clamped to the grid, DST-safe ms iterator) on shallow copies stamped with segment
+     flags marking the event's TRUE start/end even on clamped interior days. DayCell/tagMapper
+     ignore `segment` until Slice C.
+  5. **Rendering = per-cell segment chips (Option A), NOT overlay bars.** A chip in every covered
+     day, rounded only on the true start/end day (RTL-correct), square in between; week
+     boundaries are automatic (each cell knows its own role). Chosen over absolute-positioned
+     overlay bars (Option B) to avoid the project's #1 risk area (RTL/overlay geometry vs.
+     `overflow:hidden`, the ScrollView, per-week measurement). Option B is optional later polish
+     only if the user wants visually-fused bars.
+- Alternatives considered: structural migration / new columns (rejected — columns already exist);
+  COALESCE in the overlap query (rejected — backfill lets a plain index work); expanding recurring
+  × multi-day now (rejected — combinatorial complexity, rare value); overlay bars (rejected for
+  Slice C default — RTL risk); making the span Hebrew-anchored (rejected — store absolute
+  Gregorian `end.date`, no Hebrew recurrence semantics on the span).
+- Implications: Slice B adds the NoteEditor end-date picker (reuse `HebrewDateWheel`,
+  validate `end >= start`, thread `endDate` through `onSave` → `saveNote`) — only then is the
+  create→render loop device-verifiable. Slice C consumes `CalendarNote.segment` for chip
+  styling. Slice D: `.ics` VEVENT all-day `DTEND` is EXCLUSIVE (last-day + 1) — `getAllEvents`
+  already reads `end.date` but the export must add the +1. The `saveNote` defensive clamp
+  (`end < start` → single-day) and the non-null `end_date` invariant are load-bearing for the
+  query math — preserve them.
