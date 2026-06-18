@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-06-18 — Session: Multi-day events — Slice B (end-date picker UI)
+
+**Phase:** Phase 5 (multi-day events)
+**Sub-agents:** mobile-ui-builder (new `HebrewFullDatePicker` day+month+year sheet + NoteEditor multi-day toggle/end-date row/view-field + `endDate` threading). Orchestrator: 2 UX forks resolved with user (Hebrew drum, behind a toggle); delegation plan (approved); pre-flight verified DateService helpers exist; integration gate; docs; commit.
+**Status:** Code complete. DoD: typecheck 0, expo-doctor 17/17. **On-device verification still open** (orchestrator cannot drive an emulator).
+
+### UX decisions (user-locked this session)
+- End-date input = **Hebrew 3-column drum** (day+month+year), reusing `HebrewDateWheel`; returns Gregorian via `HDate.greg()`; clamp `end >= start`.
+- Entry point = **"מרובה ימים" toggle**, visible only when `allDay === true` (and, per scope, `recurrenceType === 'none'`); OFF by default = single day.
+
+### What was done (mobile-ui-builder)
+- **NEW `src/components/calendar/HebrewFullDatePicker.tsx`** — sibling of `HebrewDatePicker` (the latter UNCHANGED, since MonthGrid relies on its `onConfirm(hYear,hMonth)` signature). 3 columns `[day, month, year]` (day rightmost under row-reverse). Day length/clamp via `getHebrewDaysInMonth(hMonth, hYear)` (month-first arg order); month list via `getHebrewMonthsForYear`; year ±50. Clamps day on month/year change and month on leap→common year change. Sibling-Pressable backdrop, Gregorian caption, ביטול/אישור. PURE — `onConfirm(greg)` only; no clamping (NoteEditor owns the `end >= start` clamp).
+- **`src/components/notes/NoteEditor.tsx`** — added `endDate?: Date` to `Props.onSave`; new state `multiDay`/`endDate`/`endPickerVisible`; reset effect seeds them from `note.endDateStr` (multi-day iff `endDateStr > gregorianDateStr`); guard effect auto-clears `multiDay` when `!allDay || recurrenceType !== 'none'`; "מרובה ימים" toggle (gated `allDay && recurrenceType==='none'`) + "עד תאריך" chip row (Hebrew label via `getDayData(endDate).hebrewDate`) opening the picker; clamp on confirm via `formatDateKey(greg) < formatDateKey(date)` string compare; view-mode "עד תאריך" read-only field for existing multi-day notes; `endDate` threaded into `doDirectSave` only when `multiDay && allDay && recurrenceType==='none'` (else `undefined` = single-day, Slice A back-compat).
+
+### Notes / scope held
+- No data-layer change — `saveNote` already accepts `endDate` (Slice A). Timed branch, reminder logic, and recurring occurrence-exception/tombstone paths untouched.
+- Multi-day kept mutually exclusive with recurrence (guard effect) — no multi-day-recurring rows can be created, consistent with the locked non-recurring scope.
+
+### Open issues / blocked
+- **On-device verification (the DoD's manual Android step) NOT done** — create a 3-day all-day event, confirm it shows on all 3 days in Day view + Month grid (plain chips — span styling is Slice C), the toggle hides for recurring/timed, picking an earlier end clamps to start, and editing an existing multi-day note re-populates the toggle + end date + view field.
+- Not OTA'd (per user: push without OTA). Slice B is JS-only and OTA-eligible when desired.
+
+### Next steps
+- Device-verify Slice B. Then **Slice C:** segment-aware chip styling in DayCell/tagMapper (consume `CalendarNote.segment` — rounded start/end, square middle, RTL-correct). Confirm Option A vs B visual with user at that point.
+
+---
+
 ## 2026-06-18 — Session: Multi-day events — Slice A (data foundation)
 
 **Phase:** Phase 5 (multi-day events)

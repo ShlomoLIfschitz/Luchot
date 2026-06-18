@@ -19,6 +19,9 @@ import { reverseGeocodeNominatim } from '../../utils/reverseGeocode';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useTimeOfDayPicker } from '../../hooks/useTimeOfDayPicker';
 import { splitInstanceId } from '../../utils/recurringId';
+import { formatDateKey } from '../../utils/dateUtils';
+import { dateService } from '../../services/DateService';
+import { HebrewFullDatePicker } from '../calendar/HebrewFullDatePicker';
 import type { RecurrenceType, NoteCategory } from '../../schemas/EventSchema';
 import * as Notifications from 'expo-notifications';
 
@@ -179,6 +182,8 @@ interface Props {
     // C3 explicit recurrence params
     recurrenceType?: RecurrenceType;
     recurrenceCalendar?: 'hebrew' | 'gregorian' | null;
+    // Slice B multi-day end date (non-recurring all-day only)
+    endDate?: Date;
   }) => void;
   onDelete?: (id: string) => void;
   /** C3: thread from useNotes so the editor can write a tombstone for a single occurrence. */
@@ -241,6 +246,11 @@ export function NoteEditor({
   // reminderTime: user-picked clock time that anchors an all-day reminder.
   // Only used when allDay=true && reminderEnabled=true.
   const [reminderTime, setReminderTime] = useState<Date>(defaultStartTime);
+
+  // ── Slice B: multi-day state (declared before any early return — Rules of Hooks) ──
+  const [multiDay, setMultiDay] = useState(false);
+  const [endDate, setEndDate] = useState<Date>(date);
+  const [endPickerVisible, setEndPickerVisible] = useState(false);
 
   // ── Time pickers (all three hooks BEFORE any early return — Rules of Hooks) ──
   const {
@@ -327,6 +337,19 @@ export function NoteEditor({
       const parsedEnd = parseISO(note?.endDateTime);
       setEndTime(parsedEnd);
       setReminderTime(defaultStartTime());
+
+      // Slice B: multi-day reset
+      const isMulti =
+        !!note?.endDateStr &&
+        !!note?.gregorianDateStr &&
+        note.endDateStr > note.gregorianDateStr;
+      setMultiDay(isMulti);
+      if (isMulti && note?.endDateStr) {
+        const parts = note.endDateStr.split('-').map(Number);
+        setEndDate(new Date(parts[0], parts[1] - 1, parts[2]));
+      } else {
+        setEndDate(date);
+      }
     }
   }, [visible, note]);
 
@@ -337,6 +360,13 @@ export function NoteEditor({
       return () => clearTimeout(t);
     }
   }, [isViewMode, focusTarget]);
+
+  // Slice B: guard — multi-day cannot coexist with recurrence or timed events.
+  useEffect(() => {
+    if (multiDay && (!allDay || recurrenceType !== 'none')) {
+      setMultiDay(false);
+    }
+  }, [allDay, recurrenceType, multiDay]);
 
   // ── C3: helper to compute finalReminderMinutes (used in multiple save paths) ─
   const computeFinalReminderMinutes = (): number | null => {
@@ -391,6 +421,8 @@ export function NoteEditor({
       reminderTime: allDay ? reminderTime : null,
       recurrenceType,
       recurrenceCalendar: recurrenceType === 'yearly' ? recurrenceCalendar : null,
+      // Slice B: only pass endDate for non-recurring all-day multi-day events.
+      endDate: (multiDay && allDay && recurrenceType === 'none') ? endDate : undefined,
     });
     if (note?.id) {
       setIsViewMode(true);
@@ -540,6 +572,19 @@ export function NoteEditor({
       {endPicker}
       {reminderTimePicker}
 
+      {/* Slice B: end-date picker — rendered outside ScrollView like the time pickers */}
+      <HebrewFullDatePicker
+        visible={endPickerVisible}
+        initialDate={endDate}
+        onConfirm={(greg) => {
+          // Clamp: if picked end is before the event's start date, use start date.
+          const clamped = formatDateKey(greg) < formatDateKey(date) ? date : greg;
+          setEndDate(clamped);
+          setEndPickerVisible(false);
+        }}
+        onDismiss={() => setEndPickerVisible(false)}
+      />
+
       <View style={s.overlay}>
           <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -614,6 +659,21 @@ export function NoteEditor({
                         </Text>
                       </Pressable>
                     )}
+
+                    {/* Slice B: multi-day end date (view mode) */}
+                    {note?.endDateStr && note?.gregorianDateStr && note.endDateStr > note.gregorianDateStr && (() => {
+                      const parts = note.endDateStr!.split('-').map(Number);
+                      const parsedEnd = new Date(parts[0], parts[1] - 1, parts[2]);
+                      const eh = dateService.getDayData(parsedEnd).hebrewDate;
+                      const ehYear = eh.year ?? (parsedEnd.getFullYear() + 3760);
+                      const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
+                      return (
+                        <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
+                          <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עד תאריך</Text>
+                          <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>{endLabel}</Text>
+                        </Pressable>
+                      );
+                    })()}
 
                     {/* reminder */}
                     {note?.reminderMinutes != null && (
@@ -825,6 +885,50 @@ export function NoteEditor({
                         accessibilityLabel="כל היום"
                       />
                     </View>
+
+                    {/* ── Slice B: Multi-day toggle (only for all-day non-recurring) ── */}
+                    {allDay && recurrenceType === 'none' && (
+                      <View style={s.allDayRow}>
+                        {/* label — JSX-first = rightmost (row-reverse) */}
+                        <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                          מרובה ימים
+                        </Text>
+                        {/* Switch — JSX-last = leftmost */}
+                        <Switch
+                          value={multiDay}
+                          onValueChange={setMultiDay}
+                          trackColor={{ false: colors.border, true: colors.accent }}
+                          accessibilityLabel="מרובה ימים"
+                        />
+                      </View>
+                    )}
+
+                    {/* ── Slice B: End-date chip (only when multiDay is on) ────── */}
+                    {multiDay && allDay && recurrenceType === 'none' && (() => {
+                      const eh = dateService.getDayData(endDate).hebrewDate;
+                      // getDayData always populates year for valid dates; the optional
+                      // in the type is a defensive remnant. Fall back to endDate's
+                      // Gregorian year + 3760 (approximate) only as a last resort.
+                      const ehYear = eh.year ?? (endDate.getFullYear() + 3760);
+                      const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
+                      return (
+                        <View style={s.timeFieldRow}>
+                          {/* label — JSX-first = rightmost (row-reverse) */}
+                          <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>עד תאריך</Text>
+                          {/* chip — JSX-last = leftmost */}
+                          <Pressable
+                            onPress={() => setEndPickerVisible(true)}
+                            style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                            accessibilityLabel={`תאריך סיום: ${endLabel}`}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
+                              {endLabel}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      );
+                    })()}
 
                     {/* ── Time fields (only when allDay = false) ────────────── */}
                     {!allDay && (
