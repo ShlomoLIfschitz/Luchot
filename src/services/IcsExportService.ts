@@ -78,15 +78,28 @@ export async function exportCalendar(includeHebcal: boolean): Promise<void> {
     const rawDate = event.start.date ?? event.start.dateTime?.split('T')[0] ?? '';
     if (!rawDate) continue;
 
-    const dtStart = dateStrToIcal(rawDate);
-    const dtEnd   = nextDayIcal(rawDate);
+    const dtStart  = dateStrToIcal(rawDate);
+    // Bug 1 fix: use the real end date instead of always start+1
+    const endRaw   = event.end?.date ?? rawDate;
+    const dtEnd    = nextDayIcal(endRaw);
 
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${sanitiseUid(event.id + '@luchot')}`);
     lines.push(`SUMMARY:${escapeIcal(event.summary)}`);
     lines.push(`DESCRIPTION:${escapeIcal(event.description ?? '')}`);
-    lines.push(`DTSTART;VALUE=DATE:${dtStart}`);
-    lines.push(`DTEND;VALUE=DATE:${dtEnd}`);
+    // Bug 2 fix: timed events get real UTC timestamps; all-day events keep VALUE=DATE
+    if (event.start.dateTime) {
+      const dtStartTimed = isoToIcalTimestamp(event.start.dateTime);
+      const dtEndTimed   = event.end?.dateTime
+        ? isoToIcalTimestamp(event.end.dateTime)
+        : isoToIcalTimestamp(event.start.dateTime); // fallback: same as start
+      lines.push(`DTSTART:${dtStartTimed}`);
+      lines.push(`DTEND:${dtEndTimed}`);
+    } else {
+      // All-day event — DTEND is exclusive (Bug 1 fix applied via dtEnd)
+      lines.push(`DTSTART;VALUE=DATE:${dtStart}`);
+      lines.push(`DTEND;VALUE=DATE:${dtEnd}`);
+    }
     lines.push(`CREATED:${isoToIcalTimestamp(event.created)}`);
     lines.push(`LAST-MODIFIED:${isoToIcalTimestamp(event.updated)}`);
     lines.push('END:VEVENT');
