@@ -12,6 +12,12 @@ import { radius } from '../../constants/radius';
 // ── Cell height — per docs/DESIGN.md ──────────────────────────────────────────
 const CELL_HEIGHT = 110; // px, locked per DESIGN.md spec
 
+// ── Segment chip fixed height ──────────────────────────────────────────────────
+// Ensures blank middle/end span bars are the same height as the titled start bar
+// (which gets its height from fontSize:10 + lineHeight + paddingVertical:2 × 2).
+// fontSize 10 → lineHeight ≈ 14; + 4 (2+2 padding) = 18. Use 18 as the anchor.
+const SEGMENT_CHIP_HEIGHT = 18;
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /** Must match the 5 token categories in colors.ts */
@@ -20,6 +26,8 @@ export type TagCategory = 'holiday' | 'shabbat' | 'special' | 'event' | 'persona
 export interface DayCellTag {
   category: TagCategory;
   label: string; // displayed text, max ~12 chars practical
+  /** Populated by tagMapper for multi-day span segments. Absent on single-day chips. */
+  segment?: { isStart: boolean; isEnd: boolean };
 }
 
 export interface DayCellProps {
@@ -132,8 +140,27 @@ function DayCellInner({
       <View style={styles.tagsArea}>
         {visibleTags.map((tag, i) => {
           const { bg, fg } = TAG_COLORS[tag.category];
+          // Segment chips (multi-day span bars) use per-corner radii and a fixed
+          // height so blank middle/end bars stay the same height as the titled start.
+          // RTL: visual start = RIGHT edge, visual end = LEFT edge.
+          const segmentStyle = tag.segment
+            ? {
+                // Round only the true outer corners of the span.
+                borderRadius: 0,
+                borderTopRightRadius:
+                  tag.segment.isStart ? radius.xs : 0,
+                borderBottomRightRadius:
+                  tag.segment.isStart ? radius.xs : 0,
+                borderTopLeftRadius:
+                  tag.segment.isEnd ? radius.xs : 0,
+                borderBottomLeftRadius:
+                  tag.segment.isEnd ? radius.xs : 0,
+                // Fix bar height so blank middle/end bars match the titled start bar.
+                minHeight: SEGMENT_CHIP_HEIGHT,
+              }
+            : null;
           return (
-            <View key={i} style={[styles.tagChip, { backgroundColor: bg }]}>
+            <View key={i} style={[styles.tagChip, { backgroundColor: bg }, segmentStyle]}>
               <Text
                 style={[styles.tagText, { color: fg }]}
                 numberOfLines={1}
@@ -174,8 +201,10 @@ export const DayCell = memo(DayCellInner, (prev, next) => {
     prev.tags.length    === next.tags.length    &&
     prev.tags.every(
       (t, i) =>
-        t.category === next.tags[i].category &&
-        t.label    === next.tags[i].label
+        t.category                 === next.tags[i].category &&
+        t.label                    === next.tags[i].label    &&
+        t.segment?.isStart         === next.tags[i].segment?.isStart &&
+        t.segment?.isEnd           === next.tags[i].segment?.isEnd
     )
   );
 });

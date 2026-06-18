@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-06-18 — Session: Multi-day events — Slice C (span chip rendering)
+
+**Phase:** Phase 5 (multi-day events)
+**Sub-agents:** mobile-ui-builder (DayCell per-corner span radii + fixed bar height + memo; tagMapper top-lane ordering + blank-middle label). Orchestrator: Option A reconfirmed + 2 sub-decisions resolved with user (top-lane ordering w/ holiday-bump trade-off; blank middle bars); delegation plan (approved); integration gate; docs; commit.
+**Status:** Code complete. DoD: typecheck 0, expo-doctor 17/17. **On-device verification open** (orchestrator can't drive an emulator). Slice B was device-verified before this slice.
+
+### What was done (mobile-ui-builder) — cosmetic only, month grid
+- **`DayCell.tsx`:** `DayCellTag` gained `segment?: { isStart; isEnd }`. Segment chips get per-corner radii — **RTL: visual start = RIGHT** so `isStart` rounds the right corners, `isEnd` rounds the left, middle is all-square; no-segment chips unchanged (uniform `radius.xs`). Added `SEGMENT_CHIP_HEIGHT = 18` `minHeight` so blank middle/end bars match the titled start bar height and line up. `memo` comparator extended to compare `segment.isStart/isEnd` (else a cell won't re-render when a span's role flips).
+- **`tagMapper.ts`:** user notes split into `spanTags` (segment defined) vs `normalNoteTags`; **spans emitted FIRST** (top lane) so a bar holds the same slot every day → aligns across the week. Label rule: title on `isStart` only, `''` on middle/end. Holiday/special/single-note ordering among themselves unchanged; spans simply lifted to the front.
+
+### Decisions made
+- Logged **Multi-day Slice C — top-lane span ordering** in DECISIONS.md (2026-06-18): spans render before holiday/special/note tags so single-span bars align; accepted trade-off — on a span+holiday day the holiday TAG may fall into DayCell's `+N` overflow, but the green `isHoliday` cell tint still conveys it.
+
+### Notes / scope held
+- No data/query/schema/hook change — `CalendarNote.segment` already stamped by `useDatesNotes` (Slice A). MonthGrid, useNotes, StorageService, day.tsx untouched.
+- Option A (per-cell segment chips) — **no edge-bleed** (chips stay within cell padding; square edges read as a run across the hairline gap). Negative-margin bleed deliberately deferred.
+
+### Open issues / blocked
+- **On-device verification NOT done:** confirm a 3-day span shows right-rounded titled start, square blank middle, left-rounded blank end (same color/height), stays aligned on a day that also has a holiday, wraps correctly across a week boundary, and single-day chips look unchanged.
+- **Known limits (deferred):** multiple *simultaneously-overlapping* spans aren't lane-assigned (each renders, but 2+ on one day may not align); a span continuing in from the previous month shows no title that month; edge-bleed not implemented.
+- Not yet committed/pushed/OTA'd at time of writing (orchestrator commits this entry).
+
+### Next steps
+- Device-verify Slice C, then push + OTA if desired. Multi-day events feature (A–C) is then functionally complete for the common case.
+- Remaining backlog: **Slice D** — `.ics` VEVENT all-day `DTEND` EXCLUSIVE (last-day + 1) on export; optional overlapping-span lane assignment; optional edge-bleed; multi-day recurring (separate decision).
+
+---
+
 ## 2026-06-18 — Session: Multi-day events — Slice B (end-date picker UI)
 
 **Phase:** Phase 5 (multi-day events)

@@ -668,3 +668,37 @@
   already reads `end.date` but the export must add the +1. The `saveNote` defensive clamp
   (`end < start` → single-day) and the non-null `end_date` invariant are load-bearing for the
   query math — preserve them.
+
+## Multi-day events — Slice C: top-lane span ordering + per-cell segment chips (Option A)
+- Date: 2026-06-18
+- Context: Slice C renders multi-day spans in the month grid. For per-cell segment chips to
+  read as ONE continuous bar, a span must sit in the SAME vertical slot in every covered cell.
+  The prior `buildDayTags` order (holiday → special → note) placed a span lower on days that
+  also had a holiday, breaking the line. A rendering-order rule was needed.
+- Choices (user-approved):
+  1. **Per-cell segment chips, NOT overlay bars (Option A).** Each covered day renders its own
+     chip; `DayCell` rounds only the true outer corners via `CalendarNote.segment {isStart,
+     isEnd}`. RTL: visual start = RIGHT edge → `isStart` rounds the right corners, `isEnd` the
+     left, middle all-square. Chosen over absolute-positioned overlay bars to avoid the RTL/
+     overflow/measurement risk (the project's #1 risk area).
+  2. **Top-lane span ordering.** `buildDayTags` lifts span tags (notes with `segment` defined)
+     to the FRONT of the tag array, before holiday/special/single-note tags, so a single span
+     holds slot 0 every day and the bar aligns across the week. TRADE-OFF (accepted): on a day
+     with a span + holiday, the holiday TAG can fall into `DayCell`'s `+N` overflow — but the
+     green `isHoliday` cell background tint still conveys the holiday, so nothing is lost.
+  3. **Title on the start day only; middle/end are blank colored bars** at a fixed height
+     (`SEGMENT_CHIP_HEIGHT`) so titled and blank bars are the same height and line up. Avoids
+     repeating the title on every covered day.
+  4. **No edge-bleed.** Chips stay within the cell padding; square edges read as a run across
+     the hairline cell gap. Negative-margin bleed-to-edge fights the cell's `overflow:'hidden'`
+     + RTL geometry and is deliberately deferred.
+- Alternatives considered: keep holiday-first order (rejected — spans misalign on holiday days);
+  overlay bars (rejected — RTL/overflow risk); repeat title every day (rejected — noise, tag-slot
+  competition); full lane assignment for overlapping spans (deferred — see limitation).
+- Implications / KNOWN LIMITATIONS (deferred): multiple SIMULTANEOUSLY-OVERLAPPING spans are NOT
+  lane-assigned — each renders, but 2+ on one day may not perfectly align; a span continuing in
+  from the PREVIOUS month shows no title that month (the bar still signals it); edge-bleed not
+  implemented. The memo comparator in `DayCell` now compares `segment.isStart/isEnd` — keep it,
+  or cells won't re-render when a span's role flips. With Slice C, multi-day events (A–C) are
+  functionally complete for the common case; Slice D (.ics DTEND+1, overlap lanes, bleed,
+  multi-day recurring) remains backlog.
