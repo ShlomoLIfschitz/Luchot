@@ -99,10 +99,10 @@ const pickerStyles = StyleSheet.create({
   title:       { ...withFontFamily(typography.cardTitle), marginBottom: 14, textAlign: 'right' },
   option:      { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 11 },
   radio: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 2,
+    width: 22, height: 22, borderRadius: radius.full, borderWidth: 2,
     marginRight: 12, justifyContent: 'center', alignItems: 'center',
   },
-  radioDot:    { width: 10, height: 10, borderRadius: 5 },
+  radioDot:    { width: 10, height: 10, borderRadius: radius.full },
   optionLabel: { flex: 1, ...withFontFamily(typography.bodyMedium), textAlign: 'right' },
 });
 
@@ -542,7 +542,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   valueText: { ...withFontFamily(typography.bodySmall) },
-  chevron:   { fontSize: 22 },
+  // No exact type-scale step matches the previous hand-picked 22 — nearest
+  // step is displaySmall (20); delta of -2 noted, matches the row's Icon
+  // size (20) so the chevron reads consistently with the leading glyph.
+  chevron:   { ...withFontFamily(typography.displaySmall) },
   note: {
     ...withFontFamily(typography.caption),
     textAlign: 'right',

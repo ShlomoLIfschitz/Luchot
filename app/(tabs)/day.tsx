@@ -33,6 +33,8 @@ import { ZmanimList } from '../../src/components/zmanim/ZmanimList';
 import { ShabbatCard } from '../../src/components/zmanim/ShabbatCard';
 import { NoteEditor } from '../../src/components/notes/NoteEditor';
 import { NoteList } from '../../src/components/notes/NoteList';
+import { Card } from '../../src/components/ui/Card';
+import { SectionLabel } from '../../src/components/ui/SectionLabel';
 import {
   dateService,
   toHebrewNumeral,
@@ -353,48 +355,50 @@ export default function DayScreen() {
                   </View>
                 )}
 
-                {/* Torah Details */}
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-                    פרטים תורניים
-                  </Text>
+                {/* Torah Details — Card + SectionLabel; empty-state guarded so
+                    no empty card renders on a day with none of these fields. */}
+                {(dayData.parasha || dayData.omerDay || dayData.dafYomi || dayData.rambamOneChapter) && (
+                  <View style={styles.section}>
+                    <SectionLabel title="פרטים תורניים" colors={colors} />
+                    <Card colors={colors}>
+                      {dayData.parasha && (
+                        <DetailRow
+                          label="פרשת השבוע"
+                          value={dayData.parasha}
+                          colors={colors}
+                        />
+                      )}
 
-                  {dayData.parasha && (
-                    <DetailRow
-                      label="פרשת השבוע"
-                      value={dayData.parasha}
-                      colors={colors}
-                    />
-                  )}
+                      {dayData.omerDay && (
+                        <DetailRow
+                          label="ספירת העומר"
+                          value={`יום ${toHebrewNumeral(dayData.omerDay)} לעומר`}
+                          colors={colors}
+                        />
+                      )}
 
-                  {dayData.omerDay && (
-                    <DetailRow
-                      label="ספירת העומר"
-                      value={`יום ${toHebrewNumeral(dayData.omerDay)} לעומר`}
-                      colors={colors}
-                    />
-                  )}
+                      {dayData.dafYomi && (
+                        <DetailRow
+                          label="דף יומי"
+                          value={dayData.dafYomi.display}
+                          colors={colors}
+                          actionLabel="→ ספריא"
+                          onAction={() => Linking.openURL(dayData.dafYomi!.url)}
+                        />
+                      )}
 
-                  {dayData.dafYomi && (
-                    <DetailRow
-                      label="דף יומי"
-                      value={dayData.dafYomi.display}
-                      colors={colors}
-                      actionLabel="→ ספריא"
-                      onAction={() => Linking.openURL(dayData.dafYomi!.url)}
-                    />
-                  )}
-
-                  {dayData.rambamOneChapter && (
-                    <DetailRow
-                      label='רמב״ם יומי'
-                      value={dayData.rambamOneChapter.display}
-                      colors={colors}
-                      actionLabel="→ ספריא"
-                      onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
-                    />
-                  )}
-                </View>
+                      {dayData.rambamOneChapter && (
+                        <DetailRow
+                          label='רמב״ם יומי'
+                          value={dayData.rambamOneChapter.display}
+                          colors={colors}
+                          actionLabel="→ ספריא"
+                          onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
+                        />
+                      )}
+                    </Card>
+                  </View>
+                )}
 
                 {/* Zmanim */}
                 <ZmanimList zmanim={zmanim} />
@@ -461,15 +465,23 @@ function DetailRow({
   colors,
   actionLabel,
   onAction,
+  isLast = false,
 }: {
   label: string;
   value: string;
   colors: ReturnType<typeof useThemeColors>;
   actionLabel?: string;
   onAction?: () => void;
+  isLast?: boolean;
 }) {
   return (
-    <View style={styles.detailRow}>
+    <View
+      style={[
+        styles.detailRow,
+        { backgroundColor: colors.surface },
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+      ]}
+    >
       <View style={styles.detailFlex}>
         <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>
           {label}
@@ -481,7 +493,10 @@ function DetailRow({
       {actionLabel && onAction && (
         <Pressable
           onPress={onAction}
+          hitSlop={8}
           style={[styles.actionBtn, { backgroundColor: colors.accentLight }]}
+          accessibilityRole="button"
+          accessibilityLabel={`${actionLabel}: ${label}`}
         >
           <Text style={[styles.actionText, { color: colors.accent }]}>
             {actionLabel}
@@ -499,8 +514,8 @@ const styles = StyleSheet.create({
 
   // Header (fixed above the scroll)
   header: { alignItems: 'center', paddingTop: 16, marginBottom: 12 },
-  hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
-  gregDate: { fontSize: 14, marginTop: 4, textAlign: 'center' },
+  hebrewDate: { ...withFontFamily(typography.displayMedium), letterSpacing: -0.5, textAlign: 'center' },
+  gregDate: { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
 
   // Holiday banner
   holidayBanner: {
@@ -511,12 +526,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
   },
-  holidayText: { fontSize: 16, fontWeight: '700' },
+  holidayText: { ...withFontFamily(typography.cardTitle) },
 
   // Sections
   section: { marginVertical: 12 },
   sectionTitle: {
-    fontSize: 11,
+    ...withFontFamily(typography.caption),
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -524,13 +539,29 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Detail rows (Torah details)
-  detailRow: { flexDirection: 'row-reverse', alignItems: 'center', marginVertical: 6 },
-  detailFlex: { flex: 1 },
-  detailLabel: { fontSize: 11, fontWeight: '500', marginBottom: 2, textAlign: 'right' },
-  detailValue: { fontSize: 16, fontWeight: '500', textAlign: 'right' },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md },
-  actionText: { fontSize: 13, fontWeight: '600' },
+  // Detail rows (Torah details) — card row: bottom hairline suppressed on
+  // the last visible row via the `isLast` prop Card auto-injects.
+  detailRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 12,
+    minHeight: 56,
+  },
+  detailFlex: { flex: 1, flexShrink: 1 },
+  detailLabel: { ...withFontFamily(typography.caption), marginBottom: 2, textAlign: 'right' },
+  detailValue: { ...withFontFamily(typography.bodyLarge), textAlign: 'right' },
+  actionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: radius.md,
+    flexShrink: 0,
+  },
+  actionText: { ...withFontFamily(typography.bodySmall), fontWeight: '600' },
 
   // Notes (legacy style names kept for safety — unused by new components)
   noteRow: {
@@ -539,7 +570,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: 6,
   },
-  noteText: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
+  noteText: { ...withFontFamily(typography.bodyMedium), fontWeight: '500', textAlign: 'right' },
 
   // Hourly schedule — explicit row-reverse (locked RTL convention): first
   // JSX child (event content) lands right, last child (hourLabel) lands
@@ -599,7 +630,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tabText: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodyMedium),
     fontWeight: '600',
   },
 
@@ -612,7 +643,7 @@ const styles = StyleSheet.create({
     margin: 12,
   },
   addEventBtnText: {
-    fontSize: 15,
+    ...withFontFamily(typography.bodyMedium),
     fontWeight: '600',
   },
 });

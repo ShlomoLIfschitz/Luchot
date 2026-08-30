@@ -2,6 +2,7 @@
 
 import { HDate, HebrewCalendar, Event as HebcalEvent, flags, DailyLearning, ParshaEvent, getSedra } from '@hebcal/core';
 import '@hebcal/learning'; // side-effect: registers daily learning schedules into DailyLearning registry
+import { stripNikud } from '../utils/hebrewUtils';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningI
   const event = DailyLearning.lookup(scheduleName, hd, il);
   if (!event) return undefined;
 
-  const rawDisplay = event.render('he');
+  const rawDisplay = stripNikud(event.render('he'));
   // url() may not exist on all schedule events; defensive check guards against
   // future schedule additions in @hebcal/learning that might not expose a URL.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,7 +177,7 @@ function lookupUpcomingParasha(hdate: HDate, il: boolean): string | undefined {
   // parasha this week — return undefined rather than a wrong value.
   if (result.chag) return undefined;
   const ev = new ParshaEvent(result.hdate, result.parsha, il, result.num);
-  return ev.renderBrief('he');
+  return stripNikud(ev.renderBrief('he'));
 }
 
 // ── Core DateService ──────────────────────────────────────
@@ -222,20 +223,20 @@ export class DateService {
     for (const ev of events) {
       const mask = ev.getFlags();
       if (mask & flags.PARSHA_HASHAVUA) {
-        parasha = ev.renderBrief('he');
+        parasha = stripNikud(ev.renderBrief('he'));
       } else if (mask & flags.OMER_COUNT) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         omerDay = (ev as any).omer;
       } else if (mask & flags.YOM_TOV_ENDS || mask & flags.CHAG) {
         isYomTov = true;
-        holidays.push(ev.renderBrief('he'));
+        holidays.push(stripNikud(ev.renderBrief('he')));
         holidaysEn.push(ev.renderBrief('en'));
       } else if (mask & flags.CHOL_HAMOED) {
         isCholHamoed = true;
-        holidays.push(ev.renderBrief('he'));
+        holidays.push(stripNikud(ev.renderBrief('he')));
         holidaysEn.push(ev.renderBrief('en'));
       } else if (!(mask & flags.PARSHA_HASHAVUA) && !(mask & flags.OMER_COUNT)) {
-        holidays.push(ev.renderBrief('he'));
+        holidays.push(stripNikud(ev.renderBrief('he')));
         holidaysEn.push(ev.renderBrief('en'));
       }
     }
@@ -422,7 +423,7 @@ export function getOmerForDate(date: Date): { day: number; text: string } | null
   if (!omerEvent) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const day = (omerEvent as any).omer as number;
-  const text = omerEvent.render('he');
+  const text = stripNikud(omerEvent.render('he'));
   if (!day || !text) return null;
   return { day, text };
 }

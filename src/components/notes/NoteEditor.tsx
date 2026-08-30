@@ -170,9 +170,10 @@ const cpStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Nearest token: typography.captionBold (11/700/14) — fontWeight exact
+  // match; fontSize delta 14→11 (3px, acceptable for a small inline glyph).
   checkmark: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...withFontFamily(typography.captionBold),
   },
 });
 
@@ -1164,7 +1165,9 @@ const s = StyleSheet.create({
   handle: { width: 38, height: 4, borderRadius: radius.full, alignSelf: 'center', marginBottom: 16 },
   headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
   title: { flex: 1, textAlign: 'right', ...withFontFamily(typography.displaySmall) },
-  closeBtn: { fontSize: 20, fontWeight: '600' },
+  // Nearest token: typography.displaySmall (20/600/26) — exact fontSize AND
+  // fontWeight match, no delta.
+  closeBtn: { ...withFontFamily(typography.displaySmall) },
   // Visual size stays modest; the Pressable itself is padded to reach the 48dp target.
   closeBtnHit: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   input: {
@@ -1251,8 +1254,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  // Nearest token: typography.bodySmall (13/400/18) — fontWeight (default
+  // 400) exact match; fontSize delta 14→13 (1px).
   clearEndTime: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodySmall),
   },
   // The visual glyph stays small; the Pressable is padded to reach 48dp with hitSlop.
   clearEndTimeHit: { minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' },

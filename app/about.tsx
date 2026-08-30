@@ -17,7 +17,6 @@ import { useThemeColors } from '../src/hooks/useThemeColors';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { Card } from '../src/components/ui/Card';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
-import { radius } from '../src/constants/radius';
 import { typography, withFontFamily } from '../src/constants/typography';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
@@ -85,8 +84,9 @@ export default function AboutScreen() {
           </Text>
         </View>
 
-        {/* Description */}
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* Description — shared Card, so its gutters match the Credits
+            card below rather than hand-rolling a duplicate card style. */}
+        <Card colors={colors}>
           <Text style={[styles.cardBody, { color: colors.textPrimary }]}>
             לוחות מאחדת את כל המידע התורני-לוחי של היום במקום אחד:
             תאריך עברי, תאריך לועזי, חגים, זמנים הלכתיים, פרשת השבוע,
@@ -95,7 +95,7 @@ export default function AboutScreen() {
             עובדת ללא חיבור לאינטרנט. ללא חשבון. ללא פרסומות.
             כל הנתונים נשמרים במכשיר.
           </Text>
-        </View>
+        </Card>
 
         {/* Credits */}
         <SectionLabel title="קרדיטים" colors={colors} />
@@ -170,12 +170,6 @@ const styles = StyleSheet.create({
   tagline:  { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
   version:  { ...withFontFamily(typography.caption), marginTop: 12, textAlign: 'center' },
 
-  card: {
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 20,
-    overflow: 'hidden',
-  },
   cardBody: {
     ...withFontFamily(typography.bodyMedium),
     textAlign: 'right',
@@ -201,8 +195,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'right',
   },
+  // No exact type-scale step matches the previous hand-picked 18 — nearest
+  // is cardTitle (17), and its baked-in fontWeight (700) already matches.
   creditLink: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...withFontFamily(typography.cardTitle),
   },
 });

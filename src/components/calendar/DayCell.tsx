@@ -18,19 +18,27 @@ import { typography, withFontFamily } from '../../constants/typography';
 
 // ── Cell sizing ────────────────────────────────────────────────────────────
 // Height is intentionally NOT fixed here — the cell fills whatever height
-// its parent row resolves to (MonthGrid's flex:1 weekRow, or WeekGrid's
-// intrinsic row). CELL_MIN_HEIGHT is a floor only, so DayCell can never
-// collapse to ~0 in a parent with no bounded height (e.g. WeekGrid, which
-// has no flex-bound row today) — the same class of Yoga circular-height
-// bug that once collapsed MonthGrid's weekRow.
-const CELL_MIN_HEIGHT = 92;
+// its parent row gives it (MonthGrid now sets an explicit, deterministic
+// height on every weekRow — see MonthGrid's MIN_ROW_HEIGHT/MAX_ROW_HEIGHT —
+// or WeekGrid's intrinsic row). CELL_MIN_HEIGHT is a floor only, so DayCell
+// can never collapse to ~0 in a parent with no bounded height (e.g.
+// WeekGrid, which has no flex-bound row today) — the same class of Yoga
+// circular-height bug that once collapsed MonthGrid's weekRow.
+//
+// This floor is deliberately kept EQUAL to MonthGrid's MIN_ROW_HEIGHT (88),
+// not independent of it: MonthGrid never assigns a row a height below its
+// own MIN_ROW_HEIGHT, so a cell floor at the same value can never exceed
+// the height the row actually gives it — the cell fills the row it's given
+// and never forces the row taller. If MonthGrid's MIN_ROW_HEIGHT ever
+// changes, update this constant to match.
+const CELL_MIN_HEIGHT = 88;
 
 // ── Segment chip fixed height ──────────────────────────────────────────────
 // Ensures blank middle/end span bars are the same height as the titled
-// start bar. Matches tagChip's own fixed height (15) — kept as an explicit
+// start bar. Matches tagChip's own fixed height (17) — kept as an explicit
 // segment override (rather than relying solely on tagChip's height) so the
 // two stay intentionally decoupled if either is tuned independently later.
-const SEGMENT_CHIP_HEIGHT = 15;
+const SEGMENT_CHIP_HEIGHT = 17;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -257,7 +265,7 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     minHeight: CELL_MIN_HEIGHT, // floor only — grows to fill the parent row's height
-    padding: 4,
+    padding: 5,
     overflow: 'hidden',
   },
   dateRow: {
@@ -289,16 +297,19 @@ const styles = StyleSheet.create({
     ...withFontFamily(typography.cellSecondary),
   },
   tagsArea: {
-    // 2px gap below the date area before tags
-    marginTop: 2,
-    gap: 2,
+    // 3px gap below the date area before tags, and between each chip — with
+    // the row-height fix giving cells more vertical room, chips no longer
+    // need to be packed edge-to-edge.
+    marginTop: 3,
+    gap: 3,
     flex: 1,
   },
   tagChip: {
     alignSelf: 'stretch',
-    height: 15,
+    height: 17, // was 15 — a couple more px so a typical two-word Hebrew
+                // holiday name (e.g. "ראש השנה") has room before truncating.
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     borderRadius: radius.xs, // = 4, per DESIGN.md "Tags, small badges"
   },
   tagText: {

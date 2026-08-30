@@ -422,9 +422,10 @@ const styles = StyleSheet.create({
   cityNameSelected: {
     fontWeight: '600',
   },
+  // No exact type-scale step matches the previous hand-picked 18 — nearest
+  // is cardTitle (17), and its baked-in fontWeight (700) already matches.
   checkmark: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...withFontFamily(typography.cardTitle),
   },
 
   emptyState: {

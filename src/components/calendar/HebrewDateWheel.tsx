@@ -6,6 +6,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { typography, withFontFamily } from '../../constants/typography';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
   },
 
   itemText: {
-    fontSize: 18,
+    ...withFontFamily(typography.bodyLarge),
     textAlign: 'center',
   },
 });

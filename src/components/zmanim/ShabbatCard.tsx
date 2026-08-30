@@ -193,11 +193,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   label: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodyMedium),
     textAlign: 'right',
   },
   value: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodyMedium),
     fontWeight: '500',
   },
 

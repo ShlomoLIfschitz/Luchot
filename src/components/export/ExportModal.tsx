@@ -18,6 +18,7 @@ import {
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
+import { typography, withFontFamily } from '../../constants/typography';
 import { exportCalendar } from '../../services/IcsExportService';
 
 interface Props {
@@ -60,24 +61,35 @@ export function ExportModal({ visible, onClose }: Props) {
     >
       {/* Backdrop — tap to close when not loading */}
       <TouchableWithoutFeedback onPress={loading ? undefined : onClose}>
-        <View
-          style={[
-            styles.overlay,
-            { backgroundColor: overlay.modal },
-          ]}
-        >
+        <View style={styles.overlay}>
           {/* Inner card — stops backdrop tap from propagating through */}
           <TouchableWithoutFeedback>
             <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              {/* Title */}
-              <Text style={[styles.title, { color: colors.textPrimary }]}>
-                ייצוא יומן
-              </Text>
+              {/* Header — row-reverse: title lands right, close control at the far left */}
+              <View style={styles.headerRow}>
+                <Text style={[styles.title, { color: colors.textPrimary }]}>
+                  ייצוא יומן
+                </Text>
+                <Pressable
+                  hitSlop={12}
+                  disabled={loading}
+                  onPress={loading ? undefined : onClose}
+                  style={styles.closeBtnHit}
+                  accessibilityRole="button"
+                  accessibilityLabel="סגור"
+                  accessibilityState={{ disabled: loading }}
+                >
+                  <Text style={[styles.closeBtn, { color: colors.textTertiary }]}>
+                    ✕
+                  </Text>
+                </Pressable>
+              </View>
 
               {/* Checkbox row — RTL: checkbox on the right, label on the left */}
               <View style={styles.checkRow}>
                 <Pressable
                   onPress={() => setIncludeHebcal((v) => !v)}
+                  hitSlop={13}
                   style={[
                     styles.checkbox,
                     { borderColor: colors.accent },
@@ -120,13 +132,12 @@ export function ExportModal({ visible, onClose }: Props) {
                     </Text>
                   </Pressable>
 
-                  {/* Ghost — ביטול */}
+                  {/* ביטול */}
                   <Pressable
                     onPress={onClose}
                     style={[
                       styles.btnBase,
-                      styles.btnCancel,
-                      { borderColor: colors.border },
+                      { backgroundColor: colors.surfaceElevated },
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel="ביטול"
@@ -150,17 +161,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: overlay.modal,
   },
   card: {
     width: '85%',
     borderRadius: radius.xl,
     padding: 20,
   },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'right',
+  // row-reverse: title renders on the right, close control on the far left
+  headerRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  title: {
+    ...withFontFamily(typography.displaySmall),
+    flex: 1,
+    textAlign: 'right',
+  },
+  closeBtn: {
+    ...withFontFamily(typography.displaySmall),
+  },
+  closeBtnHit: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // RTL row: checkbox (right child) + label (left child)
   checkRow: {
@@ -173,18 +199,18 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderWidth: 2,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkmark: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodyMedium),
     fontWeight: '700',
     lineHeight: 16,
   },
   checkLabel: {
+    ...withFontFamily(typography.bodyMedium),
     flex: 1,
-    fontSize: 14,
     textAlign: 'right',
   },
   loadingRow: {
@@ -198,20 +224,17 @@ const styles = StyleSheet.create({
   },
   btnBase: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 13,
+    minHeight: 48,
+    borderRadius: radius.md,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnExport: {
     // background set inline
   },
-  btnCancel: {
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-  },
   btnText: {
-    fontSize: 15,
+    ...withFontFamily(typography.bodyMedium),
     fontWeight: '600',
   },
 });

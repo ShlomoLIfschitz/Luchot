@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
+import { typography, withFontFamily } from '../../constants/typography';
 import type { ThemeColors } from '../../hooks/useThemeColors';
 import { toHebrewYear } from '../../services/DateService';
 
@@ -14,6 +15,17 @@ const MONTH_NAMES_HE = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
 ];
+
+const MONTHS_PER_ROW = 3;
+
+/** Splits `items` into consecutive groups of `size` (last group may be shorter). */
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
 
 interface Props {
   visible: boolean;
@@ -54,31 +66,44 @@ export function MonthYearPicker({ visible, currentYear, currentMonth, colors, on
                 </Pressable>
               </View>
 
-              {/* Months grid — row-reverse + wrap: Yoga/flexbox wraps to new rows
-                  top-to-bottom regardless of main-axis reversal, so each row
-                  simply fills right-to-left (ינואר lands top-right). */}
+              {/* Months grid — plain 'row' + wrap, with the rendered array
+                  pre-reversed (per-row chunks) so ינואר still lands top-right.
+                  row-reverse + flexWrap is well-defined in the CSS spec, but
+                  it was never verified against this Yoga version on-device;
+                  reversing the array under plain 'row' gets the identical
+                  visual result without depending on that interaction. See
+                  ExportModal/HebrewDatePicker etc. for the row-reverse
+                  convention used everywhere else — this is a narrow,
+                  wrap-specific exception, not a general fallback. */}
               <View style={pickerStyles.monthGrid}>
-                {MONTH_NAMES_HE.map((name, idx) => {
-                  const isSelected = pickerYear === currentYear && idx + 1 === currentMonth;
-                  return (
-                    <Pressable
-                      key={idx}
-                      style={[
-                        pickerStyles.monthCell,
-                        isSelected && { backgroundColor: colors.accent },
-                      ]}
-                      onPress={() => { onSelect(pickerYear, idx + 1); onClose(); }}
-                    >
-                      <Text style={[
-                        pickerStyles.monthText,
-                        { color: isSelected ? colors.textInverse : colors.textPrimary },
-                        isSelected && { fontWeight: '700' },
-                      ]}>
-                        {name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                {chunk(MONTH_NAMES_HE.map((name, idx) => ({ name, idx })), MONTHS_PER_ROW).map((row, rowI) => (
+                  <View key={rowI} style={pickerStyles.monthRow}>
+                    {[...row].reverse().map(({ name, idx }) => {
+                      const isSelected = pickerYear === currentYear && idx + 1 === currentMonth;
+                      return (
+                        <Pressable
+                          key={idx}
+                          style={[
+                            pickerStyles.monthCell,
+                            isSelected && { backgroundColor: colors.accent },
+                          ]}
+                          onPress={() => { onSelect(pickerYear, idx + 1); onClose(); }}
+                          accessibilityRole="button"
+                          accessibilityLabel={name}
+                          accessibilityState={{ selected: isSelected }}
+                        >
+                          <Text style={[
+                            pickerStyles.monthText,
+                            { color: isSelected ? colors.textInverse : colors.textPrimary },
+                            isSelected && { fontWeight: '700' },
+                          ]}>
+                            {name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ))}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -91,17 +116,19 @@ export function MonthYearPicker({ visible, currentYear, currentMonth, colors, on
 const pickerStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'center', alignItems: 'center' },
   sheet: { width: 320, borderRadius: radius.xl, padding: 20, elevation: 10 },
+  // Symmetric ‹ year › row — the chevrons encode their own direction; plain 'row' is correct here.
   yearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  yearArrow: { padding: 8 },
-  arrowText: { fontSize: 30, fontWeight: '300' },
+  yearArrow: { padding: 8, minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  arrowText: { ...withFontFamily(typography.displayLarge), fontWeight: '300' },
   yearCenter: { alignItems: 'center' },
-  yearGreg: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  yearHebrew: { fontSize: 13, marginTop: 2, textAlign: 'center' },
-  monthGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  yearGreg: { ...withFontFamily(typography.displayMedium), textAlign: 'center' },
+  yearHebrew: { ...withFontFamily(typography.bodySmall), marginTop: 2, textAlign: 'center' },
+  // Column of rows — each row is plain 'row' over a pre-reversed array (see render comment above).
+  monthGrid: { gap: 8 },
+  monthRow: { flexDirection: 'row', gap: 8 },
   monthCell: {
-    width: '30%', paddingVertical: 12, borderRadius: radius.lg,
+    flex: 1, minHeight: 48, paddingVertical: 12, borderRadius: radius.lg,
     alignItems: 'center', justifyContent: 'center',
-    flexGrow: 1,
   },
-  monthText: { fontSize: 14 },
+  monthText: { ...withFontFamily(typography.bodyMedium) },
 });

@@ -796,8 +796,16 @@
 - Alternatives considered: staying on System (rejected - the user approved the
   typeface as part of the design); bundling a custom font file manually
   (rejected - the Google Fonts package handles licensing and asset wiring).
-- Implications: fonts are ASSETS, so the next release must be a full EAS build -
-  an OTA update will not deliver them.
+- Implications: Heebo is loaded at RUNTIME via useFonts with JS imports, and the
+  expo-font plugin in app.json carries no `fonts` array, so nothing is embedded
+  natively at build time. EAS Update ships assets alongside the JS bundle, so
+  font changes ARE OTA-deliverable while runtimeVersion is unchanged.
+  CORRECTED 2026-08-31: this entry originally claimed a font change always
+  requires a full EAS build. That is only true when fonts are embedded at build
+  time via the plugin's `fonts` array, which this project does not use. The
+  general rule is: OTA covers JS/TS and runtime-loaded assets; a build is needed
+  for native module changes, app.json changes (permissions, plugins, icon,
+  splash), and anything that moves runtimeVersion.
 
 ## Android auto-backup left ENABLED
 - Date: 2026-08-30

@@ -221,7 +221,10 @@ const s = StyleSheet.create({
   noteTag: { textAlign: 'right', marginTop: 2, ...withFontFamily(typography.caption) },
   // Visual glyph stays small; the Pressable is padded + hitSlop-extended to reach 48dp.
   deleteBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  deleteIcon: { fontSize: 14 },
+  // Nearest token: typography.bodySmall (13/400/18) — fontWeight (default
+  // 400) exact match; fontSize delta 14→13 (1px). Matches NoteEditor's
+  // analogous "✕" clear glyph for consistency.
+  deleteIcon: { ...withFontFamily(typography.bodySmall) },
   // Time label for timed notes — sits between the title cell and the deleteButton.
   timeLabel: {
     flexShrink: 0,

@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
 
   // Header
   header: { alignItems: 'center', marginBottom: 16 },
-  hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
-  gregDate:   { fontSize: 14, marginTop: 4, textAlign: 'center' },
+  hebrewDate: { ...withFontFamily(typography.displayMedium), letterSpacing: -0.5, textAlign: 'center' },
+  gregDate:   { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
 
   // Location card — row-reverse: pin (right) → text block (flex:1) → chevron (left)
   locationCard: {

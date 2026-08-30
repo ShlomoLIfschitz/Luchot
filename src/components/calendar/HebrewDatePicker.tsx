@@ -9,6 +9,7 @@ import { dateService, toHebrewYear } from '../../services/DateService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
+import { typography, withFontFamily } from '../../constants/typography';
 import { HebrewDateWheel } from './HebrewDateWheel';
 
 // ── Column widths ──────────────────────────────────────────────────────────────
@@ -162,7 +163,7 @@ export function HebrewDatePicker({
             </Pressable>
             <Pressable
               onPress={onDismiss}
-              style={[s.btn, s.btnCancel, { borderColor: colors.border }]}
+              style={[s.btn, s.btnCancel, { backgroundColor: colors.surfaceElevated }]}
               accessibilityLabel="ביטול"
               accessibilityRole="button"
             >
@@ -193,15 +194,15 @@ const s = StyleSheet.create({
   },
 
   handle: {
-    width: 40,
+    width: 38,
     height: 4,
-    borderRadius: 2,
+    borderRadius: radius.full,
     alignSelf: 'center',
     marginBottom: 16,
   },
 
   gregCaption: {
-    fontSize: 13,
+    ...withFontFamily(typography.bodySmall),
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 4,
@@ -216,6 +217,7 @@ const s = StyleSheet.create({
 
   btn: {
     flex: 1,
+    minHeight: 48,
     paddingVertical: 14,
     borderRadius: radius.md,
     alignItems: 'center',
@@ -227,12 +229,11 @@ const s = StyleSheet.create({
   },
 
   btnCancel: {
-    borderWidth: 1,
-    // borderColor set inline from colors.border
+    // backgroundColor set inline from colors.surfaceElevated
   },
 
   btnText: {
-    fontSize: 16,
+    ...withFontFamily(typography.bodyMedium),
     fontWeight: '600',
   },
 });

@@ -14,10 +14,19 @@
 //               local Hebrew month-name arrays (never toLocaleDateString — Hermes
 //               on Android has unreliable Intl data); the grid now fills available
 //               vertical space via flex instead of a hard 110px row height.
+// Redesign hotfix — the flex:1 weekRow above was never actually deterministic:
+//               React Native stretches flex:1 rows to fill a ScrollView's
+//               content area whenever the content is shorter than the
+//               viewport, so 6-week months rendered ~206px rows instead of
+//               falling back to the intended ~92px floor. Replaced with a
+//               single computed rowHeight (measured available height / week
+//               count, clamped to [MIN_ROW_HEIGHT, MAX_ROW_HEIGHT]) applied
+//               as an explicit height on every row — see the constants and
+//               gridArea onLayout below.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, ScrollView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, StatusBar, LayoutChangeEvent } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -131,6 +140,15 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const actionSheetRef = useRef<BottomSheet>(null);
   const scrollRef = useRef<ScrollView>(null);
 
+  // Measured height of the grid-rows area (below the header + day-name row,
+  // above the tab bar) — set once via onLayout on the wrapping View. Never
+  // assume a screen size; this must be correct on any device and survive
+  // rotation (onLayout fires again on size change).
+  const [gridAreaHeight, setGridAreaHeight] = useState(0);
+  const onGridAreaLayout = useCallback((e: LayoutChangeEvent) => {
+    setGridAreaHeight(e.nativeEvent.layout.height);
+  }, []);
+
   // NoteEditor state — opened by addNote / addRecurring quick actions.
   const [noteEditorVisible, setNoteEditorVisible] = useState(false);
 
@@ -211,22 +229,40 @@ export function MonthGrid({ mode }: MonthGridProps) {
     return a.toDateString() === b.toDateString();
   }, []);
 
-  // ── Scroll-grid derived values ─────────────────────────────────────────────
+  // ── Deterministic row height ────────────────────────────────────────────────
+  // rowHeight is computed ONCE for the whole grid from the measured available
+  // height, then applied as an explicit height on every row (see gridRows
+  // below and the weekRow style comment). This replaces the old flex:1 /
+  // minHeight approach, which produced a different, unpredictable row height
+  // per month (the 206px 6-week bug).
   const weekCount = weeks.length;
-  const needsScroll = weekCount > 5;
+
+  const rowHeight = useMemo(() => {
+    // Pre-measurement guard: onLayout hasn't fired yet (gridAreaHeight is
+    // still 0) or there's nothing to lay out. Fall back to a sensible fixed
+    // default rather than rendering 0-height rows or flashing.
+    if (!weekCount || gridAreaHeight <= 0) return DEFAULT_ROW_HEIGHT;
+    const raw = gridAreaHeight / weekCount;
+    return Math.min(MAX_ROW_HEIGHT, Math.max(MIN_ROW_HEIGHT, raw));
+  }, [gridAreaHeight, weekCount]);
+
+  // Scroll only when the computed rows genuinely don't fit the measured
+  // area (e.g. MIN_ROW_HEIGHT floor pushes total height past what's
+  // available on a very short screen / many-week month). A small epsilon
+  // absorbs float rounding from the height/weekCount division so an exact
+  // fit never triggers a spurious scroll container.
+  const needsScroll = gridAreaHeight > 0 && rowHeight * weekCount > gridAreaHeight + 0.5;
+
   const selectedRowIndex = useMemo(
     () => weeks.findIndex((week) => week.some((day) => day != null && isSameDay(day.gregorianDate, selectedDate))),
     [weeks, selectedDate, isSameDay],
   );
 
-  // Rows render at exactly GRID_ROW_MIN_HEIGHT while scrolling — see the
-  // weekRow style comment for why (flexBasis:0 + minHeight floor inside an
-  // intrinsically-sized ScrollView content area resolves to the floor).
   useEffect(() => {
     if (needsScroll && selectedRowIndex >= 0 && scrollRef.current) {
-      scrollRef.current.scrollTo({ y: selectedRowIndex * GRID_ROW_MIN_HEIGHT, animated: true });
+      scrollRef.current.scrollTo({ y: selectedRowIndex * rowHeight, animated: true });
     }
-  }, [needsScroll, selectedRowIndex]);
+  }, [needsScroll, selectedRowIndex, rowHeight]);
 
   // ── Label computation ──────────────────────────────────────────────────────
   const getLabels = useCallback(
@@ -338,7 +374,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const gridRows = weeks.map((week, wIdx) => (
     <View
       key={wIdx}
-      style={[styles.weekRow, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}
+      style={[styles.weekRow, { height: rowHeight, flexDirection: isRtl ? 'row-reverse' : 'row' }]}
     >
       {week.map((day, dIdx) => {
         if (!day) {
@@ -446,21 +482,25 @@ export function MonthGrid({ mode }: MonthGridProps) {
         </View>
 
         {/* Calendar Grid — View-based 7-column layout.
-            6-row months scroll vertically; ≤5-row months render as a static
-            flex:1 View so the grid fills the remaining screen space and the
-            tab bar sits flush at the bottom with no dead gap (Task 2d). */}
-        {needsScroll ? (
-          <ScrollView
-            ref={scrollRef}
-            style={styles.gridScroll}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={true}
-          >
-            {gridRows}
-          </ScrollView>
-        ) : (
-          <View style={styles.gridFlexContainer}>{gridRows}</View>
-        )}
+            gridArea is measured once via onLayout; rowHeight is derived from
+            that measurement and weekCount (see above) and applied as an
+            explicit height on every row. Only scrolls when the computed
+            rows genuinely exceed the measured area — otherwise a plain View
+            renders them with no dead space and no scroll container. */}
+        <View style={styles.gridArea} onLayout={onGridAreaLayout}>
+          {needsScroll ? (
+            <ScrollView
+              ref={scrollRef}
+              style={styles.gridScroll}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={true}
+            >
+              {gridRows}
+            </ScrollView>
+          ) : (
+            <View style={styles.gridStatic}>{gridRows}</View>
+          )}
+        </View>
 
         {/* Month/Year Picker — Gregorian mode only */}
         <MonthYearPicker
@@ -511,10 +551,25 @@ export function MonthGrid({ mode }: MonthGridProps) {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
-// Floor height for a week row — also the actual rendered height while
-// scrolling (see the weekRow comment below). Kept as a named constant since
-// it is also used for the scroll-to-selected-row offset calculation.
-const GRID_ROW_MIN_HEIGHT = 92;
+// ── Row-height model ─────────────────────────────────────────────────────────
+// A calendar row needs a deterministic height — the same row height for
+// every day in the grid, computed once from the measured available space,
+// never left to flex-stretch (which produced a different, unpredictable
+// height per month — the 206px 6-week bug this fix replaces).
+//
+// MIN_ROW_HEIGHT: rows must stay comfortably tappable even on a short
+// screen or a 6-week month; 88 sits just under the pre-fix 92px floor
+// (which was already well clear of the 48dp Android touch-target minimum).
+// MAX_ROW_HEIGHT: caps rows from growing oversized on short months / tall
+// screens; 132 sits just above the approved design's observed ~127px for a
+// 5-week month, matching that look with a couple of px of headroom.
+// DEFAULT_ROW_HEIGHT: pre-measurement fallback only (see the rowHeight
+// guard) — matches the pre-redesign app's fixed 110px row height, a value
+// already proven comfortable, so the very first frame never renders
+// 0-height rows or flashes before onLayout fires.
+const MIN_ROW_HEIGHT = 88;
+const MAX_ROW_HEIGHT = 132;
+const DEFAULT_ROW_HEIGHT = 110;
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 8 },
@@ -551,29 +606,34 @@ const styles = StyleSheet.create({
   },
   dayNameShabbat: { fontWeight: '700' },
 
-  // Wraps gridRows in the non-scrolling (≤5-week) case so the flex:1 weekRows
-  // below have a bounded parent height to divide evenly and fill.
-  gridFlexContainer: { flex: 1 },
+  // Measured container for the whole grid-rows area — onLayout on this View
+  // is the ONLY source of truth for gridAreaHeight (never assume a screen
+  // size). flex: 1 bounds it between the day-name header above and the tab
+  // bar below, whatever their combined height turns out to be on this device.
+  gridArea: { flex: 1 },
 
-  // Week rows — flexDirection set inline based on mode.
-  // flex:1 (which RN resolves to flexGrow:1/flexShrink:1/flexBasis:0%) makes
-  // rows divide the bounded parent's height evenly when one exists
-  // (gridFlexContainer above). Inside the ScrollView branch there IS no
-  // bounded parent height to divide (content-sized), so each row instead
-  // resolves to its minHeight floor — GRID_ROW_MIN_HEIGHT is therefore also
-  // the actual row height whenever the grid scrolls (6-week months).
-  // The explicit minHeight is load-bearing: leaving height fully inferred
-  // here is exactly the Yoga circular-height bug that once collapsed this
-  // row to ~8px (see DayCell's own CELL_MIN_HEIGHT comment).
-  weekRow: { flex: 1, minHeight: GRID_ROW_MIN_HEIGHT },
+  // Wraps gridRows in the non-scrolling case — plain View, no flex sizing
+  // needed since every row already carries its own explicit height.
+  gridStatic: {},
+
+  // Week rows — flexDirection set inline based on mode; height set inline
+  // per-row from the computed `rowHeight` (see the row-height model comment
+  // above `MIN_ROW_HEIGHT`). Deliberately NOT flex/minHeight: an explicit,
+  // deterministic height is load-bearing here — leaving row height fully
+  // inferred (or stretch-derived) is exactly the bug this fix replaces, and
+  // the same class of Yoga circular-height bug that once collapsed a row to
+  // ~8px elsewhere in this file's history (see DayCell's CELL_MIN_HEIGHT
+  // comment for the sibling case).
+  weekRow: {},
 
   // Cell containers — flex: 1 distributes each cell to 1/7 of row width.
   // alignItems: 'stretch' (default on weekRow) makes cellWrapper fill the
-  // row's resolved height so DayCell's flex:1 inside it expands correctly.
+  // row's explicit height so DayCell's flex:1 inside it expands correctly.
   cellWrapper: { flex: 1 },
-  emptyCell:   { flex: 1 }, // height comes from weekRow stretch
+  emptyCell:   { flex: 1 }, // height comes from weekRow's explicit height
 
-  // ScrollView wrapper for 6-row months. flex: 1 bounds it within the
-  // flex: 1 container so it can actually scroll rather than expanding freely.
+  // ScrollView wrapper for months whose computed rows exceed the measured
+  // area. flex: 1 bounds it within gridArea so it can actually scroll
+  // rather than expanding freely.
   gridScroll: { flex: 1 },
 });

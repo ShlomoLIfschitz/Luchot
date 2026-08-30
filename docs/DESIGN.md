@@ -167,7 +167,9 @@ Weights loaded: `Heebo_400Regular`, `Heebo_500Medium`, `Heebo_600SemiBold`, `Hee
 
 Font loading is folded into the existing `settingsReady` gate in `app/_layout.tsx`. A font **error** is treated as ready, so a failed fetch can never block render, and the 3-second `forceReady` fallback still applies.
 
-⚠️ **Fonts are bundled ASSETS.** Any release that changes them needs a **full EAS build — an OTA update will not deliver them.**
+**Delivery:** Heebo is loaded **at runtime** via `useFonts` with JS imports, and the `expo-font` plugin in `app.json` carries **no `fonts` array**, so nothing is embedded natively at build time. EAS Update ships assets alongside the JS bundle, which means **font changes are OTA-deliverable** — no new build required, as long as `runtimeVersion` is unchanged.
+
+> Corrected 2026-08-31. An earlier revision of this file claimed fonts always require a full EAS build. That is only true when fonts are embedded at build time via the `expo-font` plugin's `fonts` array — which this project does not do.
 
 #### Type Scale
 

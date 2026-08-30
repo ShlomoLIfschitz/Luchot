@@ -14,6 +14,7 @@ import { Pencil, Gift, FileText } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
+import { typography, withFontFamily } from '../../constants/typography';
 
 export type QuickAction = 'addNote' | 'addRecurring' | 'viewDay';
 
@@ -99,6 +100,8 @@ export const QuickActionSheet = forwardRef<BottomSheet, QuickActionSheetProps>(
                 styles.actionRow,
                 { backgroundColor: pressed ? colors.surfaceElevated : 'transparent' },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel={label}
             >
               <Icon size={20} color={colors.accent} />
               <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
@@ -123,14 +126,15 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    minHeight: 48,
     paddingVertical: 16,
     paddingHorizontal: 12,
     borderRadius: radius.md,
     gap: 16,
   },
   actionLabel: {
-    fontSize: 16,
-    fontWeight: '500',
+    ...withFontFamily(typography.bodyLarge),
+    flex: 1,
     textAlign: 'right',
   },
 });

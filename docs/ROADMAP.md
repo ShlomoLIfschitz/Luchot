@@ -11,9 +11,14 @@
 > week view rebuilt as a real hourly timeline · Friday parasha · Gregorian month RANGE in
 > the Hebrew calendar header · the RTL and accessibility defects found in the code review.
 >
-> **⚠️ Open before release:** on-device verification has NOT been done (see WORK_LOG
-> 2026-08-30 for the specific checklist). Heebo ships font ASSETS, so the next release
-> must be a **full EAS build — an OTA update will not deliver it.**
+> **⚠️ Open before release:** see the WORK_LOG 2026-08-30 / 2026-08-31 entries for the
+> on-device verification checklist.
+>
+> **Delivery rule:** OTA (`eas update`) covers JS/TS changes and runtime-loaded assets,
+> including fonts loaded via `useFonts`. A **full EAS build** is required only for native
+> module changes, `app.json` changes (permissions, plugins, icon, splash), or anything
+> that moves `runtimeVersion`. *(An earlier note here wrongly claimed Heebo forced a
+> build — corrected 2026-08-31.)*
 >
 > ~~Phase 5 Wave 3b complete (2026-06-01). Active work: bug fixes A/B.~~
 > ~~Phase 3.6 complete. Phases 3.1–3.6 done; 3.7 is the final Phase 3 task.~~

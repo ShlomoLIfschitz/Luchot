@@ -15,6 +15,7 @@ import { Menu, ChevronDown } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { typography, withFontFamily } from '../../constants/typography';
 import {
   dateService,
   toHebrewNumeral,
@@ -133,18 +134,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 17,
-    fontWeight: '600',
+    // Nearest token: typography.cardTitle (17/700/22) — exact fontSize match;
+    // fontWeight delta 600→700 (matches MonthGrid's analogous title-line role).
+    ...withFontFamily(typography.cardTitle),
     textAlign: 'center',
   },
   dateLineLarge: {
-    fontSize: 15,
-    fontWeight: '600',
+    // Nearest token: typography.cellPrimary (15/600/20) — exact fontSize AND
+    // fontWeight match, no delta.
+    ...withFontFamily(typography.cellPrimary),
     letterSpacing: -0.2,
     textAlign: 'center',
   },
   dateLineSmall: {
-    fontSize: 11,
+    // Nearest token: typography.caption (11/500/14) — exact fontSize match;
+    // fontWeight delta 400(default)→500. Mirrors the caption-subtitle role
+    // used under MonthGrid's title line.
+    ...withFontFamily(typography.caption),
     marginTop: 1,
     textAlign: 'center',
   },
@@ -153,6 +159,7 @@ const styles = StyleSheet.create({
   },
 
   // Phase 4.4 — tappable date area (only rendered when onDatePress is provided)
-  datePressable: { alignItems: 'center' },
+  // minHeight 48 + hitSlop(8) below satisfies the 48dp touch-target floor.
+  datePressable: { alignItems: 'center', justifyContent: 'center', minHeight: 48 },
   chevron: { marginTop: 2 },
 });
