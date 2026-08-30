@@ -72,8 +72,21 @@ const lightColors = {
 
   // Special: candle icon color (Friday indicator)
   candle:            '#E8A33D',  // Warm amber, not too saturated
+
+  // ── Added 2026-08-30 (redesign) ──────────────────────────────────────
+  holidayTint:       '#F4FAF5',  // day-cell background on a holiday
+  shabbatTint:       '#F8F6FC',  // day-cell background on Shabbat
+  candleBg:          '#FDF4E6',  // highlighted candle-lighting row
+  successBg:         '#E8F5E9',  // GPS "located" state
+  warningBg:         '#FCEFE0',  // GPS "services disabled" state
+  errorBg:           '#FDEAEA',  // GPS "blocked / failed" state
 };
 ```
+
+> The six tokens above replace two bad habits the redesign removed: opacity hacks
+> built by string-concatenating onto a hex (`colors.candle + '15'`, which breaks
+> silently the moment a token stops being a 6-digit hex) and inline tinted
+> backgrounds. Dark-mode values are in the block below.
 
 #### Dark Mode
 
@@ -124,6 +137,14 @@ const darkColors = {
 
   // Candle
   candle:            '#F0B860',
+
+  // ── Added 2026-08-30 (redesign) ──────────────────────────────────────
+  holidayTint:       '#15211A',
+  shabbatTint:       '#1B1726',
+  candleBg:          '#2E2218',
+  successBg:         '#1B2E1D',
+  warningBg:         '#2E2218',
+  errorBg:           '#2E1822',
 };
 ```
 
@@ -133,25 +154,20 @@ const darkColors = {
 
 #### Type Stack
 
-```typescript
-const fonts = {
-  // Hebrew-first — system fonts that have excellent Hebrew rendering
-  hebrew: {
-    regular: 'System',           // iOS: San Francisco Hebrew; Android: Roboto + Hebrew fallback
-    medium: 'System',
-    bold: 'System',
-  },
-  // Latin — for Gregorian dates, English UI text
-  latin: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
-  },
-  // Hebrew numerals (gematria) — uses Hebrew font; treated as text
-};
-```
+**Heebo** (via `@expo-google-fonts/heebo`) — adopted 2026-08-30, replacing `'System'`.
 
-**Note:** Using system fonts (`System` in React Native) for now. Both iOS and Android render Hebrew well with system stack. If specific custom font needed later (e.g., Frank Ruhl Libre for Hebrew elegance), can be added via `expo-font`.
+Heebo is Hebrew-first (Oded Ezer) with Latin letterforms derived from Roboto, so Hebrew text and Gregorian numerals share one visual voice. `'System'` was dropped because it renders Hebrew differently on Android and iOS and offered no control over available weights.
+
+Weights loaded: `Heebo_400Regular`, `Heebo_500Medium`, `Heebo_600SemiBold`, `Heebo_700Bold`.
+
+**The tokens live in code, not here.** `src/constants/typography.ts` is the source of truth:
+- `typography` — the full type scale (table below), with `fontWeight` typed as `TextStyle['fontWeight']` so consumers never need a cast.
+- `FONT_FAMILY` — a **single switch point**. Changing the app's typeface is a one-line edit in that file; no call site changes.
+- `withFontFamily(step)` — spreads the family onto a type step. Use this rather than hand-writing `fontSize`/`fontWeight` pairs.
+
+Font loading is folded into the existing `settingsReady` gate in `app/_layout.tsx`. A font **error** is treated as ready, so a failed fetch can never block render, and the 3-second `forceReady` fallback still applies.
+
+⚠️ **Fonts are bundled ASSETS.** Any release that changes them needs a **full EAS build — an OTA update will not deliver them.**
 
 #### Type Scale
 
@@ -271,33 +287,39 @@ Specs:
 
 #### Day Cell
 
-```
-Visual (Hebrew Calendar):
-┌──────────────┐
-│ כז       14  │  ← cell.primary on left, cell.secondary opposite corner
-│ ━━━━━━━━━━━ │
-│ פסח ראשון   │  ← tag #1 (holiday)
-│ ━━━━━━━━━━━ │
-│ ישיבת צוות  │  ← tag #2 (user event)
-└──────────────┘
+> **Revised 2026-08-30.** The old spec (full bordered box, primary date on the left, 2 tags) is superseded — see DECISIONS.md, "DayCell visual model".
 
-Specs:
-- Width: (screen width - padding) / 7
-- Height: 110px (medium)
-- Background: surface (white) / surface (dark)
-- Border: 0.5px borderSubtle
-- Border radius: sm (6)
-- Padding: xs (4)
-- Internal gap between rows: 2px
-
-States:
-- Default:   border-color: borderSubtle
-- Today:     border-color: today (2px), background: surface
-- Selected:  border-color: selected (2px), background: selectedBg, elevation.sm
-- Shabbat:   slight purple tint on background (5% opacity of tagShabbat)
-- Holiday:   slight green tint on background (5% opacity of tagHoliday)
-- Empty:     transparent, no border
 ```
+Visual (Hebrew Calendar) — RTL:
+──────────────────────────  ← 1px top hairline is the ONLY border
+│ 14              כז     │  ← Hebrew numeral top-RIGHT (reading start),
+│                        │     Gregorian small top-LEFT
+│ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │  ← tag #1 (holiday)
+│ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │  ← tag #2 (user event)
+│ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ │  ← tag #3
+│                    +2  │  ← overflow count
+──────────────────────────
+```
+
+**Specs:**
+- Width: row width / 7. Height: flexes to fill the screen, with an explicit `minHeight` floor (~92).
+  ⚠️ **Never leave row height fully inferred** — an unbounded flex row once collapsed to ~8px (the Yoga circular-height bug). The floor is what prevents its return.
+- **No border box.** A single 1px `borderSubtle` top hairline; left/right/bottom explicitly 0. This is the change that makes the grid read as a modern calendar rather than a table.
+- Top row: `flexDirection: 'row-reverse'`, `justifyContent: 'space-between'`, height ~24. First JSX child = the Hebrew numeral, so it lands on the right.
+- Primary `typography.cellPrimary`; secondary `typography.cellSecondary` in `textTertiary`.
+- Up to **3** tag chips (was 2), then a `+N` line in `typography.micro`, right-aligned.
+- Chip: height 15, `radius.xs`, `paddingHorizontal: 3`, `typography.cellTag`, right-aligned, single line with ellipsis.
+
+**States:**
+- Default: top hairline only, `surface` background
+- **Today: the primary numeral sits in a filled ~23px circle** — `today` background, `textInverse` text, `radius.full`. (Replaces the old 2px border treatment.)
+- Selected: 1.5px `selected` border on all sides + `radius.sm` + `selectedBg`. The one case that keeps a full box.
+- Shabbat: `shabbatTint` background · Holiday: `holidayTint` background — **the tint must cover the ENTIRE cell**, including the top row. An inner container with its own fill will paint over it.
+- Empty: transparent, no border
+
+**Multi-day segments** (`segment: {isStart, isEnd}`): per-corner radii. **RTL — visual start is the RIGHT edge**, so `isStart` rounds the right corners and `isEnd` rounds the left. Keep `SEGMENT_CHIP_HEIGHT` so blank middle bars align with the titled start bar, and keep the `memo` comparator on `segment.isStart/isEnd` or cells won't re-render when a span's role flips.
+
+**Accessibility:** this is the most-used control in the app. It must expose `accessibilityRole="button"`, a label combining the Hebrew date, Gregorian date and tag labels, and `accessibilityState={{ selected }}`.
 
 #### Button (Primary)
 
@@ -329,13 +351,54 @@ Specs:
 Specs:
 - Background: surface
 - Border-top: 0.5px border
-- Height: 56 + bottom safe area
-- Active tab: accent (icon + label)
-- Inactive tab: textTertiary
+- Height: 56 + bottom safe area (via useSafeAreaInsets, not a constant)
+- Active tab: the icon sits inside an accentLight PILL (radius.full,
+  ~18px horizontal / 3px vertical padding); label below is bold accent
+- Inactive tab: no pill; icon + label in textTertiary
 - Font: caption (11px / 500)
 - Icon size: 24
-- Padding: sm vertical
+- RTL: the first tab (עברי) renders on the RIGHT
 ```
+
+> The active-tab pill was added 2026-08-30. Colour alone was too weak a signal
+> for which tab is current; the filled pill reads at a glance.
+
+#### Month header (calendar tabs)
+
+```
+Specs:
+- ONE header row — hamburger (left) / centred two-line title block / jump-to-today (right).
+  Replaces the older stacked ScreenHeader + separate month bar.
+- The whole title block is tappable and opens the month picker.
+- Line 1: the month name (typography.screenTitle)
+- Line 2: the OTHER calendar's range (typography.caption, textTertiary)
+- No ‹ › arrows — swipe navigates, the title opens the picker.
+```
+
+**The range subtitle matters.** A Hebrew month normally spans two Gregorian months, so on the Hebrew tab line 2 is a RANGE, not a single month:
+- same Gregorian month → `אוקטובר 2025`
+- two months, one year → `ספט׳ – אוק׳ 2025`
+- crossing a Gregorian year → `דצמ׳ 2025 – ינו׳ 2026`
+
+The Gregorian tab mirrors this, showing the Hebrew month range beneath the Gregorian title.
+
+⚠️ **Never use `toLocaleDateString('he-IL', …)` for month names.** Hermes on Android has unreliable/absent Intl data. Use the local Hebrew month arrays (full and abbreviated) defined alongside the component.
+
+#### Week view
+
+```
+Specs (WeekTimeline):
+- Pinned day-columns header (~58px): day letter, Hebrew numeral, Gregorian number.
+  Today = filled circle. Shabbat column carries shabbatTint full height.
+- Pinned all-day row (~42px): multi-day events render as bars SPANNING the
+  columns they cover; height grows with concurrent lane count.
+- Scrollable hour grid: ~52px per hour, 34px gutter on the LEFT, hairline per
+  hour, column separators, overlapping events assigned side-by-side lanes,
+  current-time line with a dot at its RIGHT end.
+- RTL: day index 0 (Sunday) is the RIGHTMOST column.
+```
+
+🚨 **Auto-layout cannot express a block spanning multiple hours or a bar spanning multiple columns, so the body is absolutely positioned. ALL THREE BANDS — header, all-day row, hour grid — MUST derive x from the single shared `columnLeft(i, containerWidth)` against the same measured width.** The first implementation used a flex row for the header while the grid positioned from the right; the two ran in opposite directions and every event rendered under the wrong day label, while typecheck and bundling stayed green. Do not reintroduce a flex row for any band.
 
 #### Hamburger Menu (Side Drawer)
 
