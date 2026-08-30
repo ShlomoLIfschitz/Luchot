@@ -94,7 +94,7 @@ export function ShabbatCard({
                       styles.nameCell,
                       {
                         color: row.isUserRow ? colors.accent : colors.textPrimary,
-                        fontWeight: row.isUserRow ? '700' : '400',
+                        ...withFontFamily(typography.bodySmall, row.isUserRow ? '700' : '400'),
                       },
                     ]}
                   >
@@ -105,7 +105,10 @@ export function ShabbatCard({
                     style={[
                       styles.timeCell,
                       styles.candleCell,
-                      { color: row.isUserRow ? colors.accent : colors.textPrimary, fontWeight: row.isUserRow ? '700' : '400' },
+                      {
+                        color: row.isUserRow ? colors.accent : colors.textPrimary,
+                        ...withFontFamily(typography.bodySmall, row.isUserRow ? '700' : '400'),
+                      },
                     ]}
                   >
                     {formatZmanTime(row.candleLighting, use24h)}
@@ -115,7 +118,10 @@ export function ShabbatCard({
                     style={[
                       styles.timeCell,
                       styles.havdalahCell,
-                      { color: row.isUserRow ? colors.accent : colors.textPrimary, fontWeight: row.isUserRow ? '700' : '400' },
+                      {
+                        color: row.isUserRow ? colors.accent : colors.textPrimary,
+                        ...withFontFamily(typography.bodySmall, row.isUserRow ? '700' : '400'),
+                      },
                     ]}
                   >
                     {formatZmanTime(row.havdalah, use24h)}
@@ -197,8 +203,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   value: {
-    ...withFontFamily(typography.bodyMedium),
-    fontWeight: '500',
+    ...withFontFamily(typography.bodyMedium, '500'),
   },
 
   // ── Friday table ─────────────────────────────────────────────────────────

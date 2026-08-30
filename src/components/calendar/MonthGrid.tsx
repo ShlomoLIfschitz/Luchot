@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     ...withFontFamily(typography.caption),
     letterSpacing: 0.3,
   },
-  dayNameShabbat: { fontWeight: '700' },
+  dayNameShabbat: { ...withFontFamily(typography.caption, '700') },
 
   // Measured container for the whole grid-rows area — onLayout on this View
   // is the ONLY source of truth for gridAreaHeight (never assume a screen

@@ -171,5 +171,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnText: { ...withFontFamily(typography.bodyMedium), fontWeight: '600' },
+  btnText: { ...withFontFamily(typography.bodyMedium, '600') },
 });

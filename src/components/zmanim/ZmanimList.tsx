@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   label: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
-  time:  { ...withFontFamily(typography.bodyLarge), fontWeight: '700' },
+  time:  { ...withFontFamily(typography.bodyLarge, '700') },
   candleValueBlock: { alignItems: 'flex-start' },
   offsetHint: { ...withFontFamily(typography.micro), marginTop: 1, textAlign: 'right' },
 });

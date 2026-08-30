@@ -2,6 +2,13 @@
 // Phase 3.5 — Day screen. Full implementation per docs/SCREENS.md.
 // Phase 3.7a-1 — ScreenHeader added (outside ScrollView, stays fixed).
 // C2 — Hourly schedule moved to events tab; real hour bucketing; tab reset on date change.
+// Phase 5 layout pass — "highlights strip" restructure (real-device feedback):
+//   the duplicate date hero (ScreenHeader already shows both dates) was removed,
+//   and holiday banner / parasha / Omer / Rosh Chodesh / ShabbatCard were hoisted
+//   above the tab control so they render — uniformly, every day — before the
+//   user has to pick a tab. Everything below ScreenHeader now lives in ONE
+//   ScrollView (highlights → tab bar → tab content), replacing the previous
+//   fixed-outside-ScrollView tab bar.
 //
 // NoteEditor adaptation note (vs. original Phase 3.5 spec):
 //   NoteEditor is a React Native Modal component, not a @gorhom/bottom-sheet.
@@ -10,7 +17,7 @@
 //   useThemeColors internally. The ref-based pattern in the spec was adapted
 //   to a useState boolean accordingly.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +26,7 @@ import {
   Pressable,
   Linking,
 } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { BookOpenText } from 'lucide-react-native';
@@ -38,7 +46,6 @@ import { SectionLabel } from '../../src/components/ui/SectionLabel';
 import {
   dateService,
   toHebrewNumeral,
-  toHebrewYear,
   type DayData,
 } from '../../src/services/DateService';
 import { radius } from '../../src/constants/radius';
@@ -49,6 +56,18 @@ import { useDatePicker } from '../../src/hooks/useDatePicker';
 import { swipeDirection } from '../../src/constants/layout';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
+
+// Hourly grid layout constants — shared between the row style (below) and
+// the auto-scroll offset math, so there is a single source of truth instead
+// of a magic number duplicated in two places.
+const HOUR_ROW_HEIGHT = 40;
+// Default hour brought into view on mount for a non-today day (no "current
+// hour" makes sense there) — a sensible mid-morning anchor.
+const DEFAULT_TIMELINE_HOUR = 8;
+// Mirrors styles.scrollContent.paddingTop — the vertical offset of the
+// scrollable content's first child, needed to convert an onLayout-measured
+// child position into an absolute ScrollView.scrollTo() offset.
+const SCROLL_TOP_PADDING = 16;
 
 // Hourly-grid event block color: mirrors NoteList's colorId/noteType → tag
 // token mapping (that helper is local/unexported to NoteList.tsx, which is
@@ -70,7 +89,6 @@ export default function DayScreen() {
   const colors = useThemeColors();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
-  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
   const use24hTime = useSettingsStore((s) => s.use24hTime);
   const { latitude: locationLat, longitude: locationLng, placeName: locationPlaceName } = useLocationStore();
 
@@ -169,6 +187,8 @@ export default function DayScreen() {
     return map;
   }, [notes]);
 
+  const hasTimedEvents = Object.keys(notesByHour).length > 0;
+
   /** Format HH:MM for the grid label, honoring use24hTime. */
   const formatHM = useCallback((date: Date): string => {
     return date.toLocaleTimeString('he-IL', {
@@ -178,233 +198,268 @@ export default function DayScreen() {
     });
   }, [use24hTime]);
 
-  // Date formatting
-  const hebrewFormatted = `${toHebrewNumeral(dayData.hebrewDate.day)} ${dayData.hebrewDate.monthName} ${toHebrewYear(dayData.hebrewDate.year)}`;
-  const gregFormatted = selectedDate.toLocaleDateString('he-IL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  // Auto-scroll the hourly timeline so a useful hour is in view on mount,
+  // instead of opening on a wall of empty pre-dawn rows. Fires once per
+  // selected date (guarded by autoScrolledDateRef) from the timeline
+  // section's onLayout — the layout pass is the correct signal that the
+  // section's position is known, avoiding a timing race with a useEffect.
+  const scrollRef = useRef<ScrollView>(null);
+  const autoScrolledDateRef = useRef<number | null>(null);
+
+  const handleTimelineSectionLayout = useCallback((e: LayoutChangeEvent) => {
+    const dateKey = selectedDate.getTime();
+    if (autoScrolledDateRef.current === dateKey) return;
+    autoScrolledDateRef.current = dateKey;
+
+    const sectionY = e.nativeEvent.layout.y;
+    const today = new Date();
+    const isToday = selectedDate.toDateString() === today.toDateString();
+    const targetHour = isToday
+      ? Math.min(23, Math.max(0, today.getHours()))
+      : DEFAULT_TIMELINE_HOUR;
+    const offsetY = SCROLL_TOP_PADDING + sectionY + targetHour * HOUR_ROW_HEIGHT;
+    scrollRef.current?.scrollTo({ y: offsetY, animated: false });
+  }, [selectedDate]);
 
   const isHoliday = dayData.isYomTov || dayData.holidays.length > 0;
   const primaryHoliday = dayData.holidays[0];
 
-  // Parasha card — shown Friday (upcomingParasha, the coming Shabbat's
-  // reading) and Saturday (parasha, unchanged existing field). undefined on
-  // both fields (e.g. a Yom Tov week with a special holiday reading instead
-  // of a regular parasha) renders nothing — no empty card.
+  // Parasha card — shown every day: Shabbat itself uses `parasha` (the
+  // current Shabbat's reading); every other day uses `upcomingParasha`
+  // (the coming Shabbat's reading, populated daily by DateService).
+  // undefined on both fields (e.g. a Yom Tov week with a special holiday
+  // reading instead of a regular parasha) renders nothing — no empty card.
   const dayOfWeek = selectedDate.getDay(); // 5 = Friday, 6 = Saturday
-  const parashaCardName =
-    dayOfWeek === 6 ? dayData.parasha : dayOfWeek === 5 ? dayData.upcomingParasha : undefined;
+  const parashaCardName = dayOfWeek === 6 ? dayData.parasha : dayData.upcomingParasha;
+
+  // Rosh Chodesh banner — mirrors the exact de-duplication rule in
+  // src/utils/tagMapper.ts: suppressed when the day is already a Yom Tov
+  // (e.g. Rosh Hashana, which is both) or when hebcal already emitted a
+  // "Rosh Chodesh ..." entry into holidays[] (the holiday banner above
+  // already covers it) — avoids a "ראש חודש" / "ראש חודש סיון" double.
+  const hasRoshChodeshHoliday = dayData.holidaysEn.some((h) => h.startsWith('Rosh Chodesh'));
+  const showRoshChodesh = dayData.hebrewDate.isRoshChodesh && !dayData.isYomTov && !hasRoshChodeshHoliday;
 
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
+        {/* ScreenHeader already renders the compact bilingual date (Hebrew +
+            Gregorian) and is the tappable date-picker affordance — no
+            separate date hero needed below it. */}
         <ScreenHeader date={selectedDate} onDatePress={openPicker} />
-        {/* Date header — fixed above the scroll, always visible */}
-        <View style={styles.header}>
-          <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-            {hebrewOnTop ? hebrewFormatted : gregFormatted}
-          </Text>
-          <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-            {hebrewOnTop ? gregFormatted : hebrewFormatted}
-          </Text>
-        </View>
-
-        {/* Tab bar — fixed below the date header, always visible while scrolling.
-            Rendered OUTSIDE the ScrollView on purpose: a stickyHeaderIndices child
-            is re-parented into an internal Animated.View wrapper that, in this
-            RTL + nested-flex case, never gave the row a stable full-width context,
-            so the two tabs collapsed and stacked. As a normal flex-row child of the
-            root column it lays out reliably, and sitting outside the scroll viewport
-            keeps it permanently visible (functionally sticky). */}
-        <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-          {/* RTL: 'אירועים' first in JSX → renders on the right */}
-          <Pressable
-            onPress={() => setActiveTab('events')}
-            style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-            accessibilityRole="tab"
-            accessibilityLabel="אירועים"
-          >
-            <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
-              אירועים
-            </Text>
-          </Pressable>
-          {/* 'תורה וזמנים' second in JSX → renders on the left */}
-          <Pressable
-            onPress={() => setActiveTab('torah')}
-            style={[styles.tabItem, activeTab === 'torah' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-            accessibilityRole="tab"
-            accessibilityLabel="תורה וזמנים"
-          >
-            <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
-              תורה וזמנים
-            </Text>
-          </Pressable>
-        </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          stickyHeaderIndices={[1]}
         >
+          {/* ── Highlights strip — a SINGLE wrapper View, so it is always
+              exactly one direct child of the ScrollView regardless of how
+              many of the conditional items inside it render on a given day.
+              This keeps the tab bar's index below fixed at 1 in every case —
+              a plain weekday (parasha card only) and a Friday (parasha +
+              ShabbatCard) both produce the same top-level child count.
+              (ScrollView resolves stickyHeaderIndices against
+              React.Children.toArray(children), which DROPS falsy `cond &&
+              <X/>` entries entirely — so if these banners were direct
+              ScrollView children instead of wrapped here, the tab bar's
+              index would shift by day and a hardcoded number would break.)
+              Each item inside still guards its own empty state so a day with
+              nothing special collapses cleanly with no empty cards or stray
+              gaps. */}
           <View>
-            {activeTab === 'events' ? (
-              // ── Events tab ─────────────────────────────────────────────────
-              // Shows: all-day notes only (NoteList onlyAllDay) + add button +
-              // hourly schedule grid with timed notes bucketed by start hour.
-              <>
-                {/* All-day notes only — timed events appear in the hourly grid below */}
-                <NoteList
-                  date={selectedDate}
-                  hebrewDate={dayData.hebrewDate}
-                  hideAddButton
-                  onlyAllDay
-                />
-                <Pressable
-                  onPress={openNoteEditor}
-                  style={[styles.addEventBtn, { backgroundColor: colors.accentLight }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="הוסף אירוע"
-                >
-                  <Text style={[styles.addEventBtnText, { color: colors.accent }]}>+ הוסף אירוע</Text>
-                </Pressable>
-
-                {/* Hourly schedule — C2: moved from torah tab to events tab.
-                    Timed notes bucketed by getHours() of startDateTime. */}
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-                    לוח שעות
-                  </Text>
-
-                  {HOURS.map((hour) => {
-                    const hourLabel = hour.toString().padStart(2, '0') + ':00';
-                    const hourNotes = notesByHour[hour] ?? [];
-
-                    return (
-                      // RTL fix: explicit row-reverse (not plain 'row') — with
-                      // row-reverse the FIRST JSX child lands RIGHT, so the
-                      // gutter (hourLabel, last child) lands LEFT and the
-                      // event content (first child) fills the reading-start
-                      // side, matching detailRow's convention above.
-                      <View key={hour} style={[styles.hourRow, { borderTopColor: colors.borderSubtle }]}>
-                        <View style={styles.hourContent}>
-                          {hourNotes.map((note) => {
-                            const startDate = new Date(note.startDateTime!);
-                            const timeStr = formatHM(startDate);
-                            const catKey = resolveNoteCategoryKey(note);
-                            const catTokens = CATEGORY_TOKENS[catKey];
-                            return (
-                              <Pressable
-                                key={note.id}
-                                onPress={() => openGridNoteEditor(note)}
-                                style={[
-                                  styles.hourNote,
-                                  { backgroundColor: colors[catTokens.bg] },
-                                ]}
-                                accessibilityRole="button"
-                                accessibilityLabel={`${note.summary}, ${timeStr}`}
-                              >
-                                <Text style={[styles.hourNoteTitle, { color: colors[catTokens.fg] }]}>
-                                  {note.summary}
-                                </Text>
-                                <Text style={[styles.hourNoteTime, { color: colors[catTokens.fg] }]}>
-                                  {timeStr}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                        <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
-                        <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
-                          {hourLabel}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </>
-            ) : (
-              // ── Torah & Zmanim tab ─────────────────────────────────────────
-              // Keeps: ShabbatCard, holiday banner, Torah details, ZmanimList.
-              // Hourly schedule removed (C2 — moved to events tab).
-              <>
-                {/* Parasha card — Friday (upcoming Shabbat) + Saturday (current Shabbat).
-                    Renders nothing when neither field is available (e.g. a Yom Tov week). */}
-                {parashaCardName && (
-                  <ParashaCard colors={colors} label="פרשת השבוע" name={parashaCardName} />
-                )}
-
-                {/* Shabbat Card — returns null on non-Fri/Sat days */}
-                <ShabbatCard
-                  selectedDate={selectedDate}
-                  candleLightingTime={zmanim.candleLighting}
-                  tzaisTime={zmanim.tzeitHakochavim}
-                  rabbeinuTamTime={zmanim.tzeitRabbeinu}
-                  locationName={resolvedLocationName}
-                  use24h={use24hTime}
-                />
-
-                {/* Holiday Banner */}
-                {isHoliday && primaryHoliday && (
-                  <View style={[styles.holidayBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
-                    <Text style={[styles.holidayText, { color: colors.tagHoliday }]}>
-                      ✡ {primaryHoliday}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Torah Details — Card + SectionLabel; empty-state guarded so
-                    no empty card renders on a day with none of these fields. */}
-                {(dayData.parasha || dayData.omerDay || dayData.dafYomi || dayData.rambamOneChapter) && (
-                  <View style={styles.section}>
-                    <SectionLabel title="פרטים תורניים" colors={colors} />
-                    <Card colors={colors}>
-                      {dayData.parasha && (
-                        <DetailRow
-                          label="פרשת השבוע"
-                          value={dayData.parasha}
-                          colors={colors}
-                        />
-                      )}
-
-                      {dayData.omerDay && (
-                        <DetailRow
-                          label="ספירת העומר"
-                          value={`יום ${toHebrewNumeral(dayData.omerDay)} לעומר`}
-                          colors={colors}
-                        />
-                      )}
-
-                      {dayData.dafYomi && (
-                        <DetailRow
-                          label="דף יומי"
-                          value={dayData.dafYomi.display}
-                          colors={colors}
-                          actionLabel="→ ספריא"
-                          onAction={() => Linking.openURL(dayData.dafYomi!.url)}
-                        />
-                      )}
-
-                      {dayData.rambamOneChapter && (
-                        <DetailRow
-                          label='רמב״ם יומי'
-                          value={dayData.rambamOneChapter.display}
-                          colors={colors}
-                          actionLabel="→ ספריא"
-                          onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
-                        />
-                      )}
-                    </Card>
-                  </View>
-                )}
-
-                {/* Zmanim */}
-                <ZmanimList zmanim={zmanim} />
-              </>
+            {isHoliday && primaryHoliday && (
+              <View style={[styles.infoBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
+                <Text style={[styles.infoBannerText, { color: colors.tagHoliday }]}>
+                  ✡ {primaryHoliday}
+                </Text>
+              </View>
             )}
+
+            {parashaCardName && (
+              <ParashaCard colors={colors} label="פרשת השבוע" name={parashaCardName} />
+            )}
+
+            {dayData.omerDay !== undefined && (
+              <View style={[styles.infoBanner, { backgroundColor: colors.tagSpecialBg, borderColor: colors.tagSpecial }]}>
+                <Text style={[styles.infoBannerText, { color: colors.tagSpecial }]}>
+                  {`ספירת העומר — יום ${toHebrewNumeral(dayData.omerDay)} לעומר`}
+                </Text>
+              </View>
+            )}
+
+            {showRoshChodesh && (
+              <View style={[styles.infoBanner, { backgroundColor: colors.tagSpecialBg, borderColor: colors.tagSpecial }]}>
+                <Text style={[styles.infoBannerText, { color: colors.tagSpecial }]}>
+                  ראש חודש
+                </Text>
+              </View>
+            )}
+
+            {/* Shabbat Card — returns null on non-Fri/Sat days. Props/logic untouched. */}
+            <ShabbatCard
+              selectedDate={selectedDate}
+              candleLightingTime={zmanim.candleLighting}
+              tzaisTime={zmanim.tzeitHakochavim}
+              rabbeinuTamTime={zmanim.tzeitRabbeinu}
+              locationName={resolvedLocationName}
+              use24h={use24hTime}
+            />
           </View>
+
+          {/* Tab bar — pinned to the top via stickyHeaderIndices={[1]} above
+              once the highlights strip (index 0) scrolls past it. Needs an
+              explicit opaque background (colors.background, matching the
+              screen root) or content scrolling underneath would show
+              through while it's docked. */}
+          <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+            {/* RTL: 'אירועים' first in JSX → renders on the right */}
+            <Pressable
+              onPress={() => setActiveTab('events')}
+              style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+              accessibilityRole="tab"
+              accessibilityLabel="אירועים"
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
+                אירועים
+              </Text>
+            </Pressable>
+            {/* 'תורה וזמנים' second in JSX → renders on the left */}
+            <Pressable
+              onPress={() => setActiveTab('torah')}
+              style={[styles.tabItem, activeTab === 'torah' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+              accessibilityRole="tab"
+              accessibilityLabel="תורה וזמנים"
+            >
+              <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
+                תורה וזמנים
+              </Text>
+            </Pressable>
+          </View>
+
+          {activeTab === 'events' ? (
+            // ── Events tab ─────────────────────────────────────────────────
+            // Shows: all-day notes only (NoteList onlyAllDay) + add button +
+            // hourly schedule grid with timed notes bucketed by start hour.
+            <>
+              {/* All-day notes only — timed events appear in the hourly grid below */}
+              <NoteList
+                date={selectedDate}
+                hebrewDate={dayData.hebrewDate}
+                hideAddButton
+                onlyAllDay
+              />
+              <Pressable
+                onPress={openNoteEditor}
+                style={[styles.addEventBtn, { backgroundColor: colors.accentLight }]}
+                accessibilityRole="button"
+                accessibilityLabel="הוסף אירוע"
+              >
+                <Text style={[styles.addEventBtnText, { color: colors.accent }]}>+ הוסף אירוע</Text>
+              </Pressable>
+
+              {/* Hourly schedule — C2: moved from torah tab to events tab.
+                  Timed notes bucketed by getHours() of startDateTime.
+                  onLayout drives the once-per-date auto-scroll above. */}
+              <View style={styles.section} onLayout={handleTimelineSectionLayout}>
+                <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
+                  לוח שעות
+                </Text>
+
+                {!hasTimedEvents && (
+                  <Text style={[styles.timelineEmptyHint, { color: colors.textTertiary }]}>
+                    אין אירועים ליום זה
+                  </Text>
+                )}
+
+                {HOURS.map((hour) => {
+                  const hourLabel = hour.toString().padStart(2, '0') + ':00';
+                  const hourNotes = notesByHour[hour] ?? [];
+
+                  return (
+                    // RTL fix: explicit row-reverse (not plain 'row') — with
+                    // row-reverse the FIRST JSX child lands RIGHT, so the
+                    // gutter (hourLabel, last child) lands LEFT and the
+                    // event content (first child) fills the reading-start
+                    // side, matching detailRow's convention above.
+                    <View key={hour} style={[styles.hourRow, { borderTopColor: colors.borderSubtle }]}>
+                      <View style={styles.hourContent}>
+                        {hourNotes.map((note) => {
+                          const startDate = new Date(note.startDateTime!);
+                          const timeStr = formatHM(startDate);
+                          const catKey = resolveNoteCategoryKey(note);
+                          const catTokens = CATEGORY_TOKENS[catKey];
+                          return (
+                            <Pressable
+                              key={note.id}
+                              onPress={() => openGridNoteEditor(note)}
+                              style={[
+                                styles.hourNote,
+                                { backgroundColor: colors[catTokens.bg] },
+                              ]}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${note.summary}, ${timeStr}`}
+                            >
+                              <Text style={[styles.hourNoteTitle, { color: colors[catTokens.fg] }]}>
+                                {note.summary}
+                              </Text>
+                              <Text style={[styles.hourNoteTime, { color: colors[catTokens.fg] }]}>
+                                {timeStr}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
+                      <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
+                        {hourLabel}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            // ── Torah & Zmanim tab ─────────────────────────────────────────
+            // Parasha, Omer and holiday banner now live in the highlights
+            // strip above (shown every day, not just here) — kept out of
+            // this tab to avoid duplicating them. This tab keeps only the
+            // learning details that have no home in the strip (Daf Yomi,
+            // Rambam) plus the full Zmanim list.
+            <>
+              {(dayData.dafYomi || dayData.rambamOneChapter) && (
+                <View style={styles.section}>
+                  <SectionLabel title="פרטים תורניים" colors={colors} />
+                  <Card colors={colors}>
+                    {dayData.dafYomi && (
+                      <DetailRow
+                        label="דף יומי"
+                        value={dayData.dafYomi.display}
+                        colors={colors}
+                        actionLabel="→ ספריא"
+                        onAction={() => Linking.openURL(dayData.dafYomi!.url)}
+                      />
+                    )}
+
+                    {dayData.rambamOneChapter && (
+                      <DetailRow
+                        label='רמב״ם יומי'
+                        value={dayData.rambamOneChapter.display}
+                        colors={colors}
+                        actionLabel="→ ספריא"
+                        onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
+                      />
+                    )}
+                  </Card>
+                </View>
+              )}
+
+              {/* Zmanim */}
+              <ZmanimList zmanim={zmanim} />
+            </>
+          )}
         </ScrollView>
 
         {/* Note Editor — Modal-based, controlled via visible prop.
@@ -510,15 +565,11 @@ function DetailRow({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: SCROLL_TOP_PADDING, paddingBottom: 100 },
 
-  // Header (fixed above the scroll)
-  header: { alignItems: 'center', paddingTop: 16, marginBottom: 12 },
-  hebrewDate: { ...withFontFamily(typography.displayMedium), letterSpacing: -0.5, textAlign: 'center' },
-  gregDate: { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
-
-  // Holiday banner
-  holidayBanner: {
+  // Highlights-strip banner — shared visual language for the holiday banner,
+  // Omer count and Rosh Chodesh; only colors differ per use.
+  infoBanner: {
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: radius.lg,
@@ -526,13 +577,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
   },
-  holidayText: { ...withFontFamily(typography.cardTitle) },
+  infoBannerText: { ...withFontFamily(typography.cardTitle), textAlign: 'center' },
 
   // Sections
   section: { marginVertical: 12 },
   sectionTitle: {
-    ...withFontFamily(typography.caption),
-    fontWeight: '600',
+    ...withFontFamily(typography.caption, '600'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -561,7 +611,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     flexShrink: 0,
   },
-  actionText: { ...withFontFamily(typography.bodySmall), fontWeight: '600' },
+  actionText: { ...withFontFamily(typography.bodySmall, '600') },
 
   // Notes (legacy style names kept for safety — unused by new components)
   noteRow: {
@@ -570,7 +620,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: 6,
   },
-  noteText: { ...withFontFamily(typography.bodyMedium), fontWeight: '500', textAlign: 'right' },
+  noteText: { ...withFontFamily(typography.bodyMedium, '500'), textAlign: 'right' },
 
   // Hourly schedule — explicit row-reverse (locked RTL convention): first
   // JSX child (event content) lands right, last child (hourLabel) lands
@@ -578,7 +628,7 @@ const styles = StyleSheet.create({
   hourRow: {
     flexDirection: 'row-reverse',
     alignItems: 'flex-start',
-    minHeight: 40,
+    minHeight: HOUR_ROW_HEIGHT,
     paddingVertical: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
@@ -601,10 +651,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: radius.md,
   },
-  hourNoteTitle: { ...withFontFamily(typography.bodySmall), fontWeight: '700', textAlign: 'right' },
+  hourNoteTitle: { ...withFontFamily(typography.bodySmall, '700'), textAlign: 'right' },
   hourNoteTime: { ...withFontFamily(typography.micro), textAlign: 'right', marginTop: 2, opacity: 0.75 },
+  // Quiet empty-state hint shown above the grid (grid stays visible below
+  // it) when the day has zero timed events.
+  timelineEmptyHint: {
+    ...withFontFamily(typography.bodySmall),
+    textAlign: 'center',
+    marginBottom: 8,
+  },
 
-  // Parasha card (Friday: upcoming Shabbat / Saturday: current Shabbat)
+  // Parasha card (every day: upcoming Shabbat's reading, or the current
+  // Shabbat's reading on Shabbat itself)
   parashaCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -616,13 +674,14 @@ const styles = StyleSheet.create({
   parashaCaption: { ...withFontFamily(typography.caption), textAlign: 'right' },
   parashaName: { ...withFontFamily(typography.displaySmall), textAlign: 'right' },
 
-  // Tab bar (sticky header)
+  // Tab bar — normal (scrolling) child of the ScrollView content.
   tabBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'flex-start',
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 8,
+    marginBottom: 4,
   },
   tabItem: {
     alignItems: 'center',
@@ -630,8 +689,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tabText: {
-    ...withFontFamily(typography.bodyMedium),
-    fontWeight: '600',
+    ...withFontFamily(typography.bodyMedium, '600'),
   },
 
   // Inline add-event button (events tab)
@@ -643,7 +701,6 @@ const styles = StyleSheet.create({
     margin: 12,
   },
   addEventBtnText: {
-    ...withFontFamily(typography.bodyMedium),
-    fontWeight: '600',
+    ...withFontFamily(typography.bodyMedium, '600'),
   },
 });

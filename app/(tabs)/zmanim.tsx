@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.full,
   },
-  sourceBadgeText: { ...withFontFamily(typography.micro), fontWeight: '700' },
+  sourceBadgeText: { ...withFontFamily(typography.micro, '700') },
 
   // Shita selector — surfaceMuted track, surface pill for the active segment.
   shitaTrack: {
@@ -240,5 +240,5 @@ const styles = StyleSheet.create({
     ...elevation.sm,
   },
   shitaSegmentText: { ...withFontFamily(typography.bodyMedium) },
-  shitaSegmentTextActive: { fontWeight: '700' },
+  shitaSegmentTextActive: { ...withFontFamily(typography.bodyMedium, '700') },
 });

@@ -56,9 +56,9 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
       <Text
         style={[
           styles.label,
+          withFontFamily(typography.bodyLarge, active ? '700' : '500'),
           {
             color: active ? colors.accent : colors.textPrimary,
-            fontWeight: active ? '700' : typography.bodyLarge.fontWeight,
           },
         ]}
       >

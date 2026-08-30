@@ -85,8 +85,8 @@ function WheelColumn({ items, selectedIndex, onIndexChange, width }: WheelColumn
                 style={[
                   styles.itemText,
                   isSelected
-                    ? { fontWeight: '700', color: colors.accent }
-                    : { fontWeight: '400', color: colors.textPrimary },
+                    ? { ...withFontFamily(typography.bodyLarge, '700'), color: colors.accent }
+                    : { ...withFontFamily(typography.bodyLarge, '400'), color: colors.textPrimary },
                 ]}
               >
                 {item.label}

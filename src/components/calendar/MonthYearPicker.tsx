@@ -95,7 +95,7 @@ export function MonthYearPicker({ visible, currentYear, currentMonth, colors, on
                           <Text style={[
                             pickerStyles.monthText,
                             { color: isSelected ? colors.textInverse : colors.textPrimary },
-                            isSelected && { fontWeight: '700' },
+                            isSelected && withFontFamily(typography.bodyMedium, '700'),
                           ]}>
                             {name}
                           </Text>
@@ -119,7 +119,9 @@ const pickerStyles = StyleSheet.create({
   // Symmetric ‹ year › row — the chevrons encode their own direction; plain 'row' is correct here.
   yearRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   yearArrow: { padding: 8, minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  arrowText: { ...withFontFamily(typography.displayLarge), fontWeight: '300' },
+  // '300' has no bundled Heebo static (only 400/500/600/700 are registered
+  // — see resolveRegisteredWeight in typography.ts); nearest is '400'.
+  arrowText: { ...withFontFamily(typography.displayLarge, '400') },
   yearCenter: { alignItems: 'center' },
   yearGreg: { ...withFontFamily(typography.displayMedium), textAlign: 'center' },
   yearHebrew: { ...withFontFamily(typography.bodySmall), marginTop: 2, textAlign: 'center' },

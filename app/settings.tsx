@@ -582,7 +582,6 @@ const candleRowStyles = StyleSheet.create({
     borderRadius: radius.full,
   },
   chipText: {
-    ...withFontFamily(typography.bodySmall),
-    fontWeight: '600',
+    ...withFontFamily(typography.bodySmall, '600'),
   },
 });

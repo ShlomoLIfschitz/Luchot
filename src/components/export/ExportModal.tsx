@@ -204,8 +204,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkmark: {
-    ...withFontFamily(typography.bodyMedium),
-    fontWeight: '700',
+    ...withFontFamily(typography.bodyMedium, '700'),
     lineHeight: 16,
   },
   checkLabel: {
@@ -234,7 +233,6 @@ const styles = StyleSheet.create({
     // background set inline
   },
   btnText: {
-    ...withFontFamily(typography.bodyMedium),
-    fontWeight: '600',
+    ...withFontFamily(typography.bodyMedium, '600'),
   },
 });

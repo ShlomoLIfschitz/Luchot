@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     gap: 12,  // guarantees breathing room between label and time value
   },
   label: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
-  time:  { ...withFontFamily(typography.bodyLarge), fontWeight: '700' },
+  time:  { ...withFontFamily(typography.bodyLarge, '700') },
   dimmed: { opacity: 0.5 },
 
   shitaTimes: { flexDirection: 'row', gap: 16, alignItems: 'flex-end' },

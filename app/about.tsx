@@ -186,8 +186,7 @@ const styles = StyleSheet.create({
   },
   creditContent: { flex: 1 },
   creditName: {
-    ...withFontFamily(typography.bodySmall),
-    fontWeight: '600',
+    ...withFontFamily(typography.bodySmall, '600'),
     textAlign: 'right',
   },
   creditDescription: {

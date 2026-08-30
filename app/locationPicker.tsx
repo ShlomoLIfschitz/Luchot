@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   gpsButtonDisabled: { opacity: 0.6 },
-  gpsButtonText: { ...withFontFamily(typography.bodyMedium), fontWeight: '600' },
+  gpsButtonText: { ...withFontFamily(typography.bodyMedium, '600') },
 
   searchContainer: {
     flexDirection: 'row-reverse',
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   cityNameSelected: {
-    fontWeight: '600',
+    ...withFontFamily(typography.bodyMedium, '600'),
   },
   // No exact type-scale step matches the previous hand-picked 18 — nearest
   // is cardTitle (17), and its baked-in fontWeight (700) already matches.
@@ -449,6 +449,6 @@ const stripStyles = StyleSheet.create({
   },
   textBlock: { flex: 1 },
   iconSlot: { width: 24, alignItems: 'center' },
-  headline: { ...withFontFamily(typography.bodyMedium), fontWeight: '700', textAlign: 'right' },
+  headline: { ...withFontFamily(typography.bodyMedium, '700'), textAlign: 'right' },
   detail:   { ...withFontFamily(typography.caption), marginTop: 2, textAlign: 'right' },
 });

@@ -313,5 +313,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     flexShrink: 0,  // button keeps its natural size; text area yields instead
   },
-  linkText: { ...withFontFamily(typography.bodySmall), fontWeight: '600' },
+  linkText: { ...withFontFamily(typography.bodySmall, '600') },
 });

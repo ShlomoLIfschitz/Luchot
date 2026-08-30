@@ -8,6 +8,10 @@ import type { TextStyle } from 'react-native';
 // Heebo, approved and bundled via @expo-google-fonts/heebo (loaded in
 // app/_layout.tsx). Every consumer that spreads `typography.xxx` through
 // `withFontFamily()` picks this up automatically.
+//
+// FONT_FAMILY is the single switch point for the app's typeface: if the app
+// ever changes fonts, only this constant (and the WEIGHT_TO_FAMILY table
+// below it) need editing — no call site should need to change.
 export const FONT_FAMILY: string | undefined = 'Heebo_400Regular';
 
 interface TypeStyle {
@@ -36,17 +40,111 @@ export const typography = {
 export type Typography = typeof typography;
 export type TypographyKey = keyof Typography;
 
+// The four static weights actually bundled via @expo-google-fonts/heebo and
+// registered with useFonts() in app/_layout.tsx. The string values below are
+// the exact object keys passed to useFonts() there (Heebo_400Regular,
+// Heebo_500Medium, Heebo_600SemiBold, Heebo_700Bold) — those keys ARE the
+// font-family names RN's font manager registers, so they must match
+// character-for-character or the family silently falls back to the system
+// font instead of erroring.
+type RegisteredWeight = '400' | '500' | '600' | '700';
+
+// RN's built-in weight aliases resolve onto one of the registered weights
+// above ('normal' -> 400, 'bold' -> 700), so a caller may pass either form.
+type WeightAlias = 'normal' | 'bold';
+
+// Weights a caller is allowed to request via the optional `overrideWeight`
+// argument of withFontFamily(). Deliberately NOT the full
+// TextStyle['fontWeight'] union — restricting it to weights that actually
+// have a bundled Heebo static means passing an unregistered weight (e.g.
+// '800', which Heebo doesn't ship as a static in this app) is a compile-time
+// error instead of a silent, invisible fallback to Regular.
+export type OverridableWeight = RegisteredWeight | WeightAlias;
+
+const WEIGHT_TO_FAMILY: Record<RegisteredWeight, string> = {
+  '400': 'Heebo_400Regular',
+  '500': 'Heebo_500Medium',
+  '600': 'Heebo_600SemiBold',
+  '700': 'Heebo_700Bold',
+};
+
 /**
- * Helper for consumers: spreads a typography step plus (optionally) the
- * global FONT_FAMILY into a single object, ready to drop into
- * `StyleSheet.create`. This is the recommended way to consume a step so that
- * flipping FONT_FAMILY to Heebo later requires no changes at call sites.
+ * Resolves any TextStyle['fontWeight'] value (including weights this app
+ * doesn't currently declare anywhere, like '300' or '900') onto one of the
+ * four weights we actually have a bundled Heebo static for.
+ *
+ * This only matters as a defensive fallback today — every step in
+ * `typography` above already uses 400/500/600/700 — but it exists so that if
+ * a future step (or a runtime-computed fontWeight at a call site) uses a
+ * weight we don't have a static for, it degrades to the *nearest* bundled
+ * weight rather than silently collapsing to Regular, which would be a much
+ * harder bug to notice than a slightly-off weight.
+ *
+ * Documented mapping:
+ *   'normal', '100'-'300'          -> '400' (Regular)
+ *   '500'                          -> '500' (Medium)
+ *   '600'                          -> '600' (SemiBold)
+ *   'bold', '700', '800', '900'    -> '700' (Bold) for 700/800/900; 'bold' -> 700
+ */
+function resolveRegisteredWeight(weight: TextStyle['fontWeight']): RegisteredWeight {
+  switch (weight) {
+    case 'normal':
+    case '100':
+    case '200':
+    case '300':
+    case undefined:
+      return '400';
+    case '400':
+      return '400';
+    case '500':
+      return '500';
+    case '600':
+      return '600';
+    case 'bold':
+    case '700':
+    case '800':
+    case '900':
+      return '700';
+    default:
+      return '400';
+  }
+}
+
+/**
+ * Helper for consumers: spreads a typography step plus (when FONT_FAMILY is
+ * set) the correctly-weighted Heebo family into a single object, ready to
+ * drop into `StyleSheet.create`.
+ *
+ * Why this exists: in React Native, once `fontFamily` names a concrete font
+ * file, `fontWeight` is ignored (Android does not synthesise bold for a
+ * named font). So a step's `fontWeight` can never be applied by also setting
+ * `fontWeight` alongside a concrete `fontFamily` — the weight has to be
+ * baked into WHICH family is chosen instead. That's what this function does:
+ * it looks at the step's (or the override's) fontWeight, maps it to the
+ * matching bundled Heebo family, and returns a style with `fontFamily` set
+ * and `fontWeight` omitted entirely (emitting both is what causes
+ * inconsistent behaviour across platforms).
+ *
+ * Pass `overrideWeight` when a call site wants to render a step at a
+ * different weight than the step's own default, e.g. a dynamic
+ * "bold if selected" row:
+ *   withFontFamily(typography.bodyMedium, isSelected ? '700' : '400')
+ *
+ * Rollback: if FONT_FAMILY is ever set back to `undefined` (system font),
+ * this function returns the step with its declared `fontWeight` (or
+ * `overrideWeight`, if given) intact, since the system font DOES synthesise
+ * weights correctly. No call site needs to change for that rollback to work.
  *
  * Example:
  *   const styles = StyleSheet.create({
  *     title: { ...withFontFamily(typography.cardTitle), color: colors.textPrimary },
  *   });
  */
-export function withFontFamily(step: TypeStyle): TypeStyle & { fontFamily?: string } {
-  return FONT_FAMILY ? { ...step, fontFamily: FONT_FAMILY } : step;
+export function withFontFamily(step: TypeStyle, overrideWeight?: OverridableWeight): TextStyle {
+  if (!FONT_FAMILY) {
+    return overrideWeight ? { ...step, fontWeight: overrideWeight } : step;
+  }
+  const { fontWeight: _stepWeight, ...rest } = step;
+  const registered = resolveRegisteredWeight(overrideWeight ?? _stepWeight);
+  return { ...rest, fontFamily: WEIGHT_TO_FAMILY[registered] };
 }

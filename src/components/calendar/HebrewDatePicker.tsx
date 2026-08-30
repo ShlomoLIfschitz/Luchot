@@ -233,7 +233,6 @@ const s = StyleSheet.create({
   },
 
   btnText: {
-    ...withFontFamily(typography.bodyMedium),
-    fontWeight: '600',
+    ...withFontFamily(typography.bodyMedium, '600'),
   },
 });

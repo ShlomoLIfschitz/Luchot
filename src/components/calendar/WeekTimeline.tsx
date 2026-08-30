@@ -641,8 +641,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: radius.sm,
   },
   timedTitle: {
-    ...withFontFamily(typography.cellTag),
-    fontWeight: '700',
+    ...withFontFamily(typography.cellTag, '700'),
     textAlign: 'right',
   },
 

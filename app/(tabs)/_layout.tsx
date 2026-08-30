@@ -133,6 +133,6 @@ const styles = StyleSheet.create({
     ...withFontFamily(typography.caption),
   },
   labelActive: {
-    fontWeight: '700',
+    ...withFontFamily(typography.caption, '700'),
   },
 });
