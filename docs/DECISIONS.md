@@ -702,3 +702,157 @@
   or cells won't re-render when a span's role flips. With Slice C, multi-day events (A–C) are
   functionally complete for the common case; Slice D (.ics DTEND+1, overlap lanes, bleed,
   multi-day recurring) remains backlog.
+
+## Location unified into LocationProvider (supersedes the 2026-06-17 split)
+- Date: 2026-08-30
+- Context: The user had to configure their location in TWO places: LocationProvider
+  (zmanim, Zmanim screen, ShabbatCard) and SettingsProvider's candleLighting*
+  fields (candle-lighting notifications only), each with its own picker and its
+  own GPS flow. The 2026-06-17 Shabbat-table entry deliberately kept them split
+  and flagged it as "a future unification task". The user explicitly reopened it.
+- Choice: LocationProvider is the single source of truth. candleLightingCity /
+  Lat / Lng / PlaceName and their setters are removed; candleLightingRemindersEnabled
+  and candleLightingLeadMinutes stay (they are notification preferences, not
+  location). ensureCandleLightingReminders now RECEIVES the location as a
+  parameter instead of resolving a city key itself, keeping the import graph
+  one-directional (SettingsProvider -> LocationProvider, SettingsProvider ->
+  NotificationService; neither imports back). A module-level subscription in
+  SettingsProvider reschedules candle reminders when coordinates change.
+- Migration: LocationProvider.loadFromStorage adopts any orphaned candle-lighting
+  location prefs when it has no location of its own (or is still 'default'),
+  then clears them. Guarded so it can never clobber a location the user set
+  deliberately, and idempotent once the old keys are cleared.
+- Alternatives considered: keeping the split (rejected - the user's complaint was
+  precisely the duplication); making SettingsProvider the owner (rejected -
+  LocationProvider already drives zmanim, the more fundamental consumer).
+- Implications: a user who wanted zmanim for where they are but candle times for
+  their home city can no longer express that. Accepted deliberately. Also added
+  LocationProvider.placeName, because a GPS fix outside the 36 curated cities
+  previously produced no readable location name anywhere in the UI.
+
+## Device GPS acquisition is centralized and returns a typed result
+- Date: 2026-08-30
+- Context: GPS was implemented twice and divergently (locationPicker used
+  getCurrentPositionAsync({}) with no accuracy and NO TIMEOUT - it could hang the
+  spinner indefinitely; settings.tsx used Accuracy.Balanced plus its own inline
+  Nominatim fetch). Neither checked whether location services were enabled, and
+  neither distinguished a first-time denial from a permanently blocked one.
+- Choice: one action, LocationProvider.acquireFromDeviceGps(), returning a
+  discriminated union: ok:true or ok:false with reason in
+  servicesDisabled | permissionDenied | permissionBlocked | timeout | error.
+  It checks hasServicesEnabledAsync, inspects canAskAgain, races
+  getCurrentPositionAsync against a 12s timer, falls back to reverse-geocoding
+  for a display name, and never throws. The UI renders an inline status strip
+  per reason.
+- Alternatives considered: relying on the Expo API's own timeout options
+  (rejected - inconsistent across versions); keeping Alert-only feedback
+  (rejected - the user explicitly asked for a visible indicator).
+- Implications: any future location entry point must call this action rather
+  than talking to expo-location directly.
+
+## Zod validation at the SQLite read boundary
+- Date: 2026-08-30
+- Context: EventSchema.ts contained only TypeScript interfaces despite its name,
+  so StorageService.rowToEvent cast an untyped row straight into CalendarEvent.
+  The project's "validate on read" rule was effectively unimplemented at the one
+  place it mattered.
+- Choice: CalendarEventSchema mirrors the interface and rowToEvent runs safeParse.
+  A failing row is logged and DROPPED, never thrown - this executes against real
+  installed user data spanning schema v1-v6, so rejecting a legitimate legacy row
+  must never crash the calendar. Fields backed by nullable SQLite columns are
+  permissive; only status (a 3-value set, unchanged since v1, and branch-critical
+  downstream) is a closed enum.
+- Alternatives considered: throwing on invalid rows (rejected - one corrupt row
+  would take down the whole month view); strict enums everywhere (rejected - the
+  v5 migration remapped recurrence values, so historical strings vary).
+- Implications: NotificationSchema.ts remains deliberately schema-only per the
+  2026-05-28 decision and was left untouched.
+
+## Shared notification budget across all sweeps
+- Date: 2026-08-30
+- Context: Four independent sweeps schedule notifications (annual, recurring,
+  Omer, candle-lighting). Only candle-lighting capped itself; ensureRecurringReminders
+  capped at 20 PER EVENT with no cross-event budget. A user with several recurring
+  reminders plus Omer plus candle-lighting could silently exceed the OS pending
+  limit and lose notifications with no signal.
+- Choice: a single ceiling of 60 (headroom under the ~64 platform limit). Each
+  sweep collects candidates, then trims against the live scheduled count queried
+  immediately before scheduling, keeping nearest-fire-time first. console.warn
+  fires whenever trimming occurs.
+- Alternatives considered: a shared in-memory counter threaded through every call
+  (rejected - goes stale when a single sweep re-runs from a settings toggle).
+- Implications: measuring ground truth each time keeps it correct even when one
+  sweep runs in isolation.
+
+## Heebo replaces the platform system font
+- Date: 2026-08-30
+- Context: Typography was 'System', which renders Hebrew differently on Android
+  and iOS and gave no control over weight availability.
+- Choice: @expo-google-fonts/heebo. Hebrew-first (Oded Ezer), with Latin forms
+  that match for Gregorian numerals. FONT_FAMILY in src/constants/typography.ts
+  is a single switch point. Font loading is folded into the existing settingsReady
+  gate, and a font ERROR is treated as ready so a failed fetch can never block
+  render; the 3s forceReady fallback still applies.
+- Alternatives considered: staying on System (rejected - the user approved the
+  typeface as part of the design); bundling a custom font file manually
+  (rejected - the Google Fonts package handles licensing and asset wiring).
+- Implications: fonts are ASSETS, so the next release must be a full EAS build -
+  an OTA update will not deliver them.
+
+## Android auto-backup left ENABLED
+- Date: 2026-08-30
+- Context: app.json sets no android:allowBackup, so Android's default (true)
+  applies and the SQLite database - notes, birthdays, yahrzeits, GPS coordinates -
+  is backed up to the user's Google Drive. This had never been an explicit decision.
+- Choice: leave it enabled. The user chose this knowingly: with no export/restore
+  feature yet, backup is the only thing standing between a device change and total
+  data loss, and that outweighs the privacy cost of coordinates sitting in the
+  user's own Drive.
+- Alternatives considered: allowBackup=false (rejected - uninstall or a new device
+  would mean irreversible data loss); disabling backup and building manual export
+  first (deferred - real work, not blocking).
+- Implications: revisit if a real export/restore feature ships. Note this is the
+  one path by which local data leaves the device, so it belongs in any privacy
+  description of the app.
+
+## Week view is an hourly timeline; WeekGrid/WeekRow retired
+- Date: 2026-08-30
+- Context: The week screen showed a single horizontal row of DayCells (a mini
+  month-row) plus a parasha banner. The approved redesign called for a real
+  week view in the style of a high-end calendar.
+- Choice: new WeekTimeline.tsx plus a pure weekTimelineLayout.ts geometry module -
+  RTL day columns (Sunday rightmost), a pinned all-day row with true multi-day
+  spanning bars, an hour grid with overlapping-event lane assignment, and a
+  current-time indicator. WeekGrid.tsx and WeekRow.tsx deleted after confirming
+  no remaining importers.
+- CRITICAL constraint discovered during integration: auto-layout cannot express a
+  block spanning multiple hours or a bar spanning multiple day columns, so the
+  body uses absolute positioning. The first implementation had the header as a
+  plain flex row (Sunday LEFT) while the grid positioned columns from the RIGHT -
+  header and grid mirrored, putting every event under the wrong day label - and
+  the all-day row's children were offset by the gutter width because their parent
+  no longer started at x=0. Both compiled and typechecked cleanly.
+  ALL THREE BANDS (header, all-day, grid) MUST derive x from the single shared
+  columnLeft(i, containerWidth) against the same measured width. Do not
+  reintroduce a flex row for any band.
+- Alternatives considered: keeping the DayCell row (rejected - the user approved
+  the timeline); a list library (rejected - this is a positioned grid).
+- Implications: quick-add from the week screen is a FAB (bottom-end = bottom-LEFT
+  in RTL). Multi-day HOLIDAY spans still render per-day because DayData.holidays
+  carries no cross-day metadata - a data-layer change if ever wanted.
+
+## DayCell visual model: top hairline, Hebrew numeral top-right, today as a circle
+- Date: 2026-08-30
+- Context: Every cell drew a full bordered, rounded box, and DESIGN.md's sketch
+  put the primary date on the left.
+- Choice: cells carry only a 1px top hairline (no left/right/bottom border, no
+  radius) except when selected. The Hebrew numeral sits top-RIGHT - the reading
+  start in RTL, and where a Hebrew-locale calendar puts it - with the Gregorian
+  number small at top-left. "Today" is a filled accent circle around the numeral.
+  Up to 3 chips (was 2). Holiday/Shabbat tints must cover the ENTIRE cell.
+- Alternatives considered: keeping bordered cells (rejected - the border box is
+  what made the grid read as dated); primary date on the left per the old sketch
+  (rejected - contradicts RTL reading order).
+- Implications: this supersedes the DayCell sketch in DESIGN.md. Row heights now
+  flex to fill the screen WITH an explicit minHeight floor - never fully inferred,
+  or the Yoga circular-height collapse returns.

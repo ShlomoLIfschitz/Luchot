@@ -1,9 +1,21 @@
 # Luchot — Roadmap
 
-> **Status snapshot — Phase 5 Wave 3b complete (2026-06-01).**
-> Wave 3b-1 (candle-lighting reminders) and Wave 3b-2 (geolocation city resolution) both done.
-> Active work: Bug fixes (A — theme persistence, B — event indicators in day cells).
+> **Status snapshot — UI redesign + location unification complete (2026-08-30).**
+> Commits `0b26677` (data layer) and `5f02771` (UI redesign). Design was built and
+> approved in Figma before any UI code was written.
 >
+> **Done this pass:** location unified into a single source of truth (with a migration
+> for existing installs) · rebuilt device-GPS acquisition with a 12s timeout and five
+> typed failure states · Zod validation at the SQLite read boundary · shared 60-notification
+> budget across all four sweeps · Heebo typeface · full visual redesign of every screen ·
+> week view rebuilt as a real hourly timeline · Friday parasha · Gregorian month RANGE in
+> the Hebrew calendar header · the RTL and accessibility defects found in the code review.
+>
+> **⚠️ Open before release:** on-device verification has NOT been done (see WORK_LOG
+> 2026-08-30 for the specific checklist). Heebo ships font ASSETS, so the next release
+> must be a **full EAS build — an OTA update will not deliver it.**
+>
+> ~~Phase 5 Wave 3b complete (2026-06-01). Active work: bug fixes A/B.~~
 > ~~Phase 3.6 complete. Phases 3.1–3.6 done; 3.7 is the final Phase 3 task.~~
 
 This document is the dependency map and ordering plan for Luchot. Each phase lists what owns it, what it depends on, and what it unblocks. Full implementation detail lives in the per-task prompts written when the work is actually picked up — not here.

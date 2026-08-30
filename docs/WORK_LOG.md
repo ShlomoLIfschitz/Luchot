@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-08-30 — Session: Location unification + full UI redesign (Figma-first)
+
+**Phase:** Phase 5
+**Sub-agents:** local-data-builder ×2 (Zod/dead-code/race; location unification + GPS + notification budget + upcomingParasha), mobile-ui-builder ×7 (compile repair; tokens; calendar core + font; day/zmanim; settings/location/details; week timeline; drawer/editor/tabbar; RTL cleanup), security-auditor (read-only audit), Explore ×2 (read-only review). Orchestrator: code review synthesis, CLAUDE.md gap analysis, Figma design system + 20 screens, delegation planning, integration gate, docs, commits.
+**Status:** Code complete. DoD: typecheck 0, expo-doctor 17/17, expo install --check clean. **On-device verification OPEN.**
+**Commits:** `0b26677` (data layer), `5f02771` (UI redesign).
+
+### What was done
+
+**1. Read-only review pass (3 parallel agents)** — data layer, UI/RTL, security. Findings drove everything below. Security posture came back clean (no network beyond the documented Nominatim call, no AsyncStorage, no telemetry SDKs, all SQL parameterized).
+
+**2. Location unified (user-requested; reopens the 2026-06-17 split).** `LocationProvider` is now the single source of truth. `SettingsProvider.candleLighting{City,Lat,Lng,PlaceName}` removed; `candleLightingRemindersEnabled`/`LeadMinutes` kept. Added `placeName` (a GPS fix outside the 36 curated cities previously produced no readable name anywhere) and a one-time migration adopting existing candle-lighting prefs so upgrading users don't silently revert to Jerusalem. New `acquireFromDeviceGps()` checks location services, distinguishes denied vs permanently-blocked permission, enforces a 12s timeout (there was none — the spinner could hang forever), and never throws.
+
+**3. Data-layer hardening.** `EventSchema.ts` had no runtime schema despite its name — added `CalendarEventSchema` + `safeParse` in `rowToEvent` (drops a malformed row with a warning rather than throwing, since this runs against real v1–v6 user data). Shared 60-notification budget across all four sweeps (only candle-lighting self-capped before). `useNotes.load()` cancellation guard. `CalendarProvider.today` now refreshes. Nominatim consolidated + coordinates rounded to 3 decimals. Deleted dead `TorahService.ts`, `useCalendar.ts`, `createEvent()`.
+
+**4. Figma design system built and approved BEFORE any UI code** (user's explicit instruction). File: `Luchot — Design System & Screens`. 4 pages — Foundations (32 tokens as Variables with Light/Dark modes, type scale, spacing, radius, elevation), Components, 10 light screens, 10 dark screens.
+
+**5. UI redesign implemented** across 7 parallel agents on disjoint file sets. Highlights: DayCell top-hairline instead of a border box + Hebrew numeral moved to the top-RIGHT + today as a filled circle; MonthGrid merged header with the **Gregorian month RANGE** subtitle; week view rebuilt as a real hourly timeline; Friday parasha card; GPS status UI with all 5 failure states; Heebo font.
+
+### Decisions made
+Seven new entries in DECISIONS.md (2026-08-30): location unification, Heebo, Android auto-backup left enabled, week view as hourly timeline, DayCell RTL/visual model, Zod-on-read, notification budget.
+
+### Orchestrator integration gate — caught what the automated checks could not
+Both `tsc` and `expo-doctor` were green while **two real geometry bugs** sat in `WeekTimeline.tsx`:
+- The day-columns header was a plain flex `row` (Sunday LEFT) while the grid positioned `columnLeft(0)` at the RIGHT — header and grid mirrored, so every event rendered under the wrong day label.
+- The all-day row's children used `columnLeft(…)` measured against the full container width, but their parent already started after the 34px gutter — bars shifted right and clipped. The hourly grid did *not* have this bug, which is exactly what made it easy to miss.
+Both returned to the authoring agent and fixed by collapsing all three bands onto one shared `columnLeft()` so they cannot diverge again.
+Also rejected a proposed scope cut: the agent had dropped quick-add from the week screen (a functional regression). Restored as a FAB per the approved design.
+Also caught six files assigned to nobody, still carrying known defects (`MonthYearPicker` Hebrew months in Latin reading order; three picker hooks with "accidentally correct" plain-`row` button rows + hardcoded `rgba`; `NoteList` header; `CandleIcon` hex) — cleaned up in a follow-up pass.
+
+### Open issues / blocked
+- **On-device verification NOT done** (orchestrator cannot drive an emulator). Priority checks: Heebo renders and the 3s font-gate fallback works on cold start; week timeline column alignment across header/all-day/grid on a real device width; 6-week month row heights (the Yoga collapse class); Android back button closing QuickActionSheet; the location migration on an install that has existing candle-lighting prefs; drawer swipe + backdrop after the restyle.
+- `MonthYearPicker`'s `row-reverse` + `flexWrap` was reasoned from flexbox semantics, not rendered — worth an eyeball.
+- Heebo adds font assets → **the next build must be a full EAS build, not an OTA update.**
+- Deferred: special-Shabbat name (e.g. שבת שובה) needs a new `DayData` field; multi-day holiday spans in the week all-day row need cross-day metadata.
+
+### Next steps
+Device-verify, then EAS build (not OTA). Optional follow-ups: the notification-permission rows' placement in Settings, and multi-day holiday spanning.
+
+---
+
 ## 2026-06-18 — Session: Multi-day events — Slice C (span chip rendering)
 
 **Phase:** Phase 5 (multi-day events)
