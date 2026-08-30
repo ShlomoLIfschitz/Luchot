@@ -6,6 +6,52 @@
 
 ---
 
+## 2026-08-31 — Session: device-test rounds + NEXT-SESSION PLAN
+
+**Phase:** Phase 5
+**Commits:** `de5ed42` (device-test pass), `d39bd4e` (font weights + day layout), plus doc commits.
+**Published:** OTA to `preview` twice. **The device was confirmed running `de5ed42`, one update behind, at the end of the session.**
+
+### What was fixed this session
+1. **Month grid row height (the visible break).** `weekRow` was `flex: 1` + minHeight; RN's ScrollView stretches flex children when content is shorter than the viewport, so a 6-week month inflated rows to ~206px. Replaced with a measured `clamp(available / weekCount, 88, 132)` applied as an explicit height. Scroll now only when rows genuinely overflow.
+2. **Nikud stripping.** hebcal returns some holiday names vowelized and some not. `stripNikud()` normalizes them; geresh/gershayim preserved (they sit inside the naive 0591–05C7 range).
+3. **Card grouping** on Day/Zmanim via the shared `Card`/`SectionLabel`.
+4. **🔴 Font weights were completely dead.** `FONT_FAMILY` was the single string `'Heebo_400Regular'`, and in RN a concrete `fontFamily` makes `fontWeight` inert — the entire app rendered at flat Regular. `withFontFamily` is now weight→family aware with a type-safe override; 32 call sites converted.
+5. **Day screen restructure** — highlights (holiday / parasha / Omer / Rosh Chodesh / ShabbatCard) hoisted ABOVE the tab control and populated on every day (parasha uses `upcomingParasha`); duplicate date hero removed (~240px); tabs sticky via `stickyHeaderIndices={[1]}` with the strip wrapped in one unconditional View so the index can't shift.
+
+### 🚨 START HERE NEXT SESSION
+
+**1. Fix the update-delivery loop — do this FIRST, it is costing a round trip every time.**
+`expo-updates` with `checkAutomatically: ON_LOAD` downloads on one launch and applies on the NEXT. Two sessions were lost to "I see no change" when the change was already in the code and verified. Add a foreground check + `Updates.reloadAsync()` (or at minimum a visible "update ready" indicator) so an OTA lands in one launch during this iteration phase. JS-only, OTA-deliverable.
+
+**2. Verify what is already built but never seen on a device.** All of this is code-verified and gate-green, but visually unconfirmed:
+- **Week screen — never seen at all.** It had two real geometry bugs (header mirrored vs grid; all-day row offset by the gutter) that typecheck and bundling could not catch. Highest risk item in the app.
+- Day screen restructure + sticky tabs (this session's work)
+- Font weights across every screen
+- Month grid on a **6-week month** specifically (e.g. Tishrei) — the Yoga row-collapse class
+- Drawer: swipe, backdrop tap, active item now bold
+- QuickActionSheet closing on the Android hardware back button
+- Location migration on an install that has existing candle-lighting prefs
+- MonthYearPicker's chunked+reversed Hebrew month grid
+
+**3. App size** (all measured, none applied — each needs a build to verify):
+- `expo-dev-client` — 0 imports, required by nothing; a native dev-menu module with no business in a distribution build
+- `@shopify/flash-list` — 0 imports, required by nothing; unused native module
+- 5 of 9 Heebo weights are bundled but never loaded (~285KB)
+- The `preview` profile builds a **universal APK** carrying all 4 ABIs — usually ~50% of size. `production` already emits an AAB.
+- ⚠️ Do NOT remove `luxon`, `expo-linking`, or `@expo/vector-icons` — they look unused in our code but are required transitively by `kosher-zmanim`, `expo-router`, and `expo`.
+
+**4. Add a `typography.glyph` step.** Three agents independently hit this: UI glyphs (`›` `✓` `↗`) have no matching type step, so each mapped to the nearest with a 1–3px delta. The NoteEditor checkmark shrank 14→11px as a result.
+
+### Deferred (need a data-layer field first)
+- Special-Shabbat name (שבת שובה, שבת הגדול) — `DayData` has no field; deriving it from `holidays[]` would be guesswork.
+- Multi-day holiday spans in the week all-day row — `DayData.holidays` carries no cross-day metadata, so Chol HaMoed renders one chip per day.
+
+### Delivery rule (corrected this session)
+OTA covers JS/TS and runtime-loaded assets, **including fonts loaded via `useFonts`**. A full build is needed only for native module changes, `app.json` changes, or a `runtimeVersion` move. An earlier claim that Heebo forced a build was wrong and has been corrected in DESIGN.md, DECISIONS.md and ROADMAP.md.
+
+---
+
 ## 2026-08-30 — Session: Location unification + full UI redesign (Figma-first)
 
 **Phase:** Phase 5
