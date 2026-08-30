@@ -5,8 +5,14 @@
 //
 // Selecting a city or confirming GPS updates LocationProvider and
 // pops back to the previous screen.
+//
+// Redesign (Wave — GPS status UI): acquireFromDeviceGps() now returns a
+// typed, never-throwing GpsResult. Replaced the old Alert-only feedback
+// with an inline status strip reflecting the exact acquisition state
+// (acquiring / ok / each failure reason) — this is what the user actually
+// asked for ("עם חיווי").
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,12 +24,31 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MapPin, Navigation, Search } from 'lucide-react-native';
+import {
+  MapPin,
+  Navigation,
+  Search,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+} from 'lucide-react-native';
 import { useThemeColors } from '../src/hooks/useThemeColors';
-import { useLocationStore } from '../src/providers/LocationProvider';
+import { useLocationStore, type GpsResult } from '../src/providers/LocationProvider';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
+import { Card } from '../src/components/ui/Card';
+import { SectionLabel } from '../src/components/ui/SectionLabel';
 import { CITIES, type CityEntry } from '../src/constants/cities';
 import { radius } from '../src/constants/radius';
+import { typography, withFontFamily } from '../src/constants/typography';
+import type { ThemeColors } from '../src/hooks/useThemeColors';
+
+// ─── GPS acquisition UI state ──────────────────────────────────────────────────
+// Nothing renders until the first attempt (`idle`).
+
+type GpsUiState =
+  | { phase: 'idle' }
+  | { phase: 'acquiring' }
+  | { phase: 'done'; result: GpsResult };
 
 export default function LocationPickerScreen() {
   const colors = useThemeColors();
@@ -31,8 +56,13 @@ export default function LocationPickerScreen() {
   const currentKey       = useLocationStore((s) => s.cityHebcalKey);
   const setFromCity      = useLocationStore((s) => s.setLocationFromCity);
 
-  const [query, setQuery]           = useState('');
-  const [gpsLoading, setGpsLoading] = useState(false);
+  const [query, setQuery]     = useState('');
+  const [gpsState, setGpsState] = useState<GpsUiState>({ phase: 'idle' });
+
+  // Guards against setState-after-unmount if the screen pops (e.g. via
+  // hardware back) while acquireFromDeviceGps() is still in flight.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Filter city list by Hebrew name or English key
   const filteredCities = useMemo(() => {
@@ -50,45 +80,12 @@ export default function LocationPickerScreen() {
   const international = filteredCities.filter((c) => c.country === 'INTL');
 
   const handleUseGps = async () => {
-    setGpsLoading(true);
-    try {
-      const result = await useLocationStore.getState().acquireFromDeviceGps();
-      if (result.ok) {
-        router.back();
-        return;
-      }
-      switch (result.reason) {
-        case 'servicesDisabled':
-          Alert.alert(
-            'שירותי מיקום כבויים',
-            'הפעל את שירותי המיקום בהגדרות המכשיר כדי לחשב זמנים מדויקים.',
-          );
-          break;
-        case 'permissionDenied':
-          Alert.alert(
-            'הרשאה נדרשת',
-            'אשר גישה למיקום כדי לחשב זמנים מדויקים.',
-          );
-          break;
-        case 'permissionBlocked':
-          Alert.alert(
-            'הרשאה חסומה',
-            'הרשאת המיקום נחסמה. יש לאפשר אותה בהגדרות המערכת של המכשיר.',
-          );
-          break;
-        case 'timeout':
-          Alert.alert(
-            'לא הצלחנו לקבל מיקום',
-            'ניסיון קבלת המיקום ארך זמן רב מדי. נסה שוב.',
-          );
-          break;
-        case 'error':
-        default:
-          Alert.alert('שגיאה', 'לא הצלחנו לקבל את המיקום שלך. נסה שוב.');
-          break;
-      }
-    } finally {
-      setGpsLoading(false);
+    setGpsState({ phase: 'acquiring' });
+    const result = await useLocationStore.getState().acquireFromDeviceGps();
+    if (!mountedRef.current) return;
+    setGpsState({ phase: 'done', result });
+    if (result.ok) {
+      router.back();
     }
   };
 
@@ -109,24 +106,27 @@ export default function LocationPickerScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* GPS button */}
+        {/* GPS button — label first/right, glyph last/left */}
         <Pressable
           onPress={handleUseGps}
-          disabled={gpsLoading}
-          style={[styles.gpsButton, { backgroundColor: colors.accent }]}
+          disabled={gpsState.phase === 'acquiring'}
+          style={[
+            styles.gpsButton,
+            { backgroundColor: colors.accent },
+            gpsState.phase === 'acquiring' && styles.gpsButtonDisabled,
+          ]}
           accessibilityLabel="השתמש במיקום הנוכחי"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: gpsState.phase === 'acquiring' }}
         >
-          {gpsLoading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <>
-              <Navigation size={18} color={colors.textInverse} />
-              <Text style={[styles.gpsButtonText, { color: colors.textInverse }]}>
-                השתמש במיקום הנוכחי
-              </Text>
-            </>
-          )}
+          <Text style={[styles.gpsButtonText, { color: colors.textInverse }]}>
+            השתמש במיקום הנוכחי
+          </Text>
+          <Navigation size={18} color={colors.textInverse} />
         </Pressable>
+
+        {/* Inline GPS status strip — nothing on first render */}
+        <GpsStatusStrip state={gpsState} colors={colors} />
 
         {/* Search box */}
         <View
@@ -151,42 +151,36 @@ export default function LocationPickerScreen() {
         {/* Israeli cities */}
         {israeli.length > 0 && (
           <>
-            <Text style={[styles.sectionHeader, { color: colors.accent }]}>
-              ישראל
-            </Text>
-            <View style={[styles.card, { borderColor: colors.border }]}>
-              {israeli.map((city, idx) => (
+            <SectionLabel title="ישראל" colors={colors} />
+            <Card colors={colors}>
+              {israeli.map((city) => (
                 <CityRow
-                  key={city.hebcalKey + idx}
+                  key={city.hebcalKey}
                   city={city}
                   isSelected={city.hebcalKey === currentKey}
-                  isLast={idx === israeli.length - 1}
                   colors={colors}
                   onPress={() => handlePickCity(city.hebcalKey)}
                 />
               ))}
-            </View>
+            </Card>
           </>
         )}
 
         {/* International cities */}
         {international.length > 0 && (
           <>
-            <Text style={[styles.sectionHeader, { color: colors.accent }]}>
-              חוץ לארץ
-            </Text>
-            <View style={[styles.card, { borderColor: colors.border }]}>
-              {international.map((city, idx) => (
+            <SectionLabel title="חוץ לארץ" colors={colors} />
+            <Card colors={colors}>
+              {international.map((city) => (
                 <CityRow
-                  key={city.hebcalKey + idx}
+                  key={city.hebcalKey}
                   city={city}
                   isSelected={city.hebcalKey === currentKey}
-                  isLast={idx === international.length - 1}
                   colors={colors}
                   onPress={() => handlePickCity(city.hebcalKey)}
                 />
               ))}
-            </View>
+            </Card>
           </>
         )}
 
@@ -200,19 +194,145 @@ export default function LocationPickerScreen() {
   );
 }
 
+// ─── GpsStatusStrip ─────────────────────────────────────────────────────────────
+
+function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeColors }) {
+  if (state.phase === 'idle') return null;
+
+  if (state.phase === 'acquiring') {
+    return (
+      <StripRow
+        iconNode={<ActivityIndicator color={colors.accent} />}
+        headline="מאתר מיקום…"
+        detail="ממתין לקליטת GPS"
+        bg={colors.surface}
+        fg={colors.textPrimary}
+        detailColor={colors.textSecondary}
+        border={colors.border}
+      />
+    );
+  }
+
+  const { result } = state;
+
+  if (result.ok) {
+    return (
+      <StripRow
+        iconNode={<CheckCircle2 size={20} color={colors.success} />}
+        headline={result.placeName ?? 'המיקום זוהה בהצלחה'}
+        detail="המיקום זוהה בהצלחה"
+        bg={colors.successBg}
+        fg={colors.success}
+      />
+    );
+  }
+
+  switch (result.reason) {
+    case 'servicesDisabled':
+      return (
+        <StripRow
+          iconNode={<AlertTriangle size={20} color={colors.warning} />}
+          headline="שירותי המיקום כבויים"
+          detail="הפעל מיקום בהגדרות המכשיר"
+          bg={colors.warningBg}
+          fg={colors.warning}
+        />
+      );
+    case 'permissionBlocked':
+      return (
+        <StripRow
+          iconNode={<XCircle size={20} color={colors.error} />}
+          headline="ההרשאה נחסמה"
+          detail="יש לאשר גישה למיקום בהגדרות המערכת"
+          bg={colors.errorBg}
+          fg={colors.error}
+        />
+      );
+    case 'permissionDenied':
+      return (
+        <StripRow
+          iconNode={<XCircle size={20} color={colors.error} />}
+          headline="לא ניתנה הרשאת מיקום"
+          detail="נסה שוב ואשר את הבקשה"
+          bg={colors.errorBg}
+          fg={colors.error}
+        />
+      );
+    case 'timeout':
+      return (
+        <StripRow
+          iconNode={<XCircle size={20} color={colors.error} />}
+          headline="לא הצלחנו לאתר מיקום"
+          detail="נסה שוב או בחר עיר מהרשימה"
+          bg={colors.errorBg}
+          fg={colors.error}
+        />
+      );
+    case 'error':
+    default:
+      return (
+        <StripRow
+          iconNode={<XCircle size={20} color={colors.error} />}
+          headline="אירעה שגיאה באיתור המיקום"
+          detail="נסה שוב או בחר עיר מהרשימה"
+          bg={colors.errorBg}
+          fg={colors.error}
+        />
+      );
+  }
+}
+
+/** Rounded status row: icon/glyph at the LEFT, two-line text block at the
+ *  RIGHT (both lines right-aligned) — JSX order [textBlock, iconNode]
+ *  inside a `row-reverse` container puts the text block first (→ right)
+ *  and the icon last (→ left). */
+function StripRow({
+  iconNode, headline, detail, bg, fg, detailColor, border,
+}: {
+  iconNode: React.ReactNode;
+  headline: string;
+  detail: string;
+  bg: string;
+  fg: string;
+  detailColor?: string;
+  border?: string;
+}) {
+  return (
+    <View
+      style={[
+        stripStyles.strip,
+        { backgroundColor: bg },
+        border ? { borderWidth: StyleSheet.hairlineWidth, borderColor: border } : null,
+      ]}
+      accessibilityRole="text"
+      accessibilityLabel={`${headline}. ${detail}`}
+    >
+      <View style={stripStyles.textBlock}>
+        <Text style={[stripStyles.headline, { color: fg }]} numberOfLines={2}>
+          {headline}
+        </Text>
+        <Text style={[stripStyles.detail, { color: detailColor ?? fg }]} numberOfLines={2}>
+          {detail}
+        </Text>
+      </View>
+      <View style={stripStyles.iconSlot}>{iconNode}</View>
+    </View>
+  );
+}
+
 // ─── CityRow ───────────────────────────────────────────────────────────────────
 
 function CityRow({
   city,
   isSelected,
-  isLast,
+  isLast = false,
   colors,
   onPress,
 }: {
   city: CityEntry;
   isSelected: boolean;
-  isLast: boolean;
-  colors: ReturnType<typeof useThemeColors>;
+  isLast?: boolean;
+  colors: ThemeColors;
   onPress: () => void;
 }) {
   return (
@@ -224,9 +344,12 @@ function CityRow({
         { backgroundColor: colors.surface },
         !isLast && {
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          borderBottomColor: colors.borderSubtle,
         },
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={city.nameHe}
+      accessibilityState={{ selected: isSelected }}
     >
       <MapPin
         size={16}
@@ -261,13 +384,14 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: radius.lg,
-    marginBottom: 16,
+    marginBottom: 12,
     minHeight: 50,
   },
-  gpsButtonText: { fontSize: 15, fontWeight: '600' },
+  gpsButtonDisabled: { opacity: 0.6 },
+  gpsButtonText: { ...withFontFamily(typography.bodyMedium), fontWeight: '600' },
 
   searchContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
@@ -278,26 +402,8 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    ...withFontFamily(typography.bodyMedium),
     paddingVertical: 8,
-  },
-
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginTop: 8,
-    marginBottom: 6,
-    paddingHorizontal: 4,
-    textAlign: 'right',
-  },
-
-  card: {
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 4,
   },
 
   cityRow: {
@@ -310,7 +416,7 @@ const styles = StyleSheet.create({
   },
   cityName: {
     flex: 1,
-    fontSize: 15,
+    ...withFontFamily(typography.bodyMedium),
     textAlign: 'right',
   },
   cityNameSelected: {
@@ -322,9 +428,26 @@ const styles = StyleSheet.create({
   },
 
   emptyState: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodySmall),
     textAlign: 'center',
     marginTop: 32,
     fontStyle: 'italic',
   },
+});
+
+const stripStyles = StyleSheet.create({
+  strip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: radius.lg,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    minHeight: 50,
+  },
+  textBlock: { flex: 1 },
+  iconSlot: { width: 24, alignItems: 'center' },
+  headline: { ...withFontFamily(typography.bodyMedium), fontWeight: '700', textAlign: 'right' },
+  detail:   { ...withFontFamily(typography.caption), marginTop: 2, textAlign: 'right' },
 });

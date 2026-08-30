@@ -17,9 +17,9 @@ import {
   StyleSheet,
   Pressable,
   useWindowDimensions,
-  StatusBar,
 } from 'react-native';
 import type { ViewProps } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -29,6 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import {
   CalendarArrowUp,
   Calendar,
@@ -44,12 +45,20 @@ import {
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { overlay } from '../../constants/overlay';
-import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
+import { elevation } from '../../constants/elevation';
+import { dateService, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { DrawerItem } from './DrawerItem';
 import { ExportModal } from '../export/ExportModal';
 
-const DRAWER_WIDTH_RATIO = 0.8;
-const DRAWER_MAX_WIDTH = 320;
+// App version — read from app.json via expo-constants (read-only; app.json
+// itself is sensitive config, not edited here).
+const APP_VERSION = Constants.expoConfig?.version ?? '';
+
+// Fixed panel width per the approved visual design; clamped only as a safety
+// net on unusually narrow screens so the backdrop never fully disappears.
+const DRAWER_FIXED_WIDTH = 300;
+const DRAWER_MIN_BACKDROP_MARGIN = 24;
 const ANIMATION_DURATION = 250;
 const SWIPE_CLOSE_VELOCITY = 400;
 const SWIPE_CLOSE_DISTANCE = 60;
@@ -57,8 +66,9 @@ const SWIPE_CLOSE_DISTANCE = 60;
 export function Drawer() {
   const colors = useThemeColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const drawerWidth = Math.min(screenWidth * DRAWER_WIDTH_RATIO, DRAWER_MAX_WIDTH);
+  const drawerWidth = Math.min(DRAWER_FIXED_WIDTH, screenWidth - DRAWER_MIN_BACKDROP_MARGIN);
 
   const isOpen = useDrawerStore((s) => s.isOpen);
   const closeDrawer = useDrawerStore((s) => s.close);
@@ -147,11 +157,14 @@ export function Drawer() {
     setTimeout(() => router.push(path as any), 100);
   };
 
-  const todayLabel = new Date().toLocaleDateString('he-IL', {
+  const today = new Date();
+  const gregLabel = today.toLocaleDateString('he-IL', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
   });
+  const heToday = dateService.getDayData(today).hebrewDate;
+  const hebLabel = `${toHebrewNumeral(heToday.day)} ${heToday.monthName} ${toHebrewYear(heToday.year ?? today.getFullYear() + 3760)}`;
 
   return (
     <>
@@ -173,19 +186,29 @@ export function Drawer() {
       <GestureDetector gesture={swipeGesture}>
         <Animated.View
           style={[
+            elevation.lg,
             styles.drawer,
             {
               width: drawerWidth,
               backgroundColor: colors.surface,
-              borderRightColor: colors.border,
+              shadowColor: colors.textPrimary,
             },
             animatedDrawerStyle,
           ]}
         >
-          {/* Header — today's date as orientation anchor */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-              {todayLabel}
+          {/* Header — accent block, app name + today's date (Hebrew + Gregorian) */}
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: colors.accent, paddingTop: insets.top + 16 },
+            ]}
+          >
+            <Text style={[styles.appName, { color: colors.textInverse }]}>לוחות</Text>
+            <Text style={[styles.headerHebDate, { color: colors.textInverse, opacity: 0.85 }]}>
+              {hebLabel}
+            </Text>
+            <Text style={[styles.headerGregDate, { color: colors.textInverse, opacity: 0.7 }]}>
+              {gregLabel}
             </Text>
           </View>
 
@@ -252,6 +275,18 @@ export function Drawer() {
               onPress={() => navigateTo('/about')}
             />
           </View>
+
+          {/* Version string — pinned to the bottom via marginTop: 'auto' */}
+          {!!APP_VERSION && (
+            <Text
+              style={[
+                styles.version,
+                { color: colors.textTertiary, paddingBottom: insets.bottom + 12 },
+              ]}
+            >
+              {`גרסה ${APP_VERSION}`}
+            </Text>
+          )}
         </Animated.View>
       </GestureDetector>
       <ExportModal
@@ -275,26 +310,43 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,             // anchored to left edge — matches hamburger button
     bottom: 0,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    paddingTop: (StatusBar.currentHeight ?? 0) + 16,
+    // Shadow on the panel's right (leading) edge. Android's `elevation` draws
+    // an all-around drop shadow (no per-edge control); shadowOffset here
+    // biases the iOS shadow to emanate from the right.
+    shadowOffset: { width: 4, height: 0 },
   },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: 8,
+    paddingBottom: 20,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+  appName: {
     textAlign: 'right',
+    ...withFontFamily(typography.displayMedium),
+  },
+  headerHebDate: {
+    textAlign: 'right',
+    marginTop: 4,
+    ...withFontFamily(typography.bodyLarge),
+  },
+  headerGregDate: {
+    textAlign: 'right',
+    marginTop: 2,
+    ...withFontFamily(typography.bodySmall),
   },
   items: {
     paddingHorizontal: 10,
+    paddingTop: 8,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
     marginVertical: 8,
     marginHorizontal: 10,
+  },
+  version: {
+    marginTop: 'auto',
+    textAlign: 'right',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    ...withFontFamily(typography.caption),
   },
 });

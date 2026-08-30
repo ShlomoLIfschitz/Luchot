@@ -49,6 +49,14 @@ export const Colors = {
 
     // Candle (Friday / Erev Shabbat indicator)
     candle:           '#E8A33D',
+
+    // Tint backgrounds (day-cell / row highlights)
+    holidayTint:      '#F4FAF5',   // Day-cell background tint on a holiday
+    shabbatTint:      '#F8F6FC',   // Day-cell background tint on Shabbat
+    candleBg:         '#FDF4E6',   // Highlighted candle-lighting row background
+    successBg:        '#E8F5E9',   // GPS "located" state background
+    warningBg:        '#FCEFE0',   // GPS "services disabled" state background
+    errorBg:          '#FDEAEA',   // GPS "blocked / failed" state background
   },
 
   dark: {
@@ -97,5 +105,13 @@ export const Colors = {
 
     // Candle
     candle:           '#F0B860',
+
+    // Tint backgrounds (day-cell / row highlights)
+    holidayTint:      '#15211A',   // Day-cell background tint on a holiday
+    shabbatTint:      '#1B1726',   // Day-cell background tint on Shabbat
+    candleBg:         '#2E2218',   // Highlighted candle-lighting row background
+    successBg:        '#1B2E1D',   // GPS "located" state background
+    warningBg:        '#2E2218',   // GPS "services disabled" state background
+    errorBg:          '#2E1822',   // GPS "blocked / failed" state background
   },
 };

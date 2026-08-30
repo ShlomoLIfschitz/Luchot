@@ -5,10 +5,12 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Flame } from 'lucide-react-native';
 import { formatZmanTime, type ShabbatRow } from '../../services/ZmanimService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useShabbatTable } from '../../hooks/useShabbatTable';
 import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
 
 interface Props {
   selectedDate: Date;
@@ -46,24 +48,28 @@ export function ShabbatCard({
         },
       ]}
     >
-      {/* Title — colors.tagShabbat (purple). colors.holiday does not exist in
-          ThemeColors (the token set only has tagShabbat for Shabbat-purple). */}
-      <Text style={[styles.title, { color: colors.tagShabbat }]}>שבת קודש</Text>
-
       {day === 5 ? (
         /* ── Friday branch — 4-city + user-row table ───────────────────── */
         <View>
-          {/* Header row */}
+          {/* Card header row — row-reverse: title first/right, candle icon last/left */}
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardHeaderTitle, { color: colors.tagShabbat }]}>
+              כניסת שבת
+            </Text>
+            <Flame size={18} color={colors.candle} />
+          </View>
+
+          {/* Column header row */}
           <View style={styles.tableHeader}>
             {/* Column order JSX-first → rightmost (row-reverse):
                 (a) empty spacer for the city-name column (right)
                 (b) הדלקת נרות (center)
                 (c) צאת שבת  (left)                                     */}
             <View style={styles.nameCell} />
-            <Text style={[styles.headerLabel, { color: colors.textTertiary }]}>
+            <Text style={[styles.columnHeaderLabel, styles.candleCell, { color: colors.textTertiary }]}>
               הדלקת נרות
             </Text>
-            <Text style={[styles.headerLabel, { color: colors.textTertiary }]}>
+            <Text style={[styles.columnHeaderLabel, styles.havdalahCell, { color: colors.textTertiary }]}>
               צאת שבת
             </Text>
           </View>
@@ -94,12 +100,24 @@ export function ShabbatCard({
                   >
                     {row.nameHe}
                   </Text>
-                  {/* (b) Candle lighting — fixed width, center */}
-                  <Text style={[styles.timeCell, { color: colors.textPrimary }]}>
+                  {/* (b) Candle lighting — fixed ~74, center */}
+                  <Text
+                    style={[
+                      styles.timeCell,
+                      styles.candleCell,
+                      { color: row.isUserRow ? colors.accent : colors.textPrimary, fontWeight: row.isUserRow ? '700' : '400' },
+                    ]}
+                  >
                     {formatZmanTime(row.candleLighting, use24h)}
                   </Text>
-                  {/* (c) Havdalah — fixed width, center */}
-                  <Text style={[styles.timeCell, { color: colors.textPrimary }]}>
+                  {/* (c) Havdalah — fixed ~66, center */}
+                  <Text
+                    style={[
+                      styles.timeCell,
+                      styles.havdalahCell,
+                      { color: row.isUserRow ? colors.accent : colors.textPrimary, fontWeight: row.isUserRow ? '700' : '400' },
+                    ]}
+                  >
                     {formatZmanTime(row.havdalah, use24h)}
                   </Text>
                 </View>
@@ -108,8 +126,10 @@ export function ShabbatCard({
           })}
         </View>
       ) : (
-        /* ── Saturday branch — UNCHANGED ───────────────────────────────── */
+        /* ── Saturday branch — UNCHANGED behavior/content; title kept as before ── */
         <>
+          <Text style={[styles.title, { color: colors.tagShabbat }]}>שבת קודש</Text>
+
           {/* Location row — only when locationName is provided */}
           {!!locationName && (
             <View style={styles.row}>
@@ -146,11 +166,22 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
+  // Saturday-branch title (unchanged content/position — kept centered above the rows).
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    ...withFontFamily(typography.cardTitle),
     textAlign: 'center',
     marginBottom: 12,
+  },
+
+  // ── Friday card header — row-reverse: title first/right, candle icon last/left ──
+  cardHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  cardHeaderTitle: {
+    ...withFontFamily(typography.cardTitle),
   },
 
   // ── Saturday branch (row/label/value — kept exactly as before) ──────────
@@ -186,24 +217,30 @@ const styles = StyleSheet.create({
   // (a) City-name cell — flex: 1, rightmost in the row-reverse layout.
   nameCell: {
     flex: 1,
-    fontSize: 14,
+    ...withFontFamily(typography.bodySmall),
     textAlign: 'right',
   },
   // (b)/(c) Time cells — fixed width, centered.
   timeCell: {
-    width: 72,
-    fontSize: 14,
+    ...withFontFamily(typography.bodySmall),
     textAlign: 'center',
   },
-  // Header labels sit above (b)/(c); same fixed width as timeCell.
-  headerLabel: {
-    width: 72,
-    fontSize: 12,
+  // Candle-lighting column — fixed ~74pt.
+  candleCell: {
+    width: 74,
+  },
+  // Havdalah column — fixed ~66pt.
+  havdalahCell: {
+    width: 66,
+  },
+  // Column header labels — micro / textTertiary per approved design.
+  columnHeaderLabel: {
+    ...withFontFamily(typography.micro),
     textAlign: 'center',
   },
   // Divider between the 4 fixed-city rows and the user row.
   divider: {
-    height: 1,
+    height: StyleSheet.hairlineWidth,
     marginVertical: 8,
   },
 });

@@ -6,20 +6,31 @@
 // Phase 4.6-C — FlatList replaced with View grid; mode prop drives RTL/LTR
 //               direction. Hebrew mode: row-reverse (Sunday right, Shabbat left).
 //               Gregorian mode: row (Sunday left, Saturday right).
+// Redesign (Task 2) — merged header (hamburger + two-line tappable title +
+//               jump-to-today) absorbed from ScreenHeader (index.tsx/gregorian.tsx
+//               no longer render it, avoiding a duplicate/empty header bar); the
+//               month arrows are removed (swipe + title-tap picker remain); the
+//               Gregorian-tab subtitle is now a real month RANGE, computed from
+//               local Hebrew month-name arrays (never toLocaleDateString — Hermes
+//               on Android has unreliable Intl data); the grid now fills available
+//               vertical space via flex instead of a hard 110px row height.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, StatusBar } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
+import { Menu, CalendarCheck } from 'lucide-react-native';
 import { useCalendarStore } from '../../providers/CalendarProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
+import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { typography, withFontFamily } from '../../constants/typography';
 import { DayCell } from './DayCell';
 import { MonthYearPicker } from './MonthYearPicker';
 import { QuickActionSheet, QuickAction } from './QuickActionSheet';
-import { DayData, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
+import { DayData, HebrewDateInfo, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { HebrewDatePicker } from './HebrewDatePicker';
 import { buildDayTags } from '../../utils/tagMapper';
 import { NoteEditor } from '../notes/NoteEditor';
@@ -49,11 +60,49 @@ const DAY_NAMES_HE_MON_FIRST = ['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 
 const DAY_NAMES_EN_SUN_FIRST = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_NAMES_EN_MON_FIRST = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// ── Gregorian month names (Hebrew-language labels) ─────────────────────────────
+// Defined locally rather than via toLocaleDateString('he-IL', …) — Hermes on
+// Android has unreliable/absent Intl data, so relying on it here would be a
+// latent crash/garbage-output risk.
+const MONTHS_HE_FULL = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
+];
+const MONTHS_HE_ABBR = [
+  'ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני',
+  'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳',
+];
+
+/** e.g. "אוקטובר 2025" / "ספט׳ – אוק׳ 2025" / "דצמ׳ 2025 – ינו׳ 2026" */
+function formatGregorianRange(start: Date, end: Date): string {
+  const sm = start.getMonth();
+  const sy = start.getFullYear();
+  const em = end.getMonth();
+  const ey = end.getFullYear();
+
+  if (sm === em && sy === ey) return `${MONTHS_HE_FULL[sm]} ${sy}`;
+  if (sy === ey) return `${MONTHS_HE_ABBR[sm]} – ${MONTHS_HE_ABBR[em]} ${sy}`;
+  return `${MONTHS_HE_ABBR[sm]} ${sy} – ${MONTHS_HE_ABBR[em]} ${ey}`;
+}
+
+/** e.g. "תשרי תשפ״ו" / "תשרי – חשוון תשפ״ו" / "אלול תשפ״ה – תשרי תשפ״ו" */
+function formatHebrewRange(start: HebrewDateInfo, end: HebrewDateInfo): string {
+  const startYear = toHebrewYear(start.year);
+  if (start.monthName === end.monthName && start.year === end.year) {
+    return `${start.monthName} ${startYear}`;
+  }
+  if (start.year === end.year) {
+    return `${start.monthName} – ${end.monthName} ${startYear}`;
+  }
+  return `${start.monthName} ${startYear} – ${end.monthName} ${toHebrewYear(end.year)}`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MonthGrid({ mode }: MonthGridProps) {
   const colors = useThemeColors();
   const router = useRouter();
+  const openDrawer = useDrawerStore((s) => s.open);
   const {
     monthData,
     hebrewMonthData,
@@ -103,6 +152,9 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const dayNames = mode === 'hebrew'
     ? (firstDayOfWeek === 0 ? DAY_NAMES_HE_SUN_FIRST : DAY_NAMES_HE_MON_FIRST)
     : (firstDayOfWeek === 0 ? DAY_NAMES_EN_SUN_FIRST : DAY_NAMES_EN_MON_FIRST);
+  // Index of the Shabbat column within the (logical, pre-flip) dayNames array —
+  // drives the bold/tinted Shabbat header cell (Task 2c).
+  const shabbatIndex = firstDayOfWeek === 0 ? 6 : 5;
 
   // ── Grid construction ──────────────────────────────────────────────────────
   // Compute the number of empty leading cells to align the first day of
@@ -167,9 +219,12 @@ export function MonthGrid({ mode }: MonthGridProps) {
     [weeks, selectedDate, isSameDay],
   );
 
+  // Rows render at exactly GRID_ROW_MIN_HEIGHT while scrolling — see the
+  // weekRow style comment for why (flexBasis:0 + minHeight floor inside an
+  // intrinsically-sized ScrollView content area resolves to the floor).
   useEffect(() => {
     if (needsScroll && selectedRowIndex >= 0 && scrollRef.current) {
-      scrollRef.current.scrollTo({ y: selectedRowIndex * 110, animated: true });
+      scrollRef.current.scrollTo({ y: selectedRowIndex * GRID_ROW_MIN_HEIGHT, animated: true });
     }
   }, [needsScroll, selectedRowIndex]);
 
@@ -224,6 +279,19 @@ export function MonthGrid({ mode }: MonthGridProps) {
     [router],
   );
 
+  // Jump-to-today — replaces the removed ‹ › arrows' only remaining common
+  // use case. Moves both the navigation cursor (Gregorian month or Hebrew
+  // month, whichever this grid is showing) and the selected day.
+  const handleJumpToToday = useCallback(() => {
+    setSelectedDate(today);
+    if (isHebrew) {
+      const { year, month } = dateService.getDayData(today).hebrewDate;
+      navigateToHebrewMonth(year, month);
+    } else {
+      navigateToMonth(today.getFullYear(), today.getMonth() + 1);
+    }
+  }, [today, isHebrew, setSelectedDate, navigateToHebrewMonth, navigateToMonth]);
+
   // ── Swipe gesture ──────────────────────────────────────────────────────────
   const onSwipe = useCallback((vx: number) => navigate(swipeDirection(vx)), [navigate]);
 
@@ -235,29 +303,32 @@ export function MonthGrid({ mode }: MonthGridProps) {
     });
 
   // ── Month title computation ────────────────────────────────────────────────
-  const gregMonthName = useMemo(() => {
-    const d = new Date(currentYear, currentMonth - 1, 1);
-    return d.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-  }, [currentMonth, currentYear]);
+  const gregMonthName = useMemo(
+    () => `${MONTHS_HE_FULL[currentMonth - 1]} ${currentYear}`,
+    [currentMonth, currentYear],
+  );
 
   const hebrewMonthTitle = useMemo(() => {
     if (!gridData.length) return '';
     return `${gridData[0].hebrewDate.monthName} ${toHebrewYear(gridData[0].hebrewDate.year)}`;
   }, [gridData]);
 
-  // Gregorian subtitle for the Hebrew tab. A Hebrew month spans ~2 Gregorian
-  // months, so label it by the Gregorian month of the Hebrew month's midpoint.
-  // gregMonthName (currentMonth/currentYear) tracks only the Gregorian cursor,
-  // which the Hebrew tab never navigates — using it here would freeze the
-  // subtitle as the user swipes through Hebrew months.
-  const hebrewGregSubtitle = useMemo(() => {
+  // Gregorian range subtitle for the Hebrew tab — a Hebrew month usually spans
+  // two Gregorian months, so show the actual range spanned by the grid rather
+  // than a single midpoint month (Task 2a).
+  const gregRangeSubtitle = useMemo(() => {
     if (!gridData.length) return '';
-    const mid = gridData[Math.floor(gridData.length / 2)].gregorianDate;
-    return mid.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+    return formatGregorianRange(gridData[0].gregorianDate, gridData[gridData.length - 1].gregorianDate);
   }, [gridData]);
 
-  const primaryTitle   = mode === 'hebrew' ? hebrewMonthTitle  : gregMonthName;
-  const secondaryTitle = mode === 'hebrew' ? hebrewGregSubtitle : hebrewMonthTitle;
+  // Hebrew range subtitle for the Gregorian tab — same idea, mirrored.
+  const hebrewRangeSubtitle = useMemo(() => {
+    if (!gridData.length) return '';
+    return formatHebrewRange(gridData[0].hebrewDate, gridData[gridData.length - 1].hebrewDate);
+  }, [gridData]);
+
+  const primaryTitle   = mode === 'hebrew' ? hebrewMonthTitle    : gregMonthName;
+  const secondaryTitle = mode === 'hebrew' ? gregRangeSubtitle   : hebrewRangeSubtitle;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -306,10 +377,24 @@ export function MonthGrid({ mode }: MonthGridProps) {
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
 
-        {/* Month Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => navigate(1)} hitSlop={12}>
-            <Text style={[styles.navArrow, { color: colors.accent }]}>‹</Text>
+        {/* Merged header — hamburger (left) + tappable two-line title (center)
+            + jump-to-today (right). Replaces the old stacked ScreenHeader +
+            arrows-header pair; index.tsx/gregorian.tsx no longer render
+            ScreenHeader at all so there is exactly one header row. */}
+        <View
+          style={[
+            styles.header,
+            { borderBottomColor: colors.border, paddingTop: (StatusBar.currentHeight ?? 0) + 8 },
+          ]}
+        >
+          <Pressable
+            onPress={openDrawer}
+            hitSlop={12}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel="פתח תפריט"
+          >
+            <Menu size={24} color={colors.textPrimary} />
           </Pressable>
 
           <Pressable
@@ -317,7 +402,9 @@ export function MonthGrid({ mode }: MonthGridProps) {
               if (mode === 'hebrew') setHebrewPickerVisible(true);
               else setPickerVisible(true);
             }}
-            style={styles.headerCenter}
+            style={styles.titleBlock}
+            accessibilityRole="button"
+            accessibilityLabel={`${primaryTitle}, ${secondaryTitle}, לבחירת חודש`}
           >
             <Text style={[styles.monthTitle, { color: colors.textPrimary }]}>
               {primaryTitle}
@@ -327,22 +414,41 @@ export function MonthGrid({ mode }: MonthGridProps) {
             </Text>
           </Pressable>
 
-          <Pressable onPress={() => navigate(-1)} hitSlop={12}>
-            <Text style={[styles.navArrow, { color: colors.accent }]}>›</Text>
+          <Pressable
+            onPress={handleJumpToToday}
+            hitSlop={12}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel="עבור להיום"
+          >
+            <CalendarCheck size={24} color={colors.accent} />
           </Pressable>
         </View>
 
-        {/* Day Name Headers — direction driven by mode; always pinned above grid */}
+        {/* Day Name Headers — direction driven by mode; always pinned above grid.
+            Shabbat column is bold + tinted (Task 2c). */}
         <View style={[styles.dayNames, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}>
-          {dayNames.map((name, i) => (
-            <Text key={i} style={[styles.dayName, { color: colors.textTertiary }]}>
-              {name}
-            </Text>
-          ))}
+          {dayNames.map((name, i) => {
+            const isShabbatCol = i === shabbatIndex;
+            return (
+              <Text
+                key={i}
+                style={[
+                  styles.dayName,
+                  { color: isShabbatCol ? colors.tagShabbat : colors.textTertiary },
+                  isShabbatCol && styles.dayNameShabbat,
+                ]}
+              >
+                {name}
+              </Text>
+            );
+          })}
         </View>
 
         {/* Calendar Grid — View-based 7-column layout.
-            6-row months scroll vertically; ≤5-row months render as a static View. */}
+            6-row months scroll vertically; ≤5-row months render as a static
+            flex:1 View so the grid fills the remaining screen space and the
+            tab bar sits flush at the bottom with no dead gap (Task 2d). */}
         {needsScroll ? (
           <ScrollView
             ref={scrollRef}
@@ -353,7 +459,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
             {gridRows}
           </ScrollView>
         ) : (
-          <View>{gridRows}</View>
+          <View style={styles.gridFlexContainer}>{gridRows}</View>
         )}
 
         {/* Month/Year Picker — Gregorian mode only */}
@@ -405,40 +511,65 @@ export function MonthGrid({ mode }: MonthGridProps) {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
+// Floor height for a week row — also the actual rendered height while
+// scrolling (see the weekRow comment below). Kept as a named constant since
+// it is also used for the scroll-to-selected-row offset calculation.
+const GRID_ROW_MIN_HEIGHT = 92;
+
 const styles = StyleSheet.create({
-  container:   { flex: 1, paddingHorizontal: 8 },
+  container: { flex: 1, paddingHorizontal: 8 },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerCenter:   { alignItems: 'center' },
-  monthTitle:     { fontSize: 18, fontWeight: '700', letterSpacing: -0.3, textAlign: 'center' },
-  monthSubtitle:  { fontSize: 12, marginTop: 1, textAlign: 'center' },
-  navArrow:       { fontSize: 28, fontWeight: '300' },
+  iconButton: {
+    padding: 6, // combined with hitSlop(12) clears the 48dp touch-target floor
+  },
+  titleBlock: { flex: 1, alignItems: 'center' },
+  monthTitle: {
+    ...withFontFamily(typography.cardTitle),
+    textAlign: 'center',
+  },
+  monthSubtitle: {
+    ...withFontFamily(typography.caption),
+    marginTop: 1,
+    textAlign: 'center',
+  },
 
   // Day name header row — flexDirection set inline based on mode
-  dayNames: { paddingBottom: 8 },
+  dayNames: { paddingTop: 8, paddingBottom: 8 },
   dayName: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '500',
+    ...withFontFamily(typography.caption),
     letterSpacing: 0.3,
   },
+  dayNameShabbat: { fontWeight: '700' },
+
+  // Wraps gridRows in the non-scrolling (≤5-week) case so the flex:1 weekRows
+  // below have a bounded parent height to divide evenly and fill.
+  gridFlexContainer: { flex: 1 },
 
   // Week rows — flexDirection set inline based on mode.
-  // Explicit height breaks the Yoga circular-height dependency that occurs
-  // when every cell is a cellWrapper (no emptyCell with explicit height to
-  // anchor the row). Without this, rows containing only DayCell children
-  // (weeks 2–5 of most months) collapse to ~8 px tall.
-  weekRow: { height: 110 }, // matches CELL_HEIGHT in DayCell
+  // flex:1 (which RN resolves to flexGrow:1/flexShrink:1/flexBasis:0%) makes
+  // rows divide the bounded parent's height evenly when one exists
+  // (gridFlexContainer above). Inside the ScrollView branch there IS no
+  // bounded parent height to divide (content-sized), so each row instead
+  // resolves to its minHeight floor — GRID_ROW_MIN_HEIGHT is therefore also
+  // the actual row height whenever the grid scrolls (6-week months).
+  // The explicit minHeight is load-bearing: leaving height fully inferred
+  // here is exactly the Yoga circular-height bug that once collapsed this
+  // row to ~8px (see DayCell's own CELL_MIN_HEIGHT comment).
+  weekRow: { flex: 1, minHeight: GRID_ROW_MIN_HEIGHT },
 
   // Cell containers — flex: 1 distributes each cell to 1/7 of row width.
   // alignItems: 'stretch' (default on weekRow) makes cellWrapper fill the
-  // row height (110 px) so DayCell's flex:1 inside it expands correctly.
+  // row's resolved height so DayCell's flex:1 inside it expands correctly.
   cellWrapper: { flex: 1 },
   emptyCell:   { flex: 1 }, // height comes from weekRow stretch
 

@@ -1,22 +1,36 @@
 // src/components/calendar/DayCell.tsx
 // Presentational v2 component — per docs/SCREENS.md and docs/DESIGN.md.
 // Does NOT manage tap state, selection logic, or know about Hebrew/Gregorian mode.
-// All interaction logic lives in the parent (MonthGrid).
+// All interaction logic lives in the parent (MonthGrid / WeekGrid).
+//
+// Redesign (borderless grid) — the per-cell border box is gone; cells are
+// separated only by a 1px top hairline. Selected is the one exception with
+// a full border. Today is now a filled circle around the primary label
+// instead of a border/background tint. See MonthGrid Task 2 for the header
+// and grid-sizing half of this redesign.
 
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import CandleIcon from '../icons/CandleIcon';
 import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
 
-// ── Cell height — per docs/DESIGN.md ──────────────────────────────────────────
-const CELL_HEIGHT = 110; // px, locked per DESIGN.md spec
+// ── Cell sizing ────────────────────────────────────────────────────────────
+// Height is intentionally NOT fixed here — the cell fills whatever height
+// its parent row resolves to (MonthGrid's flex:1 weekRow, or WeekGrid's
+// intrinsic row). CELL_MIN_HEIGHT is a floor only, so DayCell can never
+// collapse to ~0 in a parent with no bounded height (e.g. WeekGrid, which
+// has no flex-bound row today) — the same class of Yoga circular-height
+// bug that once collapsed MonthGrid's weekRow.
+const CELL_MIN_HEIGHT = 92;
 
-// ── Segment chip fixed height ──────────────────────────────────────────────────
-// Ensures blank middle/end span bars are the same height as the titled start bar
-// (which gets its height from fontSize:10 + lineHeight + paddingVertical:2 × 2).
-// fontSize 10 → lineHeight ≈ 14; + 4 (2+2 padding) = 18. Use 18 as the anchor.
-const SEGMENT_CHIP_HEIGHT = 18;
+// ── Segment chip fixed height ──────────────────────────────────────────────
+// Ensures blank middle/end span bars are the same height as the titled
+// start bar. Matches tagChip's own fixed height (15) — kept as an explicit
+// segment override (rather than relying solely on tagChip's height) so the
+// two stay intentionally decoupled if either is tuned independently later.
+const SEGMENT_CHIP_HEIGHT = 15;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,19 +46,19 @@ export interface DayCellTag {
 
 export interface DayCellProps {
   // Date display
-  primaryLabel: string;   // e.g. "כ״ז" or "14" — large, top, writing-direction start
-  secondaryLabel: string; // e.g. "14" or "כ״ז" — small, opposite corner
+  primaryLabel: string;   // e.g. "כ״ז" or "14" — large, top-right (RTL reading start)
+  secondaryLabel: string; // e.g. "14" or "כ״ז" — small, top-left
 
   // State
-  isToday: boolean;    // 2px today border + todayBg tint
-  isSelected: boolean; // 2px selected border + selectedBg tint
+  isToday: boolean;    // primary label rendered inside a filled circle
+  isSelected: boolean; // 1.5px selected border + selectedBg tint (wins over all)
   isShabbat: boolean;  // subtle purple bg tint
   isHoliday: boolean;  // subtle green bg tint
-  isFriday: boolean;   // show candle icon opposite primary label
+  isFriday: boolean;   // show candle icon next to secondary label
   isEmpty?: boolean;   // padding day from prev/next month — render transparent placeholder
 
   // Content
-  tags: DayCellTag[]; // 0 or more; component slices to 2 visible + +N overflow
+  tags: DayCellTag[]; // 0 or more; component slices to 3 visible + +N overflow
 
   // Interaction — parent owns all logic; parent should useCallback these
   onPress: () => void;
@@ -73,24 +87,32 @@ function DayCellInner({
     return <View style={styles.emptyCell} />;
   }
 
-  // ── Border resolution (priority: selected > today > default) ───────────────
-  const borderColor = isSelected
-    ? colors.selected
-    : isToday
-    ? colors.today
-    : colors.borderSubtle;
-  const borderWidth = isSelected || isToday ? 2 : 0.5;
-
-  // ── Background resolution (priority: selected > today > holiday > shabbat > default) ─
+  // ── Background resolution (priority: selected > holiday > shabbat > default) ─
   const backgroundColor = isSelected
     ? colors.selectedBg
-    : isToday
-    ? colors.todayBg
     : isHoliday
-    ? colors.tagHolidayBg
+    ? colors.holidayTint
     : isShabbat
-    ? colors.tagShabbatBg
+    ? colors.shabbatTint
     : colors.surface;
+
+  // ── Border resolution ───────────────────────────────────────────────────────
+  // Default: no border box at all, only a 1px top hairline (the "grid breathes"
+  // change). Selected is the one exception: a full border on every side.
+  const borderStyle = isSelected
+    ? {
+        borderWidth: 1.5,
+        borderColor: colors.selected,
+        borderRadius: radius.sm,
+      }
+    : {
+        borderTopWidth: 1,
+        borderTopColor: colors.borderSubtle,
+        borderLeftWidth: 0,
+        borderRightWidth: 0,
+        borderBottomWidth: 0,
+        borderRadius: 0,
+      };
 
   // ── Tag color map — type-safe, avoids template literal string indexing ─────
   const TAG_COLORS: Record<TagCategory, { bg: string; fg: string }> = {
@@ -102,41 +124,59 @@ function DayCellInner({
   };
 
   // ── Tags slicing ───────────────────────────────────────────────────────────
-  const visibleTags = tags.slice(0, 2);
-  const overflowCount = Math.max(0, tags.length - 2);
+  const visibleTags = tags.slice(0, 3);
+  const overflowCount = Math.max(0, tags.length - 3);
+
+  // ── Accessibility ────────────────────────────────────────────────────────────
+  // Combines both date labels (whichever is Hebrew/Gregorian is decided by the
+  // parent's mode) plus every tag's text, so a screen-reader user gets the full
+  // picture of the day in one label — this is the most-used control in the app
+  // and previously had no accessibility support at all.
+  const tagLabelsForA11y = tags.map((t) => t.label).filter(Boolean).join(', ');
+  const accessibilityLabel = tagLabelsForA11y
+    ? `${primaryLabel}, ${secondaryLabel}, ${tagLabelsForA11y}`
+    : `${primaryLabel}, ${secondaryLabel}`;
 
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350} // RN sweet spot for distinguishing tap vs long-press
-      style={[
-        styles.cell,
-        { backgroundColor, borderColor, borderWidth },
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected: isSelected }}
+      style={[styles.cell, { backgroundColor }, borderStyle]}
     >
-      {/* ── Date area ───────────────────────────────────────────────────────── */}
-      {/* Row: primary label (writing-direction start) + candle (end, Fridays only) */}
+      {/* ── Top row ─────────────────────────────────────────────────────────── */}
+      {/* row-reverse: primary label (first child) lands RIGHT — the RTL
+          reading start; secondary label + Friday candle land LEFT. */}
       <View style={styles.dateRow}>
-        <Text style={[styles.primaryLabel, { color: colors.textPrimary }]}>
-          {primaryLabel}
-        </Text>
-        {isFriday && (
-          <CandleIcon width={16} height={12} color={colors.candle} />
+        {isToday ? (
+          <View style={[styles.todayCircle, { backgroundColor: colors.today }]}>
+            <Text style={[styles.primaryLabel, styles.todayLabel, { color: colors.textInverse }]}>
+              {primaryLabel}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.primaryLabel, { color: colors.textPrimary }]}>
+            {primaryLabel}
+          </Text>
         )}
+
+        <View style={styles.secondaryGroup}>
+          {isFriday && (
+            <CandleIcon width={12} height={9} color={colors.candle} />
+          )}
+          {/* writingDirection: 'ltr' ensures Gregorian digits render LTR in RTL container */}
+          <Text
+            style={[styles.secondaryLabel, { color: colors.textTertiary, writingDirection: 'ltr' }]}
+          >
+            {secondaryLabel}
+          </Text>
+        </View>
       </View>
 
-      {/* Secondary label — opposite corner from primary (writing-direction end) */}
-      {/* writingDirection: 'ltr' ensures Gregorian digit renders LTR in RTL container */}
-      <View style={styles.secondaryRow}>
-        <Text
-          style={[styles.secondaryLabel, { color: colors.textTertiary, writingDirection: 'ltr' }]}
-        >
-          {secondaryLabel}
-        </Text>
-      </View>
-
-      {/* ── Tags area (2px gap below date area — see comment in styles) ─────── */}
+      {/* ── Tags area ─────────────────────────────────────────────────────── */}
       <View style={styles.tagsArea}>
         {visibleTags.map((tag, i) => {
           const { bg, fg } = TAG_COLORS[tag.category];
@@ -172,11 +212,9 @@ function DayCellInner({
           );
         })}
         {overflowCount > 0 && (
-          <View style={[styles.tagChip, { backgroundColor: colors.surfaceElevated }]}>
-            <Text style={[styles.tagText, { color: colors.textSecondary }]}>
-              +{overflowCount}
-            </Text>
-          </View>
+          <Text style={[styles.overflowText, { color: colors.textTertiary }]}>
+            +{overflowCount}
+          </Text>
         )}
       </View>
     </Pressable>
@@ -214,33 +252,41 @@ export const DayCell = memo(DayCellInner, (prev, next) => {
 const styles = StyleSheet.create({
   emptyCell: {
     flex: 1,
-    height: CELL_HEIGHT, // still occupies grid space
+    minHeight: CELL_MIN_HEIGHT, // still occupies grid space
   },
   cell: {
     flex: 1,
-    height: CELL_HEIGHT,   // per docs/DESIGN.md — 110px locked
-    borderRadius: radius.sm, // = 6, per DESIGN.md "Day cells"
+    minHeight: CELL_MIN_HEIGHT, // floor only — grows to fill the parent row's height
     padding: 4,
     overflow: 'hidden',
   },
   dateRow: {
     flexDirection: 'row-reverse',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 24,
   },
   primaryLabel: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...withFontFamily(typography.cellPrimary),
     textAlign: 'right',
   },
-  secondaryRow: {
-    // 2px gap below the date row before the secondary label
-    marginTop: 2,
-    alignItems: 'flex-start', // opposite corner from primary (which is at flex-start in row-reverse)
+  todayCircle: {
+    width: 23,
+    height: 23,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayLabel: {
+    textAlign: 'center',
+  },
+  secondaryGroup: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 2,
   },
   secondaryLabel: {
-    fontSize: 11,
-    fontWeight: '400',
+    ...withFontFamily(typography.cellSecondary),
   },
   tagsArea: {
     // 2px gap below the date area before tags
@@ -250,12 +296,17 @@ const styles = StyleSheet.create({
   },
   tagChip: {
     alignSelf: 'stretch',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    height: 15,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
     borderRadius: radius.xs, // = 4, per DESIGN.md "Tags, small badges"
   },
   tagText: {
-    fontSize: 10,
-    fontWeight: '500',
+    ...withFontFamily(typography.cellTag),
+    textAlign: 'right',
+  },
+  overflowText: {
+    ...withFontFamily(typography.micro),
+    textAlign: 'right',
   },
 });

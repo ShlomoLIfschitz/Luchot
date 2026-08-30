@@ -2,6 +2,13 @@
 // Phase 3.7b-2 — Details screen. Displays all daily learning items in
 // themed sections, with direct Sefaria links. Accessible from the
 // hamburger drawer.
+//
+// Redesign (Wave — card restructure): each learning item is now a card row
+// [categoryBadge, textBlock(flex:1), Sefaria link button] — badge at the
+// reading start (right), link button at the far left. Sections regrouped
+// to תלמוד / הלכה / תנ״ך ומוסר, styled with the shared SectionLabel/Card
+// components (same visual language as settings.tsx / locationPicker.tsx).
+// Sefaria linking behavior and the underlying learning data are unchanged.
 
 import React, { useCallback, useMemo } from 'react';
 import {
@@ -25,6 +32,8 @@ import { useCalendarStore } from '../src/providers/CalendarProvider';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
+import { Card } from '../src/components/ui/Card';
+import { SectionLabel } from '../src/components/ui/SectionLabel';
 import {
   dateService,
   toHebrewNumeral,
@@ -33,16 +42,21 @@ import {
   type LearningItem,
 } from '../src/services/DateService';
 import { radius } from '../src/constants/radius';
+import { typography, withFontFamily } from '../src/constants/typography';
 import { useDatePicker } from '../src/hooks/useDatePicker';
 import { swipeDirection } from '../src/constants/layout';
+import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type IconComponent = React.ComponentType<any>;
+
 interface LearningSectionData {
   title: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Icon: React.ComponentType<any>;
-  items: { label: string; item: LearningItem | undefined }[];
+  color: string;
+  bg: string;
+  items: { label: string; item: LearningItem | undefined; Icon: IconComponent }[];
 }
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
@@ -89,37 +103,37 @@ export default function DetailsScreen() {
     year: 'numeric',
   });
 
-  // Themed sections — each section gets pruned of undefined items below.
+  // Themed sections — regrouped to תלמוד / הלכה / תנ״ך ומוסר. Each section
+  // carries a category tint (color/bg) applied to every item badge in it;
+  // individual items may still use distinct glyphs. Undefined items are
+  // pruned below, then empty sections are pruned.
   const sections: LearningSectionData[] = [
     {
       title: 'תלמוד',
-      Icon: BookOpen,
+      color: colors.tagEvent,
+      bg: colors.tagEventBg,
       items: [
-        { label: 'דף יומי',   item: dayData.dafYomi },
-        { label: 'משנה יומי', item: dayData.mishnaYomi },
+        { label: 'דף יומי',   item: dayData.dafYomi,   Icon: BookOpen },
+        { label: 'משנה יומי', item: dayData.mishnaYomi, Icon: BookOpen },
       ],
     },
     {
-      title: 'רמב״ם',
-      Icon: BookMarked,
+      title: 'הלכה',
+      color: colors.tagSpecial,
+      bg: colors.tagSpecialBg,
       items: [
-        { label: 'רמב״ם יומי (פרק אחד)', item: dayData.rambamOneChapter },
+        { label: 'רמב״ם יומי (פרק אחד)', item: dayData.rambamOneChapter, Icon: BookMarked },
       ],
     },
     {
-      title: 'תנ״ך',
-      Icon: BookText,
+      title: 'תנ״ך ומוסר',
+      color: colors.tagShabbat,
+      bg: colors.tagShabbatBg,
       items: [
-        { label: 'נ״ך יומי',   item: dayData.nachYomi },
-        { label: 'תנ״ך יומי', item: dayData.tanakhYomi },
-      ],
-    },
-    {
-      title: 'מוסר ותהילים',
-      Icon: Sparkles,
-      items: [
-        { label: 'חפץ חיים', item: dayData.chofetzChaim },
-        { label: 'תהילים',   item: dayData.psalms },
+        { label: 'נ״ך יומי',   item: dayData.nachYomi,      Icon: BookText },
+        { label: 'תנ״ך יומי', item: dayData.tanakhYomi,    Icon: BookText },
+        { label: 'חפץ חיים',  item: dayData.chofetzChaim,  Icon: Sparkles },
+        { label: 'תהילים',    item: dayData.psalms,        Icon: Sparkles },
       ],
     },
   ];
@@ -156,13 +170,22 @@ export default function DetailsScreen() {
             </Text>
           ) : (
             visibleSections.map((section) => (
-              <LearningSection
-                key={section.title}
-                title={section.title}
-                Icon={section.Icon}
-                items={section.items as { label: string; item: LearningItem }[]}
-                colors={colors}
-              />
+              <View key={section.title} style={styles.section}>
+                <SectionLabel title={section.title} colors={colors} />
+                <Card colors={colors}>
+                  {section.items.map(({ label, item, Icon }) => (
+                    <LearningRow
+                      key={label}
+                      label={label}
+                      item={item as LearningItem}
+                      Icon={Icon}
+                      badgeColor={section.color}
+                      badgeBg={section.bg}
+                      colors={colors}
+                    />
+                  ))}
+                </Card>
+              </View>
             ))
           )}
         </ScrollView>
@@ -174,56 +197,24 @@ export default function DetailsScreen() {
   );
 }
 
-// ─── LearningSection ───────────────────────────────────────────────────────────
-
-function LearningSection({
-  title,
-  Icon,
-  items,
-  colors,
-}: {
-  title: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Icon: React.ComponentType<any>;
-  items: { label: string; item: LearningItem }[];
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-          {title}
-        </Text>
-        <Icon size={18} color={colors.accent} />
-      </View>
-
-      <View style={[styles.card, { borderColor: colors.border }]}>
-        {items.map(({ label, item }, idx) => (
-          <LearningRow
-            key={label}
-            label={label}
-            item={item}
-            colors={colors}
-            isLast={idx === items.length - 1}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
 // ─── LearningRow ───────────────────────────────────────────────────────────────
 
 function LearningRow({
   label,
   item,
+  Icon,
+  badgeColor,
+  badgeBg,
   colors,
-  isLast,
+  isLast = false,
 }: {
   label: string;
   item: LearningItem;
-  colors: ReturnType<typeof useThemeColors>;
-  isLast: boolean;
+  Icon: IconComponent;
+  badgeColor: string;
+  badgeBg: string;
+  colors: ThemeColors;
+  isLast?: boolean;
 }) {
   return (
     <View
@@ -232,10 +223,14 @@ function LearningRow({
         { backgroundColor: colors.surface },
         !isLast && {
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          borderBottomColor: colors.borderSubtle,
         },
       ]}
     >
+      <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+        <Icon size={18} color={badgeColor} />
+      </View>
+
       <View style={styles.rowContent}>
         <Text style={[styles.rowLabel, { color: colors.textTertiary }]}>
           {label}
@@ -244,9 +239,12 @@ function LearningRow({
           {item.display}
         </Text>
       </View>
+
       <Pressable
         onPress={() => Linking.openURL(item.url)}
         style={[styles.linkBtn, { backgroundColor: colors.accentLight }]}
+        hitSlop={4}
+        accessibilityRole="button"
         accessibilityLabel={`פתח ב-ספריא: ${item.display}`}
       >
         <ExternalLink size={14} color={colors.accent} />
@@ -263,69 +261,57 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
 
   header:      { alignItems: 'center', marginBottom: 20 },
-  hebrewDate:  { fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
-  gregDate:    { fontSize: 13, marginTop: 4 },
+  hebrewDate:  { ...withFontFamily(typography.displaySmall), letterSpacing: -0.5 },
+  gregDate:    { ...withFontFamily(typography.bodySmall), marginTop: 4 },
 
   emptyState: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodySmall),
     textAlign: 'center',
     marginTop: 40,
     fontStyle: 'italic',
   },
 
-  section:       { marginBottom: 20 },
-  sectionHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textAlign: 'right',
-  },
-
-  card: {
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  section: { marginBottom: 12 },
 
   row: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     gap: 12,
-    minHeight: 60,
+    minHeight: 62,
+  },
+  badge: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   rowContent: {
     flex: 1,
     flexShrink: 1,  // yields space to button rather than compressing text
   },
   rowLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    ...withFontFamily(typography.caption),
     marginBottom: 2,
     textAlign: 'right',  // Hebrew label anchors to right edge
   },
   rowValue: {
-    fontSize: 15,
-    fontWeight: '500',
+    ...withFontFamily(typography.cardTitle),
     textAlign: 'right',  // Hebrew value anchors to right edge
   },
 
   linkBtn: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,  // reduced: button stays compact
     paddingVertical: 6,
+    minHeight: 32,
     borderRadius: radius.md,
     flexShrink: 0,  // button keeps its natural size; text area yields instead
   },
-  linkText: { fontSize: 12, fontWeight: '600' },
+  linkText: { ...withFontFamily(typography.bodySmall), fontWeight: '600' },
 });

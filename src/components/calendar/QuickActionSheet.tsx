@@ -1,13 +1,19 @@
 // src/components/calendar/QuickActionSheet.tsx
 // Long-press quick action sheet — three options per SCREENS.md.
 // Uses @gorhom/bottom-sheet for visual consistency with the rest of the app.
+//
+// Redesign (Task 3) — @gorhom/bottom-sheet v4 does NOT close on the Android
+// hardware back button by itself, and no BackHandler was wired anywhere in
+// this repo. Wired here: while the sheet is open, back closes it and
+// consumes the event instead of letting it fall through to screen navigation.
 
-import React, { forwardRef, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, BackHandler } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import { Pencil, Gift, FileText } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { radius } from '../../constants/radius';
+import { overlay } from '../../constants/overlay';
 
 export type QuickAction = 'addNote' | 'addRecurring' | 'viewDay';
 
@@ -24,13 +30,34 @@ export const QuickActionSheet = forwardRef<BottomSheet, QuickActionSheetProps>(
     const colors = useThemeColors();
     const snapPoints = useMemo(() => ['38%'], []);
 
+    // Tracks open/closed purely to gate the BackHandler subscription — kept
+    // in local state (not derived from `date`, which stays populated after
+    // close so action handlers can still read it) via BottomSheet's own
+    // index callback.
+    const [isOpen, setIsOpen] = useState(false);
+    const isOpenRef = useRef(isOpen);
+    isOpenRef.current = isOpen;
+
+    useEffect(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (!isOpenRef.current) return false; // let navigation handle it
+        onClose();
+        return true; // consumed — do not navigate away
+      });
+      return () => sub.remove();
+    }, [onClose]);
+
+    const handleSheetChange = useCallback((index: number) => {
+      setIsOpen(index >= 0);
+    }, []);
+
     const renderBackdrop = useCallback(
       (props: any) => (
         <BottomSheetBackdrop
           {...props}
           disappearsOnIndex={-1}
           appearsOnIndex={0}
-          opacity={0.45}
+          opacity={overlay.modalOpacity}
         />
       ),
       [],
@@ -55,6 +82,7 @@ export const QuickActionSheet = forwardRef<BottomSheet, QuickActionSheetProps>(
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         onClose={onClose}
+        onChange={handleSheetChange}
         backgroundStyle={{
           backgroundColor: colors.surface,
           borderTopLeftRadius: radius.xl,

@@ -11,6 +11,7 @@
     "postinstall": "node scripts/patch-expo-sqlite-imports.cjs"
   },
   "dependencies": {
+    "@expo-google-fonts/heebo": "^0.4.2",
     "@expo/vector-icons": "^14.0.0",
     "@gorhom/bottom-sheet": "^4.6.1",
     "@hebcal/cities": "5.0.1",

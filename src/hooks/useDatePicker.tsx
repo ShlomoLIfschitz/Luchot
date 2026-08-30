@@ -23,6 +23,8 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { useThemeColors } from './useThemeColors';
 import { radius } from '../constants/radius';
+import { overlay } from '../constants/overlay';
+import { typography, withFontFamily } from '../constants/typography';
 
 interface UseDatePickerResult {
   /** Call to open the date picker (iOS: modal; Android: native dialog). */
@@ -90,15 +92,6 @@ export function useDatePicker(
             />
             <View style={styles.buttons}>
               <Pressable
-                onPress={() => setVisible(false)}
-                style={[styles.btn, { backgroundColor: colors.surfaceElevated }]}
-                accessibilityLabel="ביטול"
-              >
-                <Text style={[styles.btnText, { color: colors.textSecondary }]}>
-                  ביטול
-                </Text>
-              </Pressable>
-              <Pressable
                 onPress={() => {
                   onChange(tempDate);
                   setVisible(false);
@@ -108,6 +101,15 @@ export function useDatePicker(
               >
                 <Text style={[styles.btnText, { color: colors.textInverse }]}>
                   אישור
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setVisible(false)}
+                style={[styles.btn, { backgroundColor: colors.surfaceElevated }]}
+                accessibilityLabel="ביטול"
+              >
+                <Text style={[styles.btnText, { color: colors.textSecondary }]}>
+                  ביטול
                 </Text>
               </Pressable>
             </View>
@@ -133,7 +135,7 @@ export function useDatePicker(
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: overlay.modal,
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -143,17 +145,20 @@ const styles = StyleSheet.create({
     paddingTop:    12,
     paddingBottom: 32,
   },
+  // row-reverse: אישור (confirm) renders on the right, ביטול (cancel) on the left
   buttons: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap:           12,
     paddingHorizontal: 20,
     paddingTop:    8,
   },
   btn: {
     flex: 1,
+    minHeight: 48,
     paddingVertical: 12,
     borderRadius: radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  btnText: { fontSize: 15, fontWeight: '600' },
+  btnText: { ...withFontFamily(typography.bodyMedium), fontWeight: '600' },
 });

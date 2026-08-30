@@ -4,6 +4,13 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  Heebo_400Regular,
+  Heebo_500Medium,
+  Heebo_600SemiBold,
+  Heebo_700Bold,
+} from '@expo-google-fonts/heebo';
 import { StorageService } from '../src/services/StorageService';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
@@ -25,6 +32,17 @@ export default function RootLayout() {
   const [forceReady, setForceReady] = useState(false);
   const system = useColorScheme();
   const scheme = darkMode === 'system' ? (system ?? 'light') : darkMode;
+
+  // Heebo — approved UI font (src/constants/typography.ts FONT_FAMILY).
+  // A load failure must NEVER permanently block render: fontsReady treats
+  // fontError the same as a successful load (falls back to the system font).
+  const [fontsLoaded, fontError] = useFonts({
+    Heebo_400Regular,
+    Heebo_500Medium,
+    Heebo_600SemiBold,
+    Heebo_700Bold,
+  });
+  const fontsReady = fontsLoaded || !!fontError;
 
   useEffect(() => {
     async function init() {
@@ -109,9 +127,12 @@ export default function RootLayout() {
   }, [settingsReady]);
 
   // All hooks are declared above this point — safe to early-return here.
-  // Render nothing until persisted settings are loaded so the UI never
-  // flashes the default theme before the stored preference is applied.
-  if (!settingsReady && !forceReady) return null;
+  // Render nothing until persisted settings AND fonts are ready, so the UI
+  // never flashes the default theme/system font before the stored
+  // preference / Heebo is applied. forceReady (3s fallback, below) still
+  // overrides both halves so a hung settings load OR a hung font load can
+  // never freeze the UI on a blank screen.
+  if (!forceReady && !(settingsReady && fontsReady)) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

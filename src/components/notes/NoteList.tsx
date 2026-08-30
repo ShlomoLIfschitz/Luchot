@@ -9,6 +9,8 @@ import { useNotes, type CalendarNote, type NoteType } from '../../hooks/useNotes
 import { NoteEditor } from './NoteEditor';
 import type { HebrewDateInfo } from '../../services/DateService';
 import { splitInstanceId } from '../../utils/recurringId';
+import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
 
 // C3: Quick color picker Modal removed as dead code — no opener existed since the dot was removed.
 
@@ -109,14 +111,14 @@ export function NoteList({ date, hebrewDate, hideAddButton, onlyAllDay = false }
 
   return (
     <View style={s.container}>
-      {/* Section header */}
+      {/* Section header — row-reverse, natural order: title (right), addButton (left) */}
       <View style={s.header}>
+        <Text style={[s.headerTitle, { color: colors.textTertiary }]}>הערות</Text>
         {!hideAddButton && (
           <Pressable onPress={openAdd} style={[s.addBtn, { backgroundColor: colors.accentLight }]}>
             <Text style={[s.addBtnText, { color: colors.accent }]}>+ הוסף הערה</Text>
           </Pressable>
         )}
-        <Text style={[s.headerTitle, { color: colors.textTertiary }]}>הערות</Text>
       </View>
 
       {visibleNotes.length === 0 ? (
@@ -133,35 +135,44 @@ export function NoteList({ date, hebrewDate, hideAddButton, onlyAllDay = false }
               : null;
 
           return (
-            <View key={note.id} style={s.noteRowWrapper}>
-              {/* bar — JSX-first = renders on RIGHT, outside the capsule */}
-              <View style={[s.colorBar, { backgroundColor: resolveHexColor(note) }]} />
-              {/* capsule — JSX-second = renders on LEFT */}
-              <Pressable
-                onPress={() => openEdit(note)}
-                style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-              >
-                {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={20} color={colors.textSecondary} />; })()}
-                <View style={s.noteBody}>
+            // row-reverse, JSX order [colorDot, title(flex:1,right), time, deleteButton]
+            // so colorDot is rightmost and deleteButton is the last (leftmost) child.
+            <Pressable
+              key={note.id}
+              onPress={() => openEdit(note)}
+              accessibilityRole="button"
+              accessibilityLabel={`ערוך הערה: ${note.summary}`}
+              style={[s.noteRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+            >
+              <View style={[s.colorDot, { backgroundColor: resolveHexColor(note) }]} />
+              <View style={s.noteBody}>
+                <View style={s.titleRow}>
+                  {(() => { const Icon = TYPE_ICON[note.noteType]; return <Icon size={16} color={colors.textSecondary} />; })()}
                   <Text style={[s.noteSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
-                  {note.recurring && (
-                    <Text style={[s.noteTag, { color: colors.textTertiary }]}>
-                      {note.calendarType === 'hebrew' ? '↺ עברי' : '↺ לועזי'}
-                    </Text>
-                  )}
                 </View>
-                {/* Time label — JSX-last = leftmost in row-reverse.
-                    Only shown for timed notes. Sits to the left of the summary. */}
-                {timedStart !== null && (
-                  <Text style={[s.timeLabel, { color: colors.textTertiary }]}>
-                    {formatHM(timedStart, use24hTime)}
+                {note.recurring && (
+                  <Text style={[s.noteTag, { color: colors.textTertiary }]}>
+                    {note.calendarType === 'hebrew' ? '↺ עברי' : '↺ לועזי'}
                   </Text>
                 )}
-                <Pressable onPress={() => confirmDelete(note)} hitSlop={10} style={s.deleteBtn}>
-                  <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
-                </Pressable>
+              </View>
+              {/* Time label — only shown for timed notes. */}
+              {timedStart !== null && (
+                <Text style={[s.timeLabel, { color: colors.textTertiary }]}>
+                  {formatHM(timedStart, use24hTime)}
+                </Text>
+              )}
+              {/* deleteButton — JSX-last = leftmost in row-reverse. */}
+              <Pressable
+                onPress={() => confirmDelete(note)}
+                hitSlop={6}
+                style={s.deleteBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`מחק הערה: ${note.summary}`}
+              >
+                <Text style={[s.deleteIcon, { color: colors.textTertiary }]}>✕</Text>
               </Pressable>
-            </View>
+            </Pressable>
           );
         })
       )}
@@ -184,37 +195,36 @@ export function NoteList({ date, hebrewDate, hideAddButton, onlyAllDay = false }
 
 const s = StyleSheet.create({
   container: { marginTop: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  headerTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  addBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  addBtnText: { fontSize: 13, fontWeight: '600' },
-  empty: { fontSize: 13, textAlign: 'right', paddingVertical: 8 },
-  noteRowWrapper: {
+  header: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  headerTitle: { ...withFontFamily(typography.captionBold), textTransform: 'uppercase' },
+  addBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.md },
+  addBtnText: { ...withFontFamily(typography.bodySmall) },
+  empty: { textAlign: 'right', paddingVertical: 8, ...withFontFamily(typography.bodySmall) },
+  noteRow: {
     flexDirection: 'row-reverse',
-    alignItems: 'stretch',
-    gap: 4,
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 8,
   },
-  noteRow: {
-    flex: 1,
-    flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderRadius: 10, borderWidth: StyleSheet.hairlineWidth,
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
   },
   noteBody: { flex: 1 },
-  noteSummary: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
-  noteTag: { fontSize: 11, textAlign: 'right', marginTop: 2 },
-  deleteBtn: { padding: 4 },
+  titleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  noteSummary: { textAlign: 'right', ...withFontFamily(typography.bodyMedium) },
+  noteTag: { textAlign: 'right', marginTop: 2, ...withFontFamily(typography.caption) },
+  // Visual glyph stays small; the Pressable is padded + hitSlop-extended to reach 48dp.
+  deleteBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   deleteIcon: { fontSize: 14 },
-  // Time label for timed notes — last JSX child → leftmost in row-reverse
+  // Time label for timed notes — sits between the title cell and the deleteButton.
   timeLabel: {
-    fontSize: 12,
-    fontWeight: '500',
     flexShrink: 0,
-  },
-  colorBar: {
-    width: 4,
-    alignSelf: 'stretch',
-    borderRadius: 2,
+    ...withFontFamily(typography.caption),
   },
 });

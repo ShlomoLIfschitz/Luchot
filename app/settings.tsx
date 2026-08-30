@@ -2,14 +2,17 @@
 // Phase 3.7a-2 — Settings relocated from app/(tabs)/settings.tsx to a
 // standalone screen accessible only via the hamburger drawer.
 //
-// Changes from the old tab-based version:
-//   - Dead toggles removed: showHebrew, showGregorian
-//   - Icon background squares removed; plain lucide icons used instead
-//   - All hex color literals replaced with design tokens
-//   - PickerModal uses overlay.modal, radius.xl, colors.textInverse
-//   - ScreenHeader added with title "הגדרות" (hamburger + back context)
-//   - "עברית למעלה" toggle kept — field is live and will drive the
-//     universal date header in Phase 3.7c
+// Redesign (Wave — settings card restructure):
+//   - Fixed a real RTL bug: `rowStyles.right` used plain `flexDirection: 'row'`
+//     with JSX order [valueText, chevron], which placed the chevron BETWEEN
+//     the label and the value instead of at the outer (left) edge. Every row
+//     in this file now uses explicit `flexDirection: 'row-reverse'` with a
+//     single, deliberate JSX order — no more accidental two-pattern layout.
+//   - Sections regrouped: מראה / לוח שנה / מיקום וזמנים / התראות. Location is
+//     unified (see LocationProvider) — one "המיקום שלי" row drives both
+//     zmanim and candle-lighting reminders.
+//   - `use24hTime` is only ever changed via the `setUse24hTime` store action
+//     (never inline setState + save — see the use24hTime persistence bug).
 
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -25,6 +28,7 @@ import {
   Clock,
   MapPin,
   Bell,
+  Flame,
 } from 'lucide-react-native';
 import { useNotificationPermission } from '../src/hooks/useNotificationPermission';
 import { NotificationService } from '../src/services/NotificationService';
@@ -35,8 +39,10 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { radius } from '../src/constants/radius';
 import { overlay } from '../src/constants/overlay';
-import { findCityByKey } from '../src/constants/cities';
+import { typography, withFontFamily } from '../src/constants/typography';
 import { findNearestCity } from '../src/utils/locationLookup';
+import { Card } from '../src/components/ui/Card';
+import { SectionLabel } from '../src/components/ui/SectionLabel';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
@@ -90,67 +96,198 @@ function PickerModal({
 const pickerStyles = StyleSheet.create({
   overlay:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
   sheet:       { width: 280, borderRadius: radius.xl, padding: 22, elevation: 10 },
-  title:       { fontSize: 16, fontWeight: '700', marginBottom: 14, textAlign: 'right' },
+  title:       { ...withFontFamily(typography.cardTitle), marginBottom: 14, textAlign: 'right' },
   option:      { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 11 },
   radio: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 2,
     marginRight: 12, justifyContent: 'center', alignItems: 'center',
   },
   radioDot:    { width: 10, height: 10, borderRadius: 5 },
-  optionLabel: { flex: 1, fontSize: 15, textAlign: 'right' },
+  optionLabel: { flex: 1, ...withFontFamily(typography.bodyMedium), textAlign: 'right' },
 });
 
-// ─── Section Header ───────────────────────────────────────────────────────────
-
-function SectionHeader({ title, colors }: { title: string; colors: ThemeColors }) {
-  return (
-    <Text style={[sectionStyles.header, { color: colors.accent }]}>{title}</Text>
-  );
-}
-
-const sectionStyles = StyleSheet.create({
-  header: {
-    fontSize: 12, fontWeight: '700', letterSpacing: 0.8,
-    paddingHorizontal: 20, paddingTop: 28, paddingBottom: 8,
-    textAlign: 'right', textTransform: 'uppercase',
-  },
-});
-
-// ─── Setting Row ──────────────────────────────────────────────────────────────
-// Plain lucide icon — no iconBg colored squares (stale iOS pattern removed).
+// ─── Row primitives ───────────────────────────────────────────────────────────
 // IconComponent uses ComponentType<any> for the same reason as DrawerItem:
 // Lucide's SvgProps chain makes narrower types incompatible with propTypes.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IconComponent = React.ComponentType<any>;
 
+interface RowBaseProps {
+  isLast?: boolean;
+}
+
+/** Generic row: optional leading icon (far right / reading start), label,
+ *  then arbitrary trailing content (far left / reading end). Reading order,
+ *  explicit: [Icon, Label, Right] inside a `row-reverse` container — Icon
+ *  lands on the right, Right lands on the left. This is the single row
+ *  pattern used everywhere in this file; there is no second variant. */
 function SettingRow({
   Icon, label, right, onPress, colors, isLast = false,
+  accessibilityRole, accessibilityState, accessibilityLabel, accessibilityHint,
 }: {
-  Icon: IconComponent;
+  Icon?: IconComponent;
   label: string;
   right: React.ReactNode;
   onPress?: () => void;
   colors: ThemeColors;
-  isLast?: boolean;
-}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  accessibilityRole?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  accessibilityState?: any;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+} & RowBaseProps) {
   return (
     <Pressable
       onPress={onPress}
-      android_ripple={{ color: colors.border }}
+      android_ripple={onPress ? { color: colors.border } : undefined}
       style={[
         rowStyles.row,
         { backgroundColor: colors.surface },
         !isLast && {
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          borderBottomColor: colors.borderSubtle,
         },
       ]}
+      accessibilityRole={accessibilityRole ?? (onPress ? 'button' : undefined)}
+      accessibilityState={accessibilityState}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
     >
-      <Icon size={20} color={colors.textSecondary} />
+      {Icon && <Icon size={20} color={colors.textSecondary} />}
       <Text style={[rowStyles.label, { color: colors.textPrimary }]}>{label}</Text>
       <View style={rowStyles.right}>{right}</View>
     </Pressable>
+  );
+}
+
+/** Trailing [value, chevron] content — row-reverse, JSX order [value, chevron]
+ *  so value lands adjacent to the label and the chevron lands at the far
+ *  (left) edge of the whole row. */
+function ChevronValue({ value, colors }: { value: string; colors: ThemeColors }) {
+  return (
+    <>
+      <Text style={[styles.valueText, { color: colors.textSecondary }]}>{value}</Text>
+      <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+    </>
+  );
+}
+
+/** A full toggle row — the whole row is pressable (toggles the switch) and
+ *  the Switch itself is also directly interactive. */
+function ToggleRow({
+  Icon, label, value, onValueChange, colors, isLast = false, accessibilityLabel,
+}: {
+  Icon?: IconComponent;
+  label: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  colors: ThemeColors;
+  accessibilityLabel?: string;
+} & RowBaseProps) {
+  return (
+    <SettingRow
+      Icon={Icon}
+      label={label}
+      colors={colors}
+      isLast={isLast}
+      onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={accessibilityLabel ?? label}
+      right={
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: colors.border, true: colors.accent }}
+          thumbColor={colors.surface}
+        />
+      }
+    />
+  );
+}
+
+/** Non-interactive info row — a value with no chevron (nothing to navigate
+ *  to). Used for read-only diagnostic/status text. */
+function InfoRow({
+  Icon, label, value, colors, isLast = false,
+}: {
+  Icon?: IconComponent;
+  label: string;
+  value: string;
+  colors: ThemeColors;
+} & RowBaseProps) {
+  return (
+    <SettingRow
+      Icon={Icon}
+      label={label}
+      colors={colors}
+      isLast={isLast}
+      right={<Text style={[styles.valueText, { color: colors.textSecondary }]}>{value}</Text>}
+    />
+  );
+}
+
+/** Right-aligned caption note rendered OUTSIDE a card, directly below it. */
+function CardNote({ text, colors }: { text: string; colors: ThemeColors }) {
+  return (
+    <Text style={[styles.note, { color: colors.textTertiary }]}>{text}</Text>
+  );
+}
+
+/** Lead-time chip selector row — participates in Card's isLast injection
+ *  like every other row in this file. */
+function ChipsRow({
+  label, options, selected, onSelect, colors, isLast = false,
+}: {
+  label: string;
+  options: number[];
+  selected: number;
+  onSelect: (v: number) => void;
+  colors: ThemeColors;
+} & RowBaseProps) {
+  return (
+    <View
+      style={[
+        candleRowStyles.chipsRow,
+        { backgroundColor: colors.surface },
+        !isLast && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.borderSubtle,
+        },
+      ]}
+    >
+      <Text style={[candleRowStyles.chipsLabel, { color: colors.textPrimary }]}>{label}</Text>
+      <View style={candleRowStyles.chips}>
+        {options.map((min) => {
+          const isSelected = selected === min;
+          return (
+            <Pressable
+              key={min}
+              onPress={() => onSelect(min)}
+              style={[
+                candleRowStyles.chip,
+                { backgroundColor: isSelected ? colors.accent : colors.surfaceElevated },
+              ]}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`${min} דקות מראש`}
+            >
+              <Text
+                style={[
+                  candleRowStyles.chipText,
+                  { color: isSelected ? colors.textInverse : colors.textSecondary },
+                ]}
+              >
+                {min}′
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -159,8 +296,8 @@ const rowStyles = StyleSheet.create({
     flexDirection: 'row-reverse', alignItems: 'center',
     paddingVertical: 12, paddingHorizontal: 16, gap: 14, minHeight: 54,
   },
-  label: { flex: 1, fontSize: 15, textAlign: 'right' },
-  right: { flexDirection: 'row', alignItems: 'center' },
+  label: { flex: 1, ...withFontFamily(typography.bodyMedium), textAlign: 'right' },
+  right: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -181,7 +318,7 @@ export default function SettingsScreen() {
 
   const router = useRouter();
   const calendarSetDiaspora = useCalendarStore((s) => s.setDiaspora);
-  const { cityHebcalKey, latitude, longitude } = useLocationStore();
+  const { placeName, latitude, longitude } = useLocationStore();
 
   const permission = useNotificationPermission();
 
@@ -199,15 +336,14 @@ export default function SettingsScreen() {
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
 
-  // Derive current city name for display in the location row
-  const currentCityName = useMemo(() => {
-    if (cityHebcalKey) {
-      const entry = findCityByKey(cityHebcalKey);
-      if (entry) return entry.nameHe;
-    }
+  // Location is unified (LocationProvider) — placeName covers the curated-city
+  // and successfully-reverse-geocoded-GPS cases. A raw GPS fix with no name
+  // match falls back to the nearest curated city's name, same as before.
+  const currentLocationLabel = useMemo(() => {
+    if (placeName) return placeName;
     const { city } = findNearestCity(latitude, longitude);
     return city.nameHe;
-  }, [cityHebcalKey, latitude, longitude]);
+  }, [placeName, latitude, longitude]);
 
   const themeLabel =
     darkMode === 'system' ? 'לפי המכשיר' : darkMode === 'dark' ? 'כהה' : 'בהיר';
@@ -219,7 +355,10 @@ export default function SettingsScreen() {
     permission.isDenied ? 'חסום — פתח הגדרות' :
     'לא הופעל';
 
-  const trackColor = { false: colors.border, true: colors.accent };
+  const scheduledLabel =
+    scheduledCount === null ? '...' :
+    scheduledCount === 0 ? 'אין התראות' :
+    `${scheduledCount} מתוזמנות`;
 
   /**
    * Wave 1B — location is now unified (LocationProvider always has a
@@ -237,256 +376,128 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* ── מראה ── */}
-        <SectionHeader title="מראה" colors={colors} />
-        <View style={[styles.card, { borderColor: colors.border }]}>
+        <SectionLabel title="מראה" colors={colors} />
+        <Card colors={colors}>
           <SettingRow
             Icon={Moon}
             label="ערכת צבעים"
             colors={colors}
             onPress={() => setThemePicker(true)}
-            right={
-              <>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {themeLabel}
-                </Text>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-              </>
-            }
-            isLast
+            right={<ChevronValue value={themeLabel} colors={colors} />}
           />
-        </View>
+          <ToggleRow
+            Icon={Clock}
+            label="שעון 24 שעות"
+            value={use24hTime}
+            onValueChange={setUse24hTime}
+            colors={colors}
+          />
+        </Card>
 
         {/* ── לוח שנה ── */}
-        <SectionHeader title="לוח שנה" colors={colors} />
-        <View style={[styles.card, { borderColor: colors.border }]}>
-          <SettingRow
-            Icon={CalendarDays}
-            label="עברית למעלה"
-            colors={colors}
-            right={
-              <Switch
-                value={hebrewOnTop}
-                onValueChange={toggleHebrewOnTop}
-                trackColor={trackColor}
-              />
-            }
-          />
-          <SettingRow
-            Icon={Globe}
-            label="תפוצות (חגים)"
-            colors={colors}
-            right={
-              <Switch
-                value={diaspora}
-                onValueChange={(v) => {
-                  setSettingsDiaspora(v);
-                  calendarSetDiaspora(v);
-                }}
-                trackColor={trackColor}
-              />
-            }
-          />
+        <SectionLabel title="לוח שנה" colors={colors} />
+        <Card colors={colors}>
           <SettingRow
             Icon={CalendarDays}
             label="יום ראשון בשבוע"
             colors={colors}
             onPress={() => setFirstDayOfWeek(firstDayOfWeek === 0 ? 1 : 0)}
-            right={
-              <>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {firstDayOfWeek === 0 ? 'ראשון' : 'שני'}
-                </Text>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-              </>
-            }
-            isLast
+            right={<ChevronValue value={firstDayOfWeek === 0 ? 'ראשון' : 'שני'} colors={colors} />}
           />
-        </View>
+          <ToggleRow
+            Icon={Globe}
+            label="תפוצות (חגים)"
+            value={diaspora}
+            onValueChange={(v) => {
+              setSettingsDiaspora(v);
+              calendarSetDiaspora(v);
+            }}
+            colors={colors}
+          />
+          <ToggleRow
+            Icon={CalendarDays}
+            label="עברית למעלה"
+            value={hebrewOnTop}
+            onValueChange={toggleHebrewOnTop}
+            colors={colors}
+          />
+        </Card>
 
-        {/* ── זמנים ── */}
-        <SectionHeader title="זמנים" colors={colors} />
-        <View style={[styles.card, { borderColor: colors.border }]}>
+        {/* ── מיקום וזמנים ── */}
+        <SectionLabel title="מיקום וזמנים" colors={colors} />
+        <Card colors={colors}>
+          <SettingRow
+            Icon={MapPin}
+            label="המיקום שלי"
+            colors={colors}
+            onPress={() => router.push('/locationPicker' as any)}
+            right={<ChevronValue value={currentLocationLabel} colors={colors} />}
+          />
           <SettingRow
             Icon={Clock}
             label="שיטת חישוב"
             colors={colors}
             onPress={() => setZmanimPicker(true)}
-            right={
-              <>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {zmanimLabel}
-                </Text>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-              </>
-            }
+            right={<ChevronValue value={zmanimLabel} colors={colors} />}
           />
-          <SettingRow
-            Icon={Clock}
-            label="שעון 24 שעות"
-            colors={colors}
-            right={
-              <Switch
-                value={use24hTime}
-                onValueChange={setUse24hTime}
-                trackColor={trackColor}
-              />
-            }
-          />
-          <SettingRow
-            Icon={MapPin}
-            label="מיקום"
-            colors={colors}
-            onPress={() => router.push('/locationPicker' as any)}
-            right={
-              <>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {currentCityName}
-                </Text>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-              </>
-            }
-            isLast
-          />
-        </View>
+        </Card>
+        <CardNote
+          text="מיקום אחד משמש גם לחישוב הזמנים וגם להתראות הדלקת נרות"
+          colors={colors}
+        />
 
         {/* ── התראות ── */}
-        <SectionHeader title="התראות" colors={colors} />
-        <View style={[styles.card, { borderColor: colors.border }]}>
+        <SectionLabel title="התראות" colors={colors} />
+        <Card colors={colors}>
           <SettingRow
             Icon={Bell}
-            label="התראות"
+            label="הרשאת התראות"
             colors={colors}
             onPress={() => { void permission.request(); }}
-            right={
-              <>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {notificationLabel}
-                </Text>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-              </>
-            }
+            right={<ChevronValue value={notificationLabel} colors={colors} />}
           />
-          <SettingRow
-            Icon={Bell}
-            label={scheduledCount === null ? '...' : scheduledCount === 0 ? 'אין התראות מתוזמנות' : `${scheduledCount} התראות מתוזמנות`}
+          <InfoRow
+            label="התראות מתוזמנות"
+            value={scheduledLabel}
             colors={colors}
-            right={<View />}
           />
-          {/* Row A — Omer reminder toggle (always visible) */}
-          <Pressable
-            android_ripple={{ color: colors.border }}
-            onPress={() => setOmerRemindersEnabled(!omerRemindersEnabled)}
-            style={[
-              omerRowStyles.row,
-              { backgroundColor: colors.surface },
-              omerRemindersEnabled && {
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: colors.border,
-              },
-            ]}
-            accessibilityLabel="תזכורת ספירת העומר"
-            accessibilityRole="switch"
-            accessibilityState={{ checked: omerRemindersEnabled }}
-          >
-            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
-              תזכורת ספירת העומר
-            </Text>
-            <Switch
-              value={omerRemindersEnabled}
-              onValueChange={setOmerRemindersEnabled}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surface}
+          <ToggleRow
+            Icon={Flame}
+            label="התראות הדלקת נרות"
+            value={candleLightingRemindersEnabled}
+            onValueChange={handleCandleLightingToggle}
+            colors={colors}
+            accessibilityLabel="התראות הדלקת נרות"
+          />
+          {candleLightingRemindersEnabled && (
+            <ChipsRow
+              label="זמן מראש"
+              options={[5, 10, 15, 30]}
+              selected={candleLightingLeadMinutes}
+              onSelect={setCandleLightingLeadMinutes}
+              colors={colors}
             />
-          </Pressable>
-          {/* Row B — Time picker (only when Omer reminders are enabled) */}
+          )}
+          <ToggleRow
+            Icon={Bell}
+            label="תזכורת ספירת העומר"
+            value={omerRemindersEnabled}
+            onValueChange={setOmerRemindersEnabled}
+            colors={colors}
+            accessibilityLabel="תזכורת ספירת העומר"
+          />
           {omerRemindersEnabled && (
-            <Pressable
-              android_ripple={{ color: colors.border }}
+            <SettingRow
+              label="זמן תזכורת"
+              colors={colors}
               onPress={openTimePicker}
-              style={[omerRowStyles.row, { backgroundColor: colors.surface }]}
-              accessibilityLabel={`זמן תזכורת: ${omerReminderTime}`}
               accessibilityRole="button"
               accessibilityHint="פתח בורר שעה"
-            >
-              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
-                זמן תזכורת
-              </Text>
-              <View style={omerRowStyles.right}>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {omerReminderTime}
-                </Text>
-              </View>
-            </Pressable>
-          )}
-        </View>
-
-        {/* ── הדלקת נרות ── */}
-        <SectionHeader title="הדלקת נרות" colors={colors} />
-        <View style={[styles.card, { borderColor: colors.border }]}>
-          {/* Row A — Toggle (always visible) */}
-          <Pressable
-            android_ripple={{ color: colors.border }}
-            onPress={() => handleCandleLightingToggle(!candleLightingRemindersEnabled)}
-            style={[
-              omerRowStyles.row,
-              { backgroundColor: colors.surface },
-              candleLightingRemindersEnabled && {
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: colors.border,
-              },
-            ]}
-            accessibilityLabel="התראות הדלקת נרות"
-            accessibilityRole="switch"
-            accessibilityState={{ checked: candleLightingRemindersEnabled }}
-          >
-            <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>
-              התראות הדלקת נרות
-            </Text>
-            <Switch
-              value={candleLightingRemindersEnabled}
-              onValueChange={handleCandleLightingToggle}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surface}
+              accessibilityLabel={`זמן תזכורת: ${omerReminderTime}`}
+              right={<ChevronValue value={omerReminderTime} colors={colors} />}
             />
-          </Pressable>
-
-          {/* Row B — Lead-time chips (only when enabled) */}
-          {candleLightingRemindersEnabled && (
-            <View
-              style={[
-                candleRowStyles.chipsRow,
-                { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-              ]}
-            >
-              <Text style={[candleRowStyles.chipsLabel, { color: colors.textPrimary }]}>זמן מראש</Text>
-              <View style={candleRowStyles.chips}>
-                {[5, 10, 15, 30].map((min) => {
-                  const selected = candleLightingLeadMinutes === min;
-                  return (
-                    <Pressable
-                      key={min}
-                      onPress={() => setCandleLightingLeadMinutes(min)}
-                      style={[
-                        candleRowStyles.chip,
-                        { backgroundColor: selected ? colors.accent : colors.surfaceElevated },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          candleRowStyles.chipText,
-                          { color: selected ? colors.textInverse : colors.textSecondary },
-                        ]}
-                      >
-                        {min}′
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
           )}
-        </View>
+        </Card>
 
       </ScrollView>
 
@@ -530,8 +541,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  valueText: { fontSize: 14 },
-  chevron:   { fontSize: 22, marginLeft: 2 },
+  valueText: { ...withFontFamily(typography.bodySmall) },
+  chevron:   { fontSize: 22 },
+  note: {
+    ...withFontFamily(typography.caption),
+    textAlign: 'right',
+    paddingHorizontal: 20,
+    paddingTop: 6,
+  },
 });
 
 // RTL chip row for the candle-lighting lead-time selector.
@@ -546,7 +563,7 @@ const candleRowStyles = StyleSheet.create({
   },
   chipsLabel: {
     flex: 1,
-    fontSize: 15,
+    ...withFontFamily(typography.bodyMedium),
     textAlign: 'right',
   },
   chips: {
@@ -556,32 +573,13 @@ const candleRowStyles = StyleSheet.create({
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: radius.full,
   },
   chipText: {
-    fontSize: 13,
+    ...withFontFamily(typography.bodySmall),
     fontWeight: '600',
-  },
-});
-
-// RTL rows for the Omer section — explicit row-reverse per project RTL rule.
-const omerRowStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 14,
-    minHeight: 48,
-  },
-  label: {
-    flex: 1,
-    fontSize: 17,
-    textAlign: 'right',
-  },
-  right: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
   },
 });

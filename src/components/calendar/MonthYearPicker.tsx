@@ -54,7 +54,9 @@ export function MonthYearPicker({ visible, currentYear, currentMonth, colors, on
                 </Pressable>
               </View>
 
-              {/* Months grid */}
+              {/* Months grid — row-reverse + wrap: Yoga/flexbox wraps to new rows
+                  top-to-bottom regardless of main-axis reversal, so each row
+                  simply fills right-to-left (ינואר lands top-right). */}
               <View style={pickerStyles.monthGrid}>
                 {MONTH_NAMES_HE.map((name, idx) => {
                   const isSelected = pickerYear === currentYear && idx + 1 === currentMonth;
@@ -95,9 +97,9 @@ const pickerStyles = StyleSheet.create({
   yearCenter: { alignItems: 'center' },
   yearGreg: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
   yearHebrew: { fontSize: 13, marginTop: 2, textAlign: 'center' },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  monthGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
   monthCell: {
-    width: '30%', paddingVertical: 12, borderRadius: 10,
+    width: '30%', paddingVertical: 12, borderRadius: radius.lg,
     alignItems: 'center', justifyContent: 'center',
     flexGrow: 1,
   },

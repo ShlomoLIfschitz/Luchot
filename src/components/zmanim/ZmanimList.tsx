@@ -4,6 +4,8 @@ import type { ZmanimResult } from '../../services/ZmanimService';
 import { formatZmanTime } from '../../services/ZmanimService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useSettingsStore } from '../../providers/SettingsProvider';
+import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
 
 interface Props {
   zmanim: ZmanimResult;
@@ -28,20 +30,22 @@ export function ZmanimList({ zmanim }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: colors.textTertiary }]}>זמנים</Text>
+      <Text style={[styles.title, { color: colors.accent }]}>זמנים</Text>
       {rows.map(([label, d]) => (
-        <View key={label} style={styles.row}>
-          <Text style={{ color: colors.textSecondary }}>{label}</Text>
-          <Text style={{ color: colors.textPrimary }}>{formatZmanTime(d, use24h)}</Text>
+        <View key={label} style={[styles.row, { borderBottomColor: colors.borderSubtle }]}>
+          {/* row-reverse, JSX order: label (flex:1, right) → time (left) */}
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+          <Text style={[styles.time, { color: colors.textPrimary }]}>{formatZmanTime(d, use24h)}</Text>
         </View>
       ))}
 
-      {/* Candle lighting — shown on Fridays only (candleLighting is null on other days) */}
+      {/* Candle lighting — shown on Fridays only (candleLighting is null on other days).
+          Highlighted with candleBg / candle text, matching ZmanimFullList. */}
       {zmanim.candleLighting && (
-        <View style={styles.row}>
-          <Text style={{ color: colors.textSecondary }}>הדלקת נרות</Text>
-          <View style={{ alignItems: 'flex-start' }}>
-            <Text style={{ color: colors.textPrimary }}>
+        <View style={[styles.row, { backgroundColor: colors.candleBg, borderBottomColor: colors.borderSubtle }]}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>הדלקת נרות</Text>
+          <View style={styles.candleValueBlock}>
+            <Text style={[styles.time, { color: colors.candle }]}>
               {formatZmanTime(zmanim.candleLighting, use24h)}
             </Text>
             {showOffsetHint && (
@@ -60,8 +64,19 @@ export function ZmanimList({ zmanim }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container:  { marginVertical: 12 },
-  title:      { fontSize: 11, fontWeight: '600', marginBottom: 8, textAlign: 'right' },
-  row:        { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: 4, gap: 12 },
-  offsetHint: { fontSize: 11, marginTop: 1, textAlign: 'right' },
+  container: { marginVertical: 12 },
+  title:     { ...withFontFamily(typography.captionBold), marginBottom: 8, textAlign: 'right' },
+  row: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: radius.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  label: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
+  time:  { ...withFontFamily(typography.bodyLarge), fontWeight: '700' },
+  candleValueBlock: { alignItems: 'flex-start' },
+  offsetHint: { ...withFontFamily(typography.micro), marginTop: 1, textAlign: 'right' },
 });

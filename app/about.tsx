@@ -15,7 +15,11 @@ import {
 import Constants from 'expo-constants';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
+import { Card } from '../src/components/ui/Card';
+import { SectionLabel } from '../src/components/ui/SectionLabel';
 import { radius } from '../src/constants/radius';
+import { typography, withFontFamily } from '../src/constants/typography';
+import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -94,41 +98,56 @@ export default function AboutScreen() {
         </View>
 
         {/* Credits */}
-        <Text style={[styles.sectionHeader, { color: colors.accent }]}>
-          קרדיטים
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {CREDITS.map((credit, idx) => (
-            <Pressable
-              key={credit.name}
-              onPress={credit.url ? () => Linking.openURL(credit.url!) : undefined}
-              android_ripple={{ color: colors.border }}
-              style={[
-                styles.creditRow,
-                idx !== CREDITS.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.creditContent}>
-                <Text style={[styles.creditName, { color: colors.textPrimary }]}>
-                  {credit.name}
-                </Text>
-                <Text style={[styles.creditDescription, { color: colors.textSecondary }]}>
-                  {credit.description}
-                </Text>
-              </View>
-              {credit.url && (
-                <Text style={[styles.creditLink, { color: colors.accent }]}>
-                  ↗
-                </Text>
-              )}
-            </Pressable>
+        <SectionLabel title="קרדיטים" colors={colors} />
+        <Card colors={colors}>
+          {CREDITS.map((credit) => (
+            <CreditRow key={credit.name} credit={credit} colors={colors} />
           ))}
-        </View>
+        </Card>
       </ScrollView>
     </View>
+  );
+}
+
+// ─── CreditRow ─────────────────────────────────────────────────────────────────
+
+function CreditRow({
+  credit,
+  colors,
+  isLast = false,
+}: {
+  credit: CreditItem;
+  colors: ThemeColors;
+  isLast?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={credit.url ? () => Linking.openURL(credit.url!) : undefined}
+      android_ripple={{ color: colors.border }}
+      style={[
+        styles.creditRow,
+        !isLast && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.borderSubtle,
+        },
+      ]}
+      accessibilityRole={credit.url ? 'link' : undefined}
+      accessibilityLabel={credit.name}
+    >
+      <View style={styles.creditContent}>
+        <Text style={[styles.creditName, { color: colors.textPrimary }]}>
+          {credit.name}
+        </Text>
+        <Text style={[styles.creditDescription, { color: colors.textSecondary }]}>
+          {credit.description}
+        </Text>
+      </View>
+      {credit.url && (
+        <Text style={[styles.creditLink, { color: colors.accent }]}>
+          ↗
+        </Text>
+      )}
+    </Pressable>
   );
 }
 
@@ -147,9 +166,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 8,
   },
-  appName:  { fontSize: 28, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
-  tagline:  { fontSize: 14, marginTop: 4, textAlign: 'center' },
-  version:  { fontSize: 12, marginTop: 12, textAlign: 'center' },
+  appName:  { ...withFontFamily(typography.displayMedium), letterSpacing: -0.5, textAlign: 'center' },
+  tagline:  { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
+  version:  { ...withFontFamily(typography.caption), marginTop: 12, textAlign: 'center' },
 
   card: {
     borderRadius: radius.lg,
@@ -158,20 +177,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardBody: {
-    fontSize: 14,
-    lineHeight: 22,
+    ...withFontFamily(typography.bodyMedium),
     textAlign: 'right',
     padding: 16,
-  },
-
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    paddingHorizontal: 4,
-    paddingBottom: 8,
-    textAlign: 'right',
   },
 
   creditRow: {
@@ -180,15 +188,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     gap: 12,
+    minHeight: 54,
   },
   creditContent: { flex: 1 },
   creditName: {
-    fontSize: 14,
+    ...withFontFamily(typography.bodySmall),
     fontWeight: '600',
     textAlign: 'right',
   },
   creditDescription: {
-    fontSize: 12,
+    ...withFontFamily(typography.caption),
     marginTop: 2,
     textAlign: 'right',
   },

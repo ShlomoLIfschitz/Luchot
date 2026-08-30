@@ -7,6 +7,7 @@ import React from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
 
 // DrawerIcon uses ComponentType<any> because Lucide icons extend SvgProps
 // whose size/strokeWidth accept string | number and color accepts
@@ -32,6 +33,9 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
       style={({ pressed }) => [
         styles.row,
         {
@@ -43,16 +47,18 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
         },
       ]}
     >
+      {/* icon — JSX-first = rightmost (row-reverse), the reading start */}
       <Icon
         size={22}
         color={active ? colors.accent : colors.textSecondary}
       />
+      {/* label — JSX-last = flex:1, fills toward the left */}
       <Text
         style={[
           styles.label,
           {
             color: active ? colors.accent : colors.textPrimary,
-            fontWeight: active ? '600' : '500',
+            fontWeight: active ? '700' : typography.bodyLarge.fontWeight,
           },
         ]}
       >
@@ -67,13 +73,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 16,
+    minHeight: 48,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: radius.md,
     marginVertical: 2,
   },
   label: {
-    fontSize: 15,
+    flex: 1,
     textAlign: 'right',
+    ...withFontFamily(typography.bodyLarge),
   },
 });

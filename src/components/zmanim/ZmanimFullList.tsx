@@ -11,6 +11,7 @@ import { formatZmanTime } from '../../services/ZmanimService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { radius } from '../../constants/radius';
+import { typography, withFontFamily } from '../../constants/typography';
 
 interface Props {
   zmanim: ZmanimResult;
@@ -27,9 +28,16 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
     time: Date | null;
     highlighted?: boolean;
   }) => (
-    <View style={[styles.row, highlighted && { backgroundColor: colors.candle + '15' }]}>
+    <View
+      style={[
+        styles.row,
+        { borderBottomColor: colors.borderSubtle },
+        highlighted && { backgroundColor: colors.candleBg },
+      ]}
+    >
+      {/* row-reverse, JSX order: label (flex:1, right) → time (left) */}
       <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.time, { color: colors.textPrimary }]}>
+      <Text style={[styles.time, { color: highlighted ? colors.candle : colors.textPrimary }]}>
         {formatZmanTime(time, use24h)}
       </Text>
     </View>
@@ -44,7 +52,7 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
   }) => {
     const graFocus = preferredMethod === 'GRA';
     return (
-      <View style={styles.row}>
+      <View style={[styles.row, { borderBottomColor: colors.borderSubtle }]}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
         <View style={styles.shitaTimes}>
           <View style={styles.shitaTime}>
@@ -76,7 +84,7 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
     <View style={styles.container}>
       {/* Friday-only: candle lighting prominent at top if present */}
       {zmanim.candleLighting && (
-        <View style={[styles.candleBanner, { backgroundColor: colors.candle + '20', borderColor: colors.candle }]}>
+        <View style={[styles.candleBanner, { backgroundColor: colors.candleBg, borderColor: colors.candle }]}>
           <Flame size={20} color={colors.candle} />
           <Text style={[styles.candleLabel, { color: colors.textPrimary }]}>הדלקת נרות</Text>
           {/* Wrap time + optional offset hint in a column so the hint sits
@@ -99,13 +107,13 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
       )}
 
       {/* Morning zmanim */}
-      <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>זמני בוקר</Text>
+      <Text style={[styles.sectionHeader, { color: colors.accent }]}>זמני בוקר</Text>
       <Row label="עלות השחר"  time={zmanim.alotHashachar} />
       <Row label="משיכיר"     time={zmanim.misheyakir} />
       <Row label="נץ החמה"    time={zmanim.netz} />
 
       {/* Shita-dependent — both schools side-by-side */}
-      <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>
+      <Text style={[styles.sectionHeader, { color: colors.accent }]}>
         סוף זמני קריאת שמע ותפילה
       </Text>
       <ShitaRow
@@ -120,21 +128,21 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
       />
 
       {/* Midday + mincha */}
-      <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>זמני יום</Text>
+      <Text style={[styles.sectionHeader, { color: colors.accent }]}>זמני יום</Text>
       <Row label="חצות"          time={zmanim.chatzot} />
       <Row label="מנחה גדולה"    time={zmanim.minchaGedola} />
       <Row label="מנחה קטנה"     time={zmanim.minchaKetana} />
       <Row label="פלג המנחה"     time={zmanim.plagHamincha} />
 
       {/* Evening */}
-      <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>זמני ערב</Text>
+      <Text style={[styles.sectionHeader, { color: colors.accent }]}>זמני ערב</Text>
       <Row label="שקיעה"          time={zmanim.shkia} />
       <Row label="צאת הכוכבים"   time={zmanim.tzeitHakochavim} />
       <Row label='צאת רבינו תם'  time={zmanim.tzeitRabbeinu} />
 
       {/* Saturday-only: havdalah prominent at bottom if present */}
       {zmanim.havdalah && (
-        <View style={[styles.havdalahBanner, { backgroundColor: colors.candle + '20', borderColor: colors.candle }]}>
+        <View style={[styles.havdalahBanner, { backgroundColor: colors.candleBg, borderColor: colors.candle }]}>
           <Text style={[styles.candleLabel, { color: colors.textPrimary }]}>הבדלה</Text>
           <Text style={[styles.candleTime, { color: colors.candle }]}>
             {formatZmanTime(zmanim.havdalah, use24h)}
@@ -149,27 +157,25 @@ const styles = StyleSheet.create({
   container: { paddingVertical: 8 },
 
   sectionHeader: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    ...withFontFamily(typography.captionBold),
     marginTop: 16,
     marginBottom: 8,
     textAlign: 'right',
   },
 
+  // row-reverse, JSX order: label (flex:1, right) → time (left). Hairline
+  // bottom separators + explicit gap keep label/time from ever touching.
   row: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: radius.md,
-    marginVertical: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,  // guarantees breathing room between label and time value
   },
-  label: { fontSize: 15, fontWeight: '500', flex: 1, textAlign: 'right' },
-  time:  { fontSize: 15, fontWeight: '600' },
+  label: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
+  time:  { ...withFontFamily(typography.bodyLarge), fontWeight: '700' },
   dimmed: { opacity: 0.5 },
 
   shitaTimes: { flexDirection: 'row', gap: 16, alignItems: 'flex-end' },

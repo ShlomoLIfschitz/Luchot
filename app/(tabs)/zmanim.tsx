@@ -7,21 +7,37 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { MapPin, Navigation } from 'lucide-react-native';
+import { MapPin, ChevronLeft, Navigation } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
+import type { ThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { useLocationStore } from '../../src/providers/LocationProvider';
+import type { LocationSource } from '../../src/providers/LocationProvider';
 import { ZmanimFullList } from '../../src/components/zmanim/ZmanimFullList';
 import { dateService, toHebrewNumeral, toHebrewYear } from '../../src/services/DateService';
 import type { ZmanimMethod } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
+import { typography, withFontFamily } from '../../src/constants/typography';
+import { elevation } from '../../src/constants/elevation';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
 import { swipeDirection } from '../../src/constants/layout';
 import { findCityByKey } from '../../src/constants/cities';
 import { findNearestCity } from '../../src/utils/locationLookup';
+
+/** Source badge visual config — labels + tokens per docs/DESIGN.md. */
+function sourceBadge(source: LocationSource, colors: ThemeColors) {
+  switch (source) {
+    case 'gps':
+      return { label: 'מיקום המכשיר', bg: colors.successBg, fg: colors.success, showIcon: true };
+    case 'manual':
+      return { label: 'נבחר ידנית', bg: colors.accentLight, fg: colors.accent, showIcon: false };
+    default:
+      return { label: 'ברירת מחדל', bg: colors.surfaceMuted, fg: colors.textTertiary, showIcon: false };
+  }
+}
 
 const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
   { value: 'GRA', label: 'גר״א' },
@@ -36,7 +52,7 @@ export default function ZmanimScreen() {
 
   const zmanim = useZmanim(selectedDate);
 
-  // Location chip data
+  // Location card data
   const { cityHebcalKey, latitude, longitude, source, placeName } = useLocationStore();
   const currentCityName = useMemo(() => {
     if (placeName) return placeName;
@@ -47,6 +63,7 @@ export default function ZmanimScreen() {
     const { city } = findNearestCity(latitude, longitude);
     return city.nameHe;
   }, [placeName, cityHebcalKey, latitude, longitude]);
+  const badge = useMemo(() => sourceBadge(source, colors), [source, colors]);
 
   // Date picker — Phase 4.4
   const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);
@@ -106,24 +123,33 @@ export default function ZmanimScreen() {
             </Text>
           </View>
 
-          {/* Location chip — tappable; opens picker; shows GPS indicator when
-              source is 'gps' so users can see when auto-detected. */}
+          {/* Location card — tappable; opens picker. Shows a source badge
+              (gps / manual / default) so users always know where the shown
+              zmanim are computed for. */}
           <Pressable
             onPress={() => router.push('/locationPicker' as any)}
-            style={[styles.locationRow, { backgroundColor: colors.surfaceElevated }]}
-            accessibilityLabel="שנה מיקום"
+            style={[styles.locationCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`מיקום נוכחי: ${currentCityName}, לחיצה לשינוי מיקום`}
           >
-            <MapPin size={16} color={colors.textSecondary} />
-            <Text style={[styles.locationText, { color: colors.textSecondary }]}>
-              {currentCityName}
-            </Text>
-            {source === 'gps' && (
-              <Navigation size={12} color={colors.textTertiary} />
-            )}
+            {/* row-reverse, JSX order: pin (right) → text block (flex:1) → chevron (left) */}
+            <MapPin size={20} color={colors.accent} />
+            <View style={styles.locationTextBlock}>
+              <Text style={[styles.locationName, { color: colors.textPrimary }]}>
+                {currentCityName}
+              </Text>
+              <View style={[styles.sourceBadge, { backgroundColor: badge.bg }]}>
+                {/* JSX order: text first (right) → glyph last (left) */}
+                <Text style={[styles.sourceBadgeText, { color: badge.fg }]}>{badge.label}</Text>
+                {badge.showIcon && <Navigation size={10} color={badge.fg} />}
+              </View>
+            </View>
+            <ChevronLeft size={18} color={colors.textTertiary} />
           </Pressable>
 
-          {/* Shita segmented control — selecting persists via SettingsProvider */}
-          <View style={styles.shitaSelector}>
+          {/* Shita segmented control — selecting persists via SettingsProvider.
+              Track = surfaceMuted pill; active segment = surface pill w/ elevation. */}
+          <View style={[styles.shitaTrack, { backgroundColor: colors.surfaceMuted }]}>
             {SHITA_OPTIONS.map(({ value, label }) => {
               const active = zmanimMethod === value;
               return (
@@ -131,16 +157,17 @@ export default function ZmanimScreen() {
                   key={value}
                   onPress={() => setZmanimMethod(value)}
                   style={[
-                    styles.shitaButton,
-                    {
-                      backgroundColor: active ? colors.accent : colors.surface,
-                      borderColor:     active ? colors.accent : colors.border,
-                    },
+                    styles.shitaSegment,
+                    active && [styles.shitaSegmentActive, { backgroundColor: colors.surface }],
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected: active }}
                 >
                   <Text style={[
-                    styles.shitaButtonText,
-                    { color: active ? colors.textInverse : colors.textPrimary },
+                    styles.shitaSegmentText,
+                    { color: active ? colors.textPrimary : colors.textSecondary },
+                    active && styles.shitaSegmentTextActive,
                   ]}>
                     {label}
                   </Text>
@@ -169,30 +196,49 @@ const styles = StyleSheet.create({
   hebrewDate: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' },
   gregDate:   { fontSize: 14, marginTop: 4, textAlign: 'center' },
 
-  // Location
-  locationRow: {
+  // Location card — row-reverse: pin (right) → text block (flex:1) → chevron (left)
+  locationCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
+    gap: 12,
+    paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 16,
+    minHeight: 48,
+  },
+  locationTextBlock: { flex: 1, gap: 4 },
+  locationName: { ...withFontFamily(typography.cardTitle), textAlign: 'right' },
+  // Source badge pill — right-aligned under the location name (column parent,
+  // so alignSelf controls horizontal position).
+  sourceBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  sourceBadgeText: { ...withFontFamily(typography.micro), fontWeight: '700' },
+
+  // Shita selector — surfaceMuted track, surface pill for the active segment.
+  shitaTrack: {
+    flexDirection: 'row-reverse',
+    borderRadius: radius.full,
+    padding: 3,
     marginBottom: 16,
   },
-  locationText: { fontSize: 14, fontWeight: '500', flex: 1 },
-
-  // Shita selector
-  shitaSelector: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-    marginBottom: 8,
-  },
-  shitaButton: {
+  shitaSegment: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    paddingVertical: 13, // combined with typography.bodyMedium lineHeight → ≥48dp touch target
+    borderRadius: radius.full,
     alignItems: 'center',
   },
-  shitaButtonText: { fontSize: 14, fontWeight: '600' },
+  shitaSegmentActive: {
+    ...elevation.sm,
+  },
+  shitaSegmentText: { ...withFontFamily(typography.bodyMedium) },
+  shitaSegmentTextActive: { fontWeight: '700' },
 });

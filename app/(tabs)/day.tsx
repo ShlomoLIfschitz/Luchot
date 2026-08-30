@@ -21,10 +21,12 @@ import {
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
+import { BookOpenText } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { useLocationStore } from '../../src/providers/LocationProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
+import type { ThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
 import { useNotes, type CalendarNote } from '../../src/hooks/useNotes';
 import { ZmanimList } from '../../src/components/zmanim/ZmanimList';
@@ -38,12 +40,29 @@ import {
   type DayData,
 } from '../../src/services/DateService';
 import { radius } from '../../src/constants/radius';
+import { typography, withFontFamily } from '../../src/constants/typography';
 import { findNearestCity } from '../../src/utils/locationLookup';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
 import { swipeDirection } from '../../src/constants/layout';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
+
+// Hourly-grid event block color: mirrors NoteList's colorId/noteType → tag
+// token mapping (that helper is local/unexported to NoteList.tsx, which is
+// out of this file's ownership, so it is intentionally re-derived here
+// rather than imported). Only the two tokens that already back real note
+// categories in colors.ts are used — birthday/yahrzeit/anniversary read as
+// "personal", plain notes as "event".
+type CategoryColorKey = 'tagEvent' | 'tagPersonal';
+const CATEGORY_TOKENS: Record<CategoryColorKey, { fg: keyof ThemeColors; bg: keyof ThemeColors }> = {
+  tagEvent: { fg: 'tagEvent', bg: 'tagEventBg' },
+  tagPersonal: { fg: 'tagPersonal', bg: 'tagPersonalBg' },
+};
+function resolveNoteCategoryKey(note: CalendarNote): CategoryColorKey {
+  if (note.colorId === 'tagPersonal' || note.colorId === 'tagEvent') return note.colorId;
+  return note.noteType === 'note' ? 'tagEvent' : 'tagPersonal';
+}
 
 export default function DayScreen() {
   const colors = useThemeColors();
@@ -169,6 +188,14 @@ export default function DayScreen() {
   const isHoliday = dayData.isYomTov || dayData.holidays.length > 0;
   const primaryHoliday = dayData.holidays[0];
 
+  // Parasha card — shown Friday (upcomingParasha, the coming Shabbat's
+  // reading) and Saturday (parasha, unchanged existing field). undefined on
+  // both fields (e.g. a Yom Tov week with a special holiday reading instead
+  // of a regular parasha) renders nothing — no empty card.
+  const dayOfWeek = selectedDate.getDay(); // 5 = Friday, 6 = Saturday
+  const parashaCardName =
+    dayOfWeek === 6 ? dayData.parasha : dayOfWeek === 5 ? dayData.upcomingParasha : undefined;
+
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -254,33 +281,43 @@ export default function DayScreen() {
                     const hourNotes = notesByHour[hour] ?? [];
 
                     return (
-                      <View key={hour} style={styles.hourRow}>
-                        <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
-                          {hourLabel}
-                        </Text>
-                        <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
+                      // RTL fix: explicit row-reverse (not plain 'row') — with
+                      // row-reverse the FIRST JSX child lands RIGHT, so the
+                      // gutter (hourLabel, last child) lands LEFT and the
+                      // event content (first child) fills the reading-start
+                      // side, matching detailRow's convention above.
+                      <View key={hour} style={[styles.hourRow, { borderTopColor: colors.borderSubtle }]}>
                         <View style={styles.hourContent}>
                           {hourNotes.map((note) => {
                             const startDate = new Date(note.startDateTime!);
                             const timeStr = formatHM(startDate);
+                            const catKey = resolveNoteCategoryKey(note);
+                            const catTokens = CATEGORY_TOKENS[catKey];
                             return (
                               <Pressable
                                 key={note.id}
                                 onPress={() => openGridNoteEditor(note)}
                                 style={[
                                   styles.hourNote,
-                                  { backgroundColor: colors.accentLight },
+                                  { backgroundColor: colors[catTokens.bg] },
                                 ]}
                                 accessibilityRole="button"
                                 accessibilityLabel={`${note.summary}, ${timeStr}`}
                               >
-                                <Text style={[styles.hourNoteText, { color: colors.accent }]}>
-                                  {timeStr} {note.summary}
+                                <Text style={[styles.hourNoteTitle, { color: colors[catTokens.fg] }]}>
+                                  {note.summary}
+                                </Text>
+                                <Text style={[styles.hourNoteTime, { color: colors[catTokens.fg] }]}>
+                                  {timeStr}
                                 </Text>
                               </Pressable>
                             );
                           })}
                         </View>
+                        <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
+                        <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
+                          {hourLabel}
+                        </Text>
                       </View>
                     );
                   })}
@@ -291,6 +328,12 @@ export default function DayScreen() {
               // Keeps: ShabbatCard, holiday banner, Torah details, ZmanimList.
               // Hourly schedule removed (C2 — moved to events tab).
               <>
+                {/* Parasha card — Friday (upcoming Shabbat) + Saturday (current Shabbat).
+                    Renders nothing when neither field is available (e.g. a Yom Tov week). */}
+                {parashaCardName && (
+                  <ParashaCard colors={colors} label="פרשת השבוע" name={parashaCardName} />
+                )}
+
                 {/* Shabbat Card — returns null on non-Fri/Sat days */}
                 <ShabbatCard
                   selectedDate={selectedDate}
@@ -391,6 +434,27 @@ export default function DayScreen() {
 
 // ─── Subcomponents ─────────────────────────────────────────────────────────────
 
+function ParashaCard({
+  colors,
+  label,
+  name,
+}: {
+  colors: ThemeColors;
+  label: string;
+  name: string;
+}) {
+  return (
+    <View style={[styles.parashaCard, { backgroundColor: colors.tagShabbatBg }]}>
+      {/* row-reverse, JSX order: text block first (right, flex:1) → icon last (left) */}
+      <View style={styles.parashaTextBlock}>
+        <Text style={[styles.parashaCaption, { color: colors.tagShabbat }]}>{label}</Text>
+        <Text style={[styles.parashaName, { color: colors.tagShabbat }]}>{name}</Text>
+      </View>
+      <BookOpenText size={22} color={colors.tagShabbat} />
+    </View>
+  );
+}
+
 function DetailRow({
   label,
   value,
@@ -477,31 +541,49 @@ const styles = StyleSheet.create({
   },
   noteText: { fontSize: 14, fontWeight: '500', textAlign: 'right' },
 
-  // Hourly schedule
+  // Hourly schedule — explicit row-reverse (locked RTL convention): first
+  // JSX child (event content) lands right, last child (hourLabel) lands
+  // left as the fixed time gutter. Rows separated by a top hairline.
   hourRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'flex-start',
-    minHeight: 36,
-    paddingVertical: 4,
+    minHeight: 40,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   hourLabel: {
-    width: 50,
-    fontSize: 12,
-    fontWeight: '500',
+    width: 38,
+    ...withFontFamily(typography.micro),
     paddingTop: 4,
+    textAlign: 'left',
   },
   hourDivider: {
     width: 1,
     alignSelf: 'stretch',
-    marginHorizontal: 12,
+    marginHorizontal: 10,
   },
-  hourContent: { flex: 1, gap: 4 },
+  hourContent: { flex: 1, gap: 6 },
+  // Filled, rounded event block — background/foreground colors come from the
+  // note's resolved category token (CATEGORY_TOKENS), applied inline.
   hourNote: {
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 10,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
-  hourNoteText: { fontSize: 13, fontWeight: '500', textAlign: 'right' },
+  hourNoteTitle: { ...withFontFamily(typography.bodySmall), fontWeight: '700', textAlign: 'right' },
+  hourNoteTime: { ...withFontFamily(typography.micro), textAlign: 'right', marginTop: 2, opacity: 0.75 },
+
+  // Parasha card (Friday: upcoming Shabbat / Saturday: current Shabbat)
+  parashaCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: 14,
+    marginBottom: 16,
+  },
+  parashaTextBlock: { flex: 1, gap: 2 },
+  parashaCaption: { ...withFontFamily(typography.caption), textAlign: 'right' },
+  parashaName: { ...withFontFamily(typography.displaySmall), textAlign: 'right' },
 
   // Tab bar (sticky header)
   tabBar: {

@@ -7,9 +7,14 @@ import {
   ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { MapPin, Pencil, Trash2, Share2, Cake, Flame, Gem, FileText, type LucideIcon } from 'lucide-react-native';
+import {
+  MapPin, Pencil, Trash2, Share2, Cake, Flame, Gem, FileText,
+  Clock, Bell, CalendarDays, Sun, CalendarRange,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { radius } from '../../constants/radius';
 import { overlay } from '../../constants/overlay';
+import { typography, withFontFamily } from '../../constants/typography';
 import type { ThemeColors } from '../../hooks/useThemeColors';
 import type { NoteType, CalendarNote } from '../../hooks/useNotes';
 import type { HebrewDateInfo } from '../../services/DateService';
@@ -106,15 +111,24 @@ function ColorPickerRow({ noteType, colorId, onChange, colors }: ColorPickerRowP
       <Text style={[cpStyles.label, { color: colors.textTertiary }]}>צבע</Text>
       <View style={cpStyles.circles}>
         {COLOR_OPTIONS.map((key) => {
-          const hexColor = (colors as Record<string, string>)[key] ?? '#888';
+          const hexColor = (colors as Record<string, string>)[key] ?? colors.textTertiary;
           const isSelected = key === effectiveKey;
           return (
             <Pressable
               key={key}
               onPress={() => onChange(key)}
-              style={[cpStyles.circle, { backgroundColor: hexColor }]}
+              accessibilityRole="button"
+              accessibilityLabel={key}
+              accessibilityState={{ selected: isSelected }}
+              hitSlop={4}
+              style={[
+                cpStyles.circleRing,
+                { borderColor: isSelected ? colors.textPrimary : 'transparent' },
+              ]}
             >
-              {isSelected && <Text style={cpStyles.checkmark}>✓</Text>}
+              <View style={[cpStyles.circle, { backgroundColor: hexColor }]}>
+                {isSelected && <Text style={[cpStyles.checkmark, { color: colors.textInverse }]}>✓</Text>}
+              </View>
             </Pressable>
           );
         })}
@@ -122,6 +136,8 @@ function ColorPickerRow({ noteType, colorId, onChange, colors }: ColorPickerRowP
     </View>
   );
 }
+
+const CIRCLE_SIZE = 34;
 
 const cpStyles = StyleSheet.create({
   row: {
@@ -131,25 +147,30 @@ const cpStyles = StyleSheet.create({
     gap: 12,
   },
   label: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    ...withFontFamily(typography.captionBold),
   },
   circles: {
     flexDirection: 'row-reverse',
-    gap: 8,
+    gap: 6,
     flex: 1,
+    flexWrap: 'wrap',
     justifyContent: 'flex-start',
   },
+  // Ring drawn OUTSIDE the swatch (via padding), so selection never shrinks
+  // the colour itself — just adds a 2px ring around it.
+  circleRing: {
+    borderRadius: (CIRCLE_SIZE + 4 + 4) / 2,
+    borderWidth: 2,
+    padding: 2,
+  },
   circle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkmark: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -589,7 +610,7 @@ export function NoteEditor({
           <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
               <View style={[s.sheet, { backgroundColor: colors.surface }]}>
-                <View style={[s.handle, { backgroundColor: colors.border }]} />
+                <View style={[s.handle, { backgroundColor: colors.border }]} accessibilityElementsHidden importantForAccessibility="no" />
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
@@ -601,97 +622,126 @@ export function NoteEditor({
                     <View style={s.headerRow}>
                       {/* X button — JSX-last = leftmost */}
                       <Pressable
-                        hitSlop={8}
+                        hitSlop={12}
                         onPress={onClose}
                         accessibilityLabel="סגור"
                         accessibilityRole="button"
+                        style={s.closeBtnHit}
                       >
                         <Text style={[s.closeBtn, { color: colors.textTertiary }]}>✕</Text>
                       </Pressable>
                     </View>
 
-                    {/* summary */}
+                    {/* summary — the note's title, kept prominent above the field-group card */}
                     <Pressable style={s.viewField} onPress={() => enterEdit('summary')}>
-                      <Text style={[s.viewFieldValue, s.viewSummary, { color: colors.textPrimary }]}>
+                      <Text style={[s.viewSummary, { color: colors.textPrimary }]}>
                         {summary}
                       </Text>
                     </Pressable>
 
-                    {/* time (timed events only) */}
-                    {note && !note.isAllDay && note.startDateTime && (
-                      <Pressable style={[s.viewField, s.viewRow]} onPress={() => enterEdit(null)}>
-                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
-                          {formatHM(new Date(note.startDateTime), use24hTime)}
-                          {note.endDateTime ? ` — ${formatHM(new Date(note.endDateTime), use24hTime)}` : ''}
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    {/* note type */}
-                    {noteTypeInfo && (
-                      <Pressable style={[s.viewField, s.viewRow]} onPress={() => enterEdit(null)}>
-                        {(() => { const TypeIcon = TYPE_ICON[noteType]; return <TypeIcon size={20} color={colors.textSecondary} />; })()}
-                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
-                          {noteTypeInfo.label}
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    {/* location */}
-                    {!!location && (
-                      <Pressable style={[s.viewField, s.viewRow]} onPress={() => enterEdit('location')}>
-                        <MapPin size={14} color={colors.textTertiary} />
-                        <Text style={[s.viewFieldValue, { color: colors.textSecondary, flex: 1 }]}>
-                          {location}
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    {/* recurring anchor (view mode) — ONLY for yearly recurrence,
-                        keyed off the recurrence calendar (not noteType / calendarType).
-                        Bug fix: the old `isRecurring` gate both over-showed (non-yearly
-                        birthday/yahrzeit) and under-showed (yearly 'note'-type events). */}
-                    {recurrenceType === 'yearly' && recurrenceCalendar != null && (
-                      <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
-                        <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
-                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
-                          {recurrenceCalendar === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    {/* Slice B: multi-day end date (view mode) */}
-                    {note?.endDateStr && note?.gregorianDateStr && note.endDateStr > note.gregorianDateStr && (() => {
-                      const parts = note.endDateStr!.split('-').map(Number);
-                      const parsedEnd = new Date(parts[0], parts[1] - 1, parts[2]);
-                      const eh = dateService.getDayData(parsedEnd).hebrewDate;
-                      const ehYear = eh.year ?? (parsedEnd.getFullYear() + 3760);
-                      const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
-                      return (
-                        <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
-                          <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>עד תאריך</Text>
-                          <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>{endLabel}</Text>
+                    {/* Field-group card — metadata rows, each [icon, label(flex:1,right), value] */}
+                    <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      {/* time (timed events only) */}
+                      {note && !note.isAllDay && note.startDateTime && (
+                        <Pressable
+                          style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
+                          onPress={() => enterEdit(null)}
+                        >
+                          <Clock size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>שעה</Text>
+                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                            {formatHM(new Date(note.startDateTime), use24hTime)}
+                            {note.endDateTime ? ` — ${formatHM(new Date(note.endDateTime), use24hTime)}` : ''}
+                          </Text>
                         </Pressable>
-                      );
-                    })()}
+                      )}
 
-                    {/* reminder */}
-                    {note?.reminderMinutes != null && (
-                      <Pressable style={s.viewField} onPress={() => enterEdit(null)}>
-                        <Text style={[s.viewFieldLabel, { color: colors.textTertiary }]}>תזכורת</Text>
-                        <Text style={[s.viewFieldValue, { color: colors.textSecondary }]}>
-                          {note.reminderMinutes === 0
-                            ? 'בזמן האירוע'
-                            : note.reminderMinutes < 60
-                              ? `${note.reminderMinutes} דקות לפני`
-                              : note.reminderMinutes === 60
-                                ? 'שעה לפני'
-                                : note.reminderMinutes === 1440
-                                  ? 'יום לפני'
-                                  : `${note.reminderMinutes} דקות לפני`}
-                        </Text>
-                      </Pressable>
-                    )}
+                      {/* note type */}
+                      {noteTypeInfo && (
+                        <Pressable
+                          style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
+                          onPress={() => enterEdit(null)}
+                        >
+                          {(() => { const TypeIcon = TYPE_ICON[noteType]; return <TypeIcon size={18} color={colors.textTertiary} />; })()}
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>סוג</Text>
+                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                            {noteTypeInfo.label}
+                          </Text>
+                        </Pressable>
+                      )}
+
+                      {/* location */}
+                      {!!location && (
+                        <Pressable
+                          style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
+                          onPress={() => enterEdit('location')}
+                        >
+                          <MapPin size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>מיקום</Text>
+                          <Text style={[s.fieldValue, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
+                            {location}
+                          </Text>
+                        </Pressable>
+                      )}
+
+                      {/* recurring anchor (view mode) — ONLY for yearly recurrence,
+                          keyed off the recurrence calendar (not noteType / calendarType).
+                          Bug fix: the old `isRecurring` gate both over-showed (non-yearly
+                          birthday/yahrzeit) and under-showed (yearly 'note'-type events). */}
+                      {recurrenceType === 'yearly' && recurrenceCalendar != null && (
+                        <Pressable
+                          style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
+                          onPress={() => enterEdit(null)}
+                        >
+                          <CalendarDays size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>עוגן תאריך</Text>
+                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                            {recurrenceCalendar === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
+                          </Text>
+                        </Pressable>
+                      )}
+
+                      {/* Slice B: multi-day end date (view mode) */}
+                      {note?.endDateStr && note?.gregorianDateStr && note.endDateStr > note.gregorianDateStr && (() => {
+                        const parts = note.endDateStr!.split('-').map(Number);
+                        const parsedEnd = new Date(parts[0], parts[1] - 1, parts[2]);
+                        const eh = dateService.getDayData(parsedEnd).hebrewDate;
+                        const ehYear = eh.year ?? (parsedEnd.getFullYear() + 3760);
+                        const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
+                        return (
+                          <Pressable
+                            style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
+                            onPress={() => enterEdit(null)}
+                          >
+                            <CalendarDays size={18} color={colors.textTertiary} />
+                            <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>עד תאריך</Text>
+                            <Text style={[s.fieldValue, { color: colors.textPrimary }]}>{endLabel}</Text>
+                          </Pressable>
+                        );
+                      })()}
+
+                      {/* reminder */}
+                      {note?.reminderMinutes != null && (
+                        <Pressable
+                          style={[s.fieldRow, s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}
+                          onPress={() => enterEdit(null)}
+                        >
+                          <Bell size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>תזכורת</Text>
+                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                            {note.reminderMinutes === 0
+                              ? 'בזמן האירוע'
+                              : note.reminderMinutes < 60
+                                ? `${note.reminderMinutes} דקות לפני`
+                                : note.reminderMinutes === 60
+                                  ? 'שעה לפני'
+                                  : note.reminderMinutes === 1440
+                                    ? 'יום לפני'
+                                    : `${note.reminderMinutes} דקות לפני`}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
 
                     {/* bottom toolbar */}
                     <View style={[s.toolbar, { borderTopColor: colors.border }]}>
@@ -701,6 +751,7 @@ export function NoteEditor({
                         onPress={handleDeletePress}
                         accessibilityLabel="מחק הערה"
                         accessibilityRole="button"
+                        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
                       >
                         <Trash2 size={22} color={colors.textTertiary} />
                         <Text style={[s.toolbarLabel, { color: colors.textTertiary }]}>מחק</Text>
@@ -712,6 +763,7 @@ export function NoteEditor({
                         onPress={() => Alert.alert('שתף', 'בפיתוח')}
                         accessibilityLabel="שתף הערה"
                         accessibilityRole="button"
+                        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
                       >
                         <Share2 size={22} color={colors.textTertiary} />
                         <Text style={[s.toolbarLabel, { color: colors.textTertiary }]}>שתף</Text>
@@ -723,6 +775,7 @@ export function NoteEditor({
                         onPress={() => setIsViewMode(false)}
                         accessibilityLabel="ערוך הערה"
                         accessibilityRole="button"
+                        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
                       >
                         <Pencil size={22} color={colors.accent} />
                         <Text style={[s.toolbarLabel, { color: colors.accent }]}>עריכה</Text>
@@ -739,10 +792,11 @@ export function NoteEditor({
                       </Text>
                       {/* X button — JSX-last = leftmost */}
                       <Pressable
-                        hitSlop={8}
+                        hitSlop={12}
                         onPress={onClose}
                         accessibilityLabel="סגור"
                         accessibilityRole="button"
+                        style={s.closeBtnHit}
                       >
                         <Text style={[s.closeBtn, { color: colors.textTertiary }]}>✕</Text>
                       </Pressable>
@@ -761,7 +815,7 @@ export function NoteEditor({
                       maxLength={200}
                     />
 
-                    <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>סוג</Text>
+                    <Text style={[s.sectionLabel, { color: colors.accent }]}>סוג</Text>
                     <View style={s.typeRow}>
                       {NOTE_TYPES.map(({ type, label }) => {
                         const active = noteType === type;
@@ -770,14 +824,16 @@ export function NoteEditor({
                           <Pressable
                             key={type}
                             onPress={() => setNoteType(type)}
+                            accessibilityRole="button"
+                            accessibilityLabel={label}
+                            accessibilityState={{ selected: active }}
                             style={[
                               s.typeChip,
-                              { borderColor: colors.border, backgroundColor: colors.background },
-                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                              { backgroundColor: active ? colors.accent : colors.surfaceMuted },
                             ]}
                           >
-                            <Icon size={20} color={colors.textSecondary} />
-                            <Text style={[s.typeLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>{label}</Text>
+                            <Icon size={18} color={active ? colors.textInverse : colors.textSecondary} />
+                            <Text style={[s.typeLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>{label}</Text>
                           </Pressable>
                         );
                       })}
@@ -791,7 +847,7 @@ export function NoteEditor({
                     />
 
                     {/* C3 Task 1: Explicit recurrence picker — shown for ALL note types */}
-                    <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>חזרה</Text>
+                    <Text style={[s.sectionLabel, { color: colors.accent }]}>חזרה</Text>
                     <View style={s.recurrenceRow}>
                       {RECURRENCE_OPTIONS.map(({ label, value }) => {
                         const active = recurrenceType === value;
@@ -801,13 +857,13 @@ export function NoteEditor({
                             onPress={() => setRecurrenceType(value)}
                             style={[
                               s.recurrenceChip,
-                              { borderColor: colors.border, backgroundColor: colors.background },
-                              active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                              { backgroundColor: active ? colors.accent : colors.surfaceMuted },
                             ]}
                             accessibilityLabel={label}
                             accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
                           >
-                            <Text style={[s.recurrenceChipLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                            <Text style={[s.recurrenceChipLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>
                               {label}
                             </Text>
                           </Pressable>
@@ -818,7 +874,7 @@ export function NoteEditor({
                     {/* C3 Task 1: Calendar anchor chips — ONLY for yearly recurrence */}
                     {recurrenceType === 'yearly' && (
                       <>
-                        <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>עוגן תאריך</Text>
+                        <Text style={[s.sectionLabel, { color: colors.accent }]}>עוגן תאריך</Text>
                         <View style={s.anchorRow}>
                           {(['hebrew', 'gregorian'] as const).map((ct) => {
                             const active = recurrenceCalendar === ct;
@@ -828,13 +884,13 @@ export function NoteEditor({
                                 onPress={() => setRecurrenceCalendar(ct)}
                                 style={[
                                   s.anchorChip,
-                                  { borderColor: colors.border, backgroundColor: colors.background },
-                                  active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                                  { backgroundColor: active ? colors.accent : colors.surfaceMuted },
                                 ]}
                                 accessibilityLabel={ct === 'hebrew' ? 'לפי לוח עברי' : 'לפי לוח לועזי'}
                                 accessibilityRole="button"
+                                accessibilityState={{ selected: active }}
                               >
-                                <Text style={[s.anchorLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                                <Text style={[s.anchorLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>
                                   {ct === 'hebrew' ? 'לפי לוח עברי' : 'לפי לוח לועזי'}
                                 </Text>
                               </Pressable>
@@ -871,76 +927,75 @@ export function NoteEditor({
                       </Pressable>
                     </View>
 
-                    {/* ── All-day toggle ────────────────────────────────────── */}
-                    <View style={s.allDayRow}>
-                      {/* label — JSX-first = rightmost (row-reverse) */}
-                      <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
-                        כל היום
-                      </Text>
-                      {/* Switch — JSX-last = leftmost */}
-                      <Switch
-                        value={allDay}
-                        onValueChange={setAllDay}
-                        trackColor={{ false: colors.border, true: colors.accent }}
-                        accessibilityLabel="כל היום"
-                      />
-                    </View>
-
-                    {/* ── Slice B: Multi-day toggle (only for all-day non-recurring) ── */}
-                    {allDay && recurrenceType === 'none' && (
-                      <View style={s.allDayRow}>
-                        {/* label — JSX-first = rightmost (row-reverse) */}
-                        <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
-                          מרובה ימים
+                    {/* ── All-day / multi-day field-group card ────────────────── */}
+                    <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      {/* All-day toggle — [icon, label(flex:1,right), Switch] */}
+                      <View style={[s.fieldRow, !(allDay && recurrenceType === 'none') && s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}>
+                        <Sun size={18} color={colors.textTertiary} />
+                        <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>
+                          כל היום
                         </Text>
-                        {/* Switch — JSX-last = leftmost */}
                         <Switch
-                          value={multiDay}
-                          onValueChange={setMultiDay}
+                          value={allDay}
+                          onValueChange={setAllDay}
                           trackColor={{ false: colors.border, true: colors.accent }}
-                          accessibilityLabel="מרובה ימים"
+                          accessibilityLabel="כל היום"
                         />
                       </View>
-                    )}
 
-                    {/* ── Slice B: End-date chip (only when multiDay is on) ────── */}
-                    {multiDay && allDay && recurrenceType === 'none' && (() => {
-                      const eh = dateService.getDayData(endDate).hebrewDate;
-                      // getDayData always populates year for valid dates; the optional
-                      // in the type is a defensive remnant. Fall back to endDate's
-                      // Gregorian year + 3760 (approximate) only as a last resort.
-                      const ehYear = eh.year ?? (endDate.getFullYear() + 3760);
-                      const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
-                      return (
-                        <View style={s.timeFieldRow}>
-                          {/* label — JSX-first = rightmost (row-reverse) */}
-                          <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>עד תאריך</Text>
-                          {/* chip — JSX-last = leftmost */}
-                          <Pressable
-                            onPress={() => setEndPickerVisible(true)}
-                            style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-                            accessibilityLabel={`תאריך סיום: ${endLabel}`}
-                            accessibilityRole="button"
-                          >
-                            <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
-                              {endLabel}
-                            </Text>
-                          </Pressable>
+                      {/* Slice B: Multi-day toggle (only for all-day non-recurring) */}
+                      {allDay && recurrenceType === 'none' && (
+                        <View style={[s.fieldRow, !multiDay && s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}>
+                          <CalendarRange size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>
+                            מרובה ימים
+                          </Text>
+                          <Switch
+                            value={multiDay}
+                            onValueChange={setMultiDay}
+                            trackColor={{ false: colors.border, true: colors.accent }}
+                            accessibilityLabel="מרובה ימים"
+                          />
                         </View>
-                      );
-                    })()}
+                      )}
 
-                    {/* ── Time fields (only when allDay = false) ────────────── */}
+                      {/* Slice B: End-date chip (only when multiDay is on) */}
+                      {multiDay && allDay && recurrenceType === 'none' && (() => {
+                        const eh = dateService.getDayData(endDate).hebrewDate;
+                        // getDayData always populates year for valid dates; the optional
+                        // in the type is a defensive remnant. Fall back to endDate's
+                        // Gregorian year + 3760 (approximate) only as a last resort.
+                        const ehYear = eh.year ?? (endDate.getFullYear() + 3760);
+                        const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
+                        return (
+                          <View style={[s.fieldRow, s.fieldRowLast]}>
+                            <CalendarDays size={18} color={colors.textTertiary} />
+                            <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>עד תאריך</Text>
+                            <Pressable
+                              onPress={() => setEndPickerVisible(true)}
+                              style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
+                              accessibilityLabel={`תאריך סיום: ${endLabel}`}
+                              accessibilityRole="button"
+                            >
+                              <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
+                                {endLabel}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        );
+                      })()}
+                    </View>
+
+                    {/* ── Time fields card (only when allDay = false) ─────────── */}
                     {!allDay && (
-                      <>
+                      <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
                         {/* Start time row */}
-                        <View style={s.timeFieldRow}>
-                          {/* label — JSX-first = rightmost */}
-                          <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>משעה</Text>
-                          {/* time value — JSX-last = leftmost */}
+                        <View style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}>
+                          <Clock size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>משעה</Text>
                           <Pressable
                             onPress={openStartPicker}
-                            style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                            style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
                             accessibilityLabel={`שעת התחלה: ${formatHM(startTime, use24hTime)}`}
                             accessibilityRole="button"
                           >
@@ -951,15 +1006,14 @@ export function NoteEditor({
                         </View>
 
                         {/* End time row */}
-                        <View style={s.timeFieldRow}>
-                          {/* label — JSX-first = rightmost */}
-                          <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>עד שעה</Text>
-                          {/* time value / add affordance — JSX-last = leftmost */}
+                        <View style={[s.fieldRow, s.fieldRowLast]}>
+                          <Clock size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>עד שעה</Text>
                           {endTime !== null ? (
                             <View style={s.endTimeGroup}>
                               <Pressable
                                 onPress={openEndPicker}
-                                style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                                style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
                                 accessibilityLabel={`שעת סיום: ${formatHM(endTime, use24hTime)}`}
                                 accessibilityRole="button"
                               >
@@ -970,7 +1024,8 @@ export function NoteEditor({
                               {/* Clear end time */}
                               <Pressable
                                 onPress={() => setEndTime(null)}
-                                hitSlop={10}
+                                hitSlop={14}
+                                style={s.clearEndTimeHit}
                                 accessibilityLabel="הסר שעת סיום"
                                 accessibilityRole="button"
                               >
@@ -988,39 +1043,41 @@ export function NoteEditor({
                             </Pressable>
                           )}
                         </View>
-                      </>
-                    )}
-
-                    {/* reminder toggle */}
-                    <View style={s.reminderToggleRow}>
-                      <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
-                        תזכּר אותי
-                      </Text>
-                      <Switch
-                        value={reminderEnabled}
-                        onValueChange={handleReminderToggle}
-                        trackColor={{ false: colors.border, true: colors.accent }}
-                      />
-                    </View>
-
-                    {/* Inline reminder time chip — shown only for all-day events with reminder on */}
-                    {allDay && reminderEnabled && (
-                      <View style={s.timeFieldRow}>
-                        {/* label — JSX-first = rightmost (row-reverse) */}
-                        <Text style={[s.timeFieldLabel, { color: colors.textTertiary }]}>שעת תזכורת</Text>
-                        {/* chip — JSX-last = leftmost */}
-                        <Pressable
-                          onPress={openReminderTimePicker}
-                          style={[s.timeChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`שעת תזכורת: ${formatHM(reminderTime, use24hTime)}`}
-                        >
-                          <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
-                            {formatHM(reminderTime, use24hTime)}
-                          </Text>
-                        </Pressable>
                       </View>
                     )}
+
+                    {/* ── Reminder field-group card ────────────────────────────── */}
+                    <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <View style={[s.fieldRow, !(allDay && reminderEnabled) && s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}>
+                        <Bell size={18} color={colors.textTertiary} />
+                        <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>
+                          תזכּר אותי
+                        </Text>
+                        <Switch
+                          value={reminderEnabled}
+                          onValueChange={handleReminderToggle}
+                          trackColor={{ false: colors.border, true: colors.accent }}
+                        />
+                      </View>
+
+                      {/* Inline reminder time chip — shown only for all-day events with reminder on */}
+                      {allDay && reminderEnabled && (
+                        <View style={[s.fieldRow, s.fieldRowLast]}>
+                          <Clock size={18} color={colors.textTertiary} />
+                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>שעת תזכורת</Text>
+                          <Pressable
+                            onPress={openReminderTimePicker}
+                            style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`שעת תזכורת: ${formatHM(reminderTime, use24hTime)}`}
+                          >
+                            <Text style={[s.timeChipText, { color: colors.textPrimary }]}>
+                              {formatHM(reminderTime, use24hTime)}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
 
                     {reminderEnabled && (
                       <>
@@ -1040,13 +1097,15 @@ export function NoteEditor({
                                     setReminderMinutes(minutes);
                                   }
                                 }}
+                                accessibilityRole="button"
+                                accessibilityLabel={label}
+                                accessibilityState={{ selected: active }}
                                 style={[
                                   s.leadChip,
-                                  { borderColor: colors.border, backgroundColor: colors.background },
-                                  active && { backgroundColor: colors.accent, borderColor: colors.accent },
+                                  { backgroundColor: active ? colors.accent : colors.surfaceMuted },
                                 ]}
                               >
-                                <Text style={[s.leadChipLabel, { color: active ? colors.textInverse : colors.textPrimary }]}>
+                                <Text style={[s.leadChipLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>
                                   {label}
                                 </Text>
                               </Pressable>
@@ -1055,7 +1114,7 @@ export function NoteEditor({
                         </View>
                         {reminderMinutes === -1 && (
                           <View style={s.customRow}>
-                            <Text style={[s.sectionLabel, { color: colors.textTertiary, marginBottom: 0 }]}>
+                            <Text style={[s.sectionLabel, { color: colors.accent, marginBottom: 0 }]}>
                               דקות לפני:
                             </Text>
                             <TextInput
@@ -1070,12 +1129,23 @@ export function NoteEditor({
                       </>
                     )}
 
+                    {/* Footer — row-reverse, [Save, Cancel] so Save (primary) sits on the RIGHT */}
                     <View style={s.actions}>
-                      <Pressable onPress={onClose} style={[s.btn, { borderColor: colors.border }]}>
-                        <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
+                      <Pressable
+                        onPress={handleSave}
+                        style={[s.btn, { backgroundColor: colors.accent }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="שמירה"
+                      >
+                        <Text style={[s.btnText, { color: colors.textInverse }]}>שמירה</Text>
                       </Pressable>
-                      <Pressable onPress={handleSave} style={[s.btn, s.btnSave, { backgroundColor: colors.accent }]}>
-                        <Text style={[s.btnText, { color: colors.textInverse }]}>שמור</Text>
+                      <Pressable
+                        onPress={onClose}
+                        style={[s.btn, { backgroundColor: colors.surfaceMuted }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="ביטול"
+                      >
+                        <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
                       </Pressable>
                     </View>
                   </>
@@ -1091,19 +1161,30 @@ export function NoteEditor({
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36, maxHeight: '85%' },
-  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  handle: { width: 38, height: 4, borderRadius: radius.full, alignSelf: 'center', marginBottom: 16 },
   headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
-  title: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'right' },
-  closeBtn: { fontSize: 18, fontWeight: '600', padding: 4 },
+  title: { flex: 1, textAlign: 'right', ...withFontFamily(typography.displaySmall) },
+  closeBtn: { fontSize: 20, fontWeight: '600' },
+  // Visual size stays modest; the Pressable itself is padded to reach the 48dp target.
+  closeBtnHit: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   input: {
-    borderWidth: 1, borderRadius: 10, padding: 12,
-    fontSize: 15, minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
+    borderWidth: 1, borderRadius: radius.md, padding: 12,
+    minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
+    ...withFontFamily(typography.bodyMedium),
   },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textAlign: 'right', marginBottom: 8 },
-  typeRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
-  typeChip: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center', gap: 3 },
-  typeLabel: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
-  // C3: recurrence chip row — wraps if needed (row-reverse + flexWrap)
+  sectionLabel: {
+    textAlign: 'right', marginBottom: 8,
+    ...withFontFamily(typography.captionBold),
+  },
+  // Chip rows (type / recurrence / anchor / lead-time): row-reverse + flexWrap so the
+  // FIRST option lands at the right. Active = accent fill + inverse bold; inactive =
+  // surfaceMuted + textSecondary. Fully rounded pills.
+  typeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  typeChip: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 6,
+    borderRadius: radius.full, paddingVertical: 9, paddingHorizontal: 14,
+  },
+  typeLabel: { ...withFontFamily(typography.bodySmall) },
   recurrenceRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
@@ -1111,75 +1192,70 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   recurrenceChip: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    borderRadius: radius.full,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
   recurrenceChipLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    ...withFontFamily(typography.bodySmall),
   },
   // Calendar anchor chips (shown only for yearly)
-  anchorRow: { gap: 8, marginBottom: 16 },
-  anchorChip: { borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
-  anchorLabel: { fontSize: 13, textAlign: 'center' },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  btn: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
-  btnSave: { borderWidth: 0 },
-  btnText: { fontSize: 15, fontWeight: '600' },
-  // All-day toggle (matches reminderToggleRow style)
-  allDayRow: {
+  anchorRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  anchorChip: { borderRadius: radius.full, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' },
+  anchorLabel: { textAlign: 'center', ...withFontFamily(typography.bodySmall) },
+  // Footer — row-reverse, [Save, Cancel] JSX order puts Save on the RIGHT.
+  actions: { flexDirection: 'row-reverse', gap: 10, marginTop: 4 },
+  btn: { flex: 1, minHeight: 48, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  btnText: { ...withFontFamily(typography.bodyLarge) },
+  // Field-group card — used for view-mode metadata and edit-mode toggle groups.
+  // Rows are separated by hairlines; the card itself clips to radius.lg.
+  fieldGroup: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  fieldRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'flex-start',
     gap: 10,
-    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  // Time fields (only shown when allDay = false)
-  timeFieldRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 10,
-    marginBottom: 10,
+  fieldRowLast: {
+    borderBottomWidth: 0,
   },
-  timeFieldLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  fieldLabel: {
     textAlign: 'right',
-    minWidth: 50,
+    ...withFontFamily(typography.bodyMedium),
+  },
+  fieldValue: {
+    textAlign: 'right',
+    ...withFontFamily(typography.bodyMedium),
   },
   timeChip: {
-    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     paddingVertical: 7,
     paddingHorizontal: 12,
   },
   timeChipAdd: {
+    borderWidth: StyleSheet.hairlineWidth,
     // No background fill for the "הוסף" affordance — it reads as a ghost button.
   },
   timeChipText: {
-    fontSize: 14,
-    fontWeight: '500',
+    ...withFontFamily(typography.bodySmall),
   },
   endTimeGroup: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
   },
   clearEndTime: {
     fontSize: 14,
-    padding: 4,
   },
-  reminderToggleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 10,
-    marginBottom: 10,
-  },
+  // The visual glyph stays small; the Pressable is padded to reach 48dp with hitSlop.
+  clearEndTimeHit: { minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center' },
   leadTimeRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
@@ -1187,14 +1263,12 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   leadChip: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    borderRadius: radius.full,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
   leadChipLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    ...withFontFamily(typography.bodySmall),
   },
   customRow: {
     flexDirection: 'row-reverse',
@@ -1204,37 +1278,36 @@ const s = StyleSheet.create({
   },
   customInput: {
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: radius.md,
     padding: 8,
     width: 70,
-    fontSize: 14,
     textAlign: 'center',
+    ...withFontFamily(typography.bodyMedium),
   },
-  // toolbar (view mode)
+  // toolbar (view mode) — each button is padded + hitSlop-extended to reach ≥48dp.
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 32,
+    gap: 24,
     paddingTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   toolbarBtn: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    minWidth: 48,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   toolbarLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    ...withFontFamily(typography.caption),
   },
-  // view-mode read-only fields
+  // view-mode: summary kept prominent above the field-group card
   viewField: { marginBottom: 12 },
-  viewRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  viewSummary: { fontSize: 18, fontWeight: '600' },
-  viewFieldLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textAlign: 'right', marginBottom: 2 },
-  viewFieldValue: { fontSize: 15, textAlign: 'right' },
+  viewSummary: { textAlign: 'right', ...withFontFamily(typography.displaySmall) },
   // location field (edit mode)
   locationRow: {
     flexDirection: 'row-reverse',
@@ -1245,10 +1318,10 @@ const s = StyleSheet.create({
   locationInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: radius.md,
     padding: 10,
-    fontSize: 14,
     textAlign: 'right',
+    ...withFontFamily(typography.bodySmall),
   },
-  gpsBtn: { padding: 8 },
+  gpsBtn: { padding: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });
