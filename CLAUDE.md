@@ -73,7 +73,9 @@ Sub-agents live in `~/.claude/agents/` (global). For **this project**, the activ
 | `local-data-builder` | ✅ Active | `src/services/` (data access), `src/providers/` (Zustand stores), `src/schemas/`, data hooks |
 | `database-architect` | ✅ Active | SQLite schema definitions, migration/upgrade logic, `docs/SCHEMA.md` |
 | `test-engineer` | 💤 Dormant | `tests/`, `*.test.*` — **not active yet.** Activate only when the user decides to start writing tests (ROADMAP Phase 5+). Until then, do not invoke. |
-| `security-auditor` | 💤 Dormant | READ-ONLY. Profile: `mobile-local-only`. Low priority (no network attack surface). Invoke only for AsyncStorage hygiene / privacy review when explicitly asked. |
+| `security-auditor` | 🟡 On-trigger | READ-ONLY. Profile: `mobile-local-only`. Not a routine gate, but **auto-invoke** when a task adds a new OS permission, a new network call, or a new data export/import path — the three things that can actually change this app's privacy posture. Otherwise only on request. |
+
+> **Everything else in the generic template roster is deliberately NOT active here** — `automation-engineer`, `notification-engineer`, `localization-engineer`, `content-manager`, `data-export-engineer`, `devops-engineer`, `analytics-engineer`, `error-monitoring-engineer`, `onboarding-engineer`, `performance-engineer`, `documentation-engineer`, `merge-coordinator`. Their concerns are folded into the three active builders (e.g. notifications and .ics export live in `local-data-builder`; Hebrew/RTL and copy live in `mobile-ui-builder`). This is a recorded choice, not an oversight — do not silently start dispatching them.
 
 > *`app.json` and `eas.json` are sensitive (see Do-Not list). `mobile-ui-builder` may READ them but must ask the user before any edit.*
 
@@ -135,6 +137,20 @@ If a sub-agent needs to modify a file outside its ownership, it must STOP and re
 
 ---
 
+### 🔀 Dispatching Agents in Parallel
+
+Parallel dispatch works well here and is worth using for large tasks — the 2026-08-30 redesign ran seven agents across disjoint file sets. It requires discipline:
+
+1. **Partition by FILE, never by concern.** Two agents both "doing RTL fixes" will collide; two agents owning disjoint file lists cannot. Give every agent an explicit ownership list AND an explicit do-NOT-touch list.
+2. **Enumerate every file.** Files assigned to nobody silently keep their defects — the redesign left `MonthYearPicker`, three picker hooks, `NoteList`'s header and `CandleIcon` unassigned, and they had to be swept up afterwards. Before dispatching, list every file the task could plausibly touch and confirm each has exactly one owner.
+3. **Freeze shared contracts up front.** When file A's owner consumes a type or prop interface from file B, state in *both* briefs that the interface is frozen (`NoteEditor.Props`, `ShabbatCard.Props`, existing `DayCell` props). Agents may ADD optional props; they may never remove or rename.
+4. **Sequence anything that blocks.** Design tokens, schemas, and shared types must land BEFORE their consumers start, or every downstream agent invents its own.
+5. **Expect cross-agent typecheck noise.** An agent running `tsc` mid-flight will see errors in files another agent is still writing. Tell each agent to report but never fix errors outside its ownership, and re-run the gate yourself once all agents are done.
+6. **Verify the reports; don't trust them.** Agents describe their own work optimistically and occasionally inaccurately. Read the actual code for anything high-risk (`Drawer.tsx`'s locked constraints, geometry, hook ordering) rather than accepting a checklist. Both week-timeline bugs came from an agent that reported success in good faith.
+7. **Push back on scope cuts.** An agent that drops functionality because it "wasn't in the design" or "lives in a folder I don't own" is describing a regression. Restore it or decide explicitly to defer it.
+
+---
+
 ### ✅ Definition of Done (Release Gate — YOU run this, not sub-agents)
 
 Before declaring ANY task complete, run via Bash and confirm exit code 0:
@@ -169,6 +185,24 @@ npx expo install --check   # verifies installed versions match SDK 51; reports d
 ```
 Use `npx expo install <pkg>` (never `npm install <pkg>`) so the SDK-compatible
 version is chosen.
+
+**Before ANY `eas build`, also run a local production bundle:**
+```bash
+npx expo export --platform android   # must complete with 0 errors
+```
+`tsc` validates types and `expo-doctor` validates dependency wiring, but neither
+executes the module graph. Only a real bundle catches broken imports, unresolved
+assets, and circular dependencies — the class of failure that produces a green
+checklist and an APK that crashes on launch. An EAS build costs real quota and
+~20 minutes; this costs ~90 seconds. Never skip it to save time.
+
+**Understand what these gates CANNOT catch.** They are all static. In the
+2026-08-30 redesign, `tsc` and `expo-doctor` were both fully green while the week
+view rendered every event under the wrong day column (the header was laid out
+left-to-right while the grid positioned columns right-to-left) and the all-day row
+was shifted off-screen by the gutter width. Anything involving **layout geometry,
+RTL direction, or absolute positioning must be verified visually** — a green gate
+is necessary, never sufficient.
 
 For **data-layer / schema changes**, add manual verification:
 - Run the app with existing data present (upgrade scenario), confirm migration applies cleanly and no data loss.
@@ -287,6 +321,9 @@ luchot/
 This is the single highest-risk area in Luchot. **Every one of the six bugs fixed in Phase 4.7 was RTL/layout-related.** The rule:
 
 - **Use `flexDirection: 'row-reverse'` for Hebrew RTL rows. Do NOT rely on `flexDirection: 'row'` auto-flip, and do NOT use CSS transforms.** (This supersedes any older guidance that said "row auto-flips" — that approach caused the 4.7 bug cluster.)
+- **Reject the "accidentally correct" row.** The recurring anti-pattern here is plain `flexDirection: 'row'` with the JSX children hand-ordered backwards so the pixels come out right. Since the app is pinned to an LTR base, `'row'` is deterministic, so these render correctly *today* — which is exactly why they survive review. They are still wrong: the next person who reorders children in natural reading order silently breaks the layout. The 2026-08-30 audit found this in `settings.tsx` (six rows), three picker hooks, `NoteList`'s header, and `details.tsx`. When you find it, convert to explicit `row-reverse` with natural JSX order and confirm the render is unchanged.
+- **Plain `'row'` IS legitimate** for genuinely direction-neutral rows: a symmetric 3-slot header (item-left / title-centre / item-right), a centred icon toolbar, or a `‹ … ›` chevron pair whose glyphs already encode direction. Don't mechanically convert those — judge each one.
+- **Absolutely-positioned layouts need ONE geometry source.** When a screen mixes a flex row with absolutely-positioned children (the week timeline), every band must compute x from the same shared function against the same measured width. Two independent direction decisions WILL drift, and the failure is silent — it typechecks, bundles, and renders; it just puts content under the wrong column.
 - For Hebrew reading order, the first child should land on the **right**. When an icon+text row reads wrong, the fix is usually swapping JSX child order, not adding flips.
 - `textAlign: 'right'` for Hebrew text.
 - The drawer slides from the **left** (hamburger is top-left). Anchor `left: 0`, initial `translateX = -drawerWidth`.
