@@ -11,12 +11,11 @@
 //   - "עברית למעלה" toggle kept — field is live and will drive the
 //     universal date header in Phase 3.7c
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, Switch, StyleSheet, ScrollView, Pressable,
-  Modal, TouchableWithoutFeedback, Alert,
+  Modal, TouchableWithoutFeedback,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { useTimePicker } from '../src/hooks/useTimePicker';
 import { useRouter } from 'expo-router';
 import {
@@ -36,7 +35,7 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { radius } from '../src/constants/radius';
 import { overlay } from '../src/constants/overlay';
-import { CITIES, findCityByKey } from '../src/constants/cities';
+import { findCityByKey } from '../src/constants/cities';
 import { findNearestCity } from '../src/utils/locationLookup';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
@@ -172,14 +171,12 @@ export default function SettingsScreen() {
     hebrewOnTop, diaspora, use24hTime,
     darkMode, zmanimMethod, firstDayOfWeek,
     toggleHebrewOnTop,
-    setDarkMode, setZmanimMethod, setFirstDayOfWeek,
+    setDarkMode, setZmanimMethod, setFirstDayOfWeek, setUse24hTime,
     setDiaspora: setSettingsDiaspora,
     omerRemindersEnabled, omerReminderTime,
     setOmerRemindersEnabled, setOmerReminderTime,
-    candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity,
-    setCandleLightingRemindersEnabled, setCandleLightingLeadMinutes, setCandleLightingCity,
-    candleLightingPlaceName,
-    setCandleLightingLocation,
+    candleLightingRemindersEnabled, candleLightingLeadMinutes,
+    setCandleLightingRemindersEnabled, setCandleLightingLeadMinutes,
   } = useSettingsStore();
 
   const router = useRouter();
@@ -199,11 +196,8 @@ export default function SettingsScreen() {
     setOmerReminderTime,
   );
 
-  const pendingCandleLightingEnable = useRef(false);
-
   const [themePicker, setThemePicker] = useState(false);
   const [zmanimPicker, setZmanimPicker] = useState(false);
-  const [candleLightingCityPicker, setCandleLightingCityPicker] = useState(false);
 
   // Derive current city name for display in the location row
   const currentCityName = useMemo(() => {
@@ -228,96 +222,13 @@ export default function SettingsScreen() {
   const trackColor = { false: colors.border, true: colors.accent };
 
   /**
-   * Requests foreground location permission, gets current GPS position, and
-   * reverse-geocodes a city-level name via Nominatim (Hebrew).
-   *
-   * On success: calls setCandleLightingLocation(lat, lng, cityName) and
-   * returns { success: true }.
-   *
-   * On permission denial: returns { success: false, permissionDenied: true }.
-   * On any other failure (network error, timeout, non-200, null city from
-   * address): returns { success: false, permissionDenied: false } — SILENT,
-   * no Alert for the geocode miss itself.
+   * Wave 1B — location is now unified (LocationProvider always has a
+   * location; see docs). The "pick a location first" gate that used to live
+   * here is obsolete: enabling/disabling candle-lighting reminders is now a
+   * plain toggle.
    */
-  const resolveAndStoreLocation = async (): Promise<{ success: boolean; permissionDenied: boolean }> => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      return { success: false, permissionDenied: true };
-    }
-    let lat: number;
-    let lng: number;
-    try {
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    } catch {
-      return { success: false, permissionDenied: false };
-    }
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      let response: Response;
-      try {
-        response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=he`,
-          { headers: { 'User-Agent': 'Luchot-App/1.0' }, signal: controller.signal },
-        );
-      } finally {
-        clearTimeout(timeoutId);
-      }
-      if (!response.ok) {
-        return { success: false, permissionDenied: false };
-      }
-      const data = (await response.json()) as { address?: { city?: string; town?: string; village?: string } };
-      const cityName = data.address?.city ?? data.address?.town ?? data.address?.village ?? null;
-      if (cityName === null) {
-        return { success: false, permissionDenied: false };
-      }
-      setCandleLightingLocation(lat, lng, cityName);
-      return { success: true, permissionDenied: false };
-    } catch {
-      // Covers AbortError (timeout), JSON parse failures, and any fetch error.
-      return { success: false, permissionDenied: false };
-    }
-  };
-
-  const handleCandleLightingToggle = async (newValue: boolean) => {
-    if (!newValue) {
-      setCandleLightingRemindersEnabled(false);
-      return;
-    }
-    if (candleLightingCity !== null || candleLightingPlaceName !== null) {
-      setCandleLightingRemindersEnabled(true);
-      return;
-    }
-    // No location yet — must resolve before enabling
-    Alert.alert(
-      'מיקום להדלקת נרות',
-      'להשתמש במיקום הנוכחי לחישוב זמן ההדלקה?',
-      [
-        {
-          text: 'בחר עיר ידנית',
-          onPress: () => {
-            pendingCandleLightingEnable.current = true;
-            setCandleLightingCityPicker(true);
-          },
-        },
-        {
-          text: 'השתמש במיקום',
-          onPress: async () => {
-            const result = await resolveAndStoreLocation();
-            if (result.success) {
-              // Store already updated by resolveAndStoreLocation; just enable.
-              setCandleLightingRemindersEnabled(true);
-            } else {
-              // Permission denied or silent geocode miss — fall back to manual picker.
-              pendingCandleLightingEnable.current = true;
-              setCandleLightingCityPicker(true);
-            }
-          },
-        },
-      ],
-    );
+  const handleCandleLightingToggle = (newValue: boolean) => {
+    setCandleLightingRemindersEnabled(newValue);
   };
 
   return (
@@ -416,10 +327,7 @@ export default function SettingsScreen() {
             right={
               <Switch
                 value={use24hTime}
-                onValueChange={(v) => {
-                  useSettingsStore.setState({ use24hTime: v });
-                  useSettingsStore.getState().save('use24hTime', String(v));
-                }}
+                onValueChange={setUse24hTime}
                 trackColor={trackColor}
               />
             }
@@ -519,7 +427,7 @@ export default function SettingsScreen() {
           {/* Row A — Toggle (always visible) */}
           <Pressable
             android_ripple={{ color: colors.border }}
-            onPress={() => { void handleCandleLightingToggle(!candleLightingRemindersEnabled); }}
+            onPress={() => handleCandleLightingToggle(!candleLightingRemindersEnabled)}
             style={[
               omerRowStyles.row,
               { backgroundColor: colors.surface },
@@ -537,7 +445,7 @@ export default function SettingsScreen() {
             </Text>
             <Switch
               value={candleLightingRemindersEnabled}
-              onValueChange={(v) => { void handleCandleLightingToggle(v); }}
+              onValueChange={handleCandleLightingToggle}
               trackColor={{ false: colors.border, true: colors.accent }}
               thumbColor={colors.surface}
             />
@@ -578,43 +486,6 @@ export default function SettingsScreen() {
               </View>
             </View>
           )}
-
-          {/* Row C — City picker (only when enabled) */}
-          {candleLightingRemindersEnabled && (
-            <Pressable
-              android_ripple={{ color: colors.border }}
-              onPress={() => setCandleLightingCityPicker(true)}
-              style={[omerRowStyles.row, { backgroundColor: colors.surface }]}
-              accessibilityLabel={`עיר: ${candleLightingPlaceName ?? findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}`}
-              accessibilityRole="button"
-            >
-              {/* RIGHT side — label (first in JSX = right in row-reverse) */}
-              <Text style={[omerRowStyles.label, { color: colors.textPrimary }]}>עיר</Text>
-              {/* Middle — chevron + current city value */}
-              <View style={omerRowStyles.right}>
-                <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
-                <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-                  {candleLightingPlaceName ?? findCityByKey(candleLightingCity ?? '')?.nameHe ?? 'לא נבחרה'}
-                </Text>
-              </View>
-              {/* LEFT side — update button (last in JSX = left in row-reverse).
-                  Show when any location is set — curated city OR GPS place name. */}
-              {(candleLightingCity !== null || candleLightingPlaceName !== null) && (
-                <Pressable
-                  onPress={async () => {
-                    const result = await resolveAndStoreLocation();
-                    if (!result.success && result.permissionDenied) {
-                      Alert.alert('שגיאה', 'לא ניתנה הרשאת מיקום');
-                    }
-                    // Silent on geocode miss — keep current city/location.
-                  }}
-                  style={[candleRowStyles.updateBtn, { backgroundColor: colors.accentLight }]}
-                >
-                  <Text style={[candleRowStyles.updateBtnText, { color: colors.accent }]}>עדכן</Text>
-                </Pressable>
-              )}
-            </Pressable>
-          )}
         </View>
 
       </ScrollView>
@@ -646,21 +517,6 @@ export default function SettingsScreen() {
         colors={colors}
       />
       {timePicker}
-      <PickerModal
-        visible={candleLightingCityPicker}
-        title="עיר להדלקת נרות"
-        options={CITIES.map((c) => ({ label: c.nameHe, value: c.hebcalKey }))}
-        selected={candleLightingCity ?? ''}
-        onSelect={(v) => {
-          setCandleLightingCity(v);
-          if (pendingCandleLightingEnable.current) {
-            setCandleLightingRemindersEnabled(true);
-            pendingCandleLightingEnable.current = false;
-          }
-        }}
-        onClose={() => setCandleLightingCityPicker(false)}
-        colors={colors}
-      />
     </View>
   );
 }
@@ -706,8 +562,6 @@ const candleRowStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  updateBtn:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  updateBtnText: { fontSize: 13, fontWeight: '600' },
 });
 
 // RTL rows for the Omer section — explicit row-reverse per project RTL rule.

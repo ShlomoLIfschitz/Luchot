@@ -94,57 +94,69 @@ export function useNotes(date: Date | null) {
   useEffect(() => {
     if (!date) { setNotes([]); return; }
     const d: Date = date;
+    let cancelled = false;
+
     async function load() {
-      const hdate = new HDate(d);
-      const [gregEvents, hebEvents, recurringEvents, exceptionEvents] = await Promise.all([
-        StorageService.getEventsForGregorianDate(d),
-        StorageService.getEventsForHebrewDate(hdate.getDate(), hdate.getMonth()),
-        // Fetch all recurring notes so we can expand Gregorian recurring ones
-        // to this specific date. Hebrew recurring are already returned by
-        // getEventsForHebrewDate above; the id-keyed merge below deduplicates.
-        StorageService.getAllRecurringNotes(),
-        // Fetch exception/tombstone rows for the overlay.
-        // Existing installs have zero such rows → no-op for current data.
-        StorageService.getExceptions(),
-      ]);
+      try {
+        const hdate = new HDate(d);
+        const [gregEvents, hebEvents, recurringEvents, exceptionEvents] = await Promise.all([
+          StorageService.getEventsForGregorianDate(d),
+          StorageService.getEventsForHebrewDate(hdate.getDate(), hdate.getMonth()),
+          // Fetch all recurring notes so we can expand Gregorian recurring ones
+          // to this specific date. Hebrew recurring are already returned by
+          // getEventsForHebrewDate above; the id-keyed merge below deduplicates.
+          StorageService.getAllRecurringNotes(),
+          // Fetch exception/tombstone rows for the overlay.
+          // Existing installs have zero such rows → no-op for current data.
+          StorageService.getExceptions(),
+        ]);
 
-      // Primary path: dedup gregEvents + hebEvents (unchanged behaviour).
-      // getEventsForGregorianDate and getEventsForHebrewDate both filter
-      // is_exception = 0, so exception/tombstone rows never enter this path.
-      const seen = new Set<string>();
-      const primary = [...gregEvents, ...hebEvents].filter(e => {
-        if (seen.has(e.id)) return false;
-        seen.add(e.id);
-        return true;
-      });
-      const allPrimaryNotes = primary.map(eventToCalendarNote);
+        if (cancelled) return;
 
-      // Secondary path: expand recurring notes to this day.
-      // Fixes Gregorian recurring notes (birthday/yahrzeit saved with
-      // calendarType: 'gregorian') which previously only fired on their
-      // original start_date and never on subsequent years.
-      const recurringNotes = recurringEvents.map(eventToCalendarNote);
-      const exceptionNotes = exceptionEvents.map(eventToCalendarNote);
-      const instances = expandRecurringNotes(recurringNotes, d, d, exceptionNotes);
+        // Primary path: dedup gregEvents + hebEvents (unchanged behaviour).
+        // getEventsForGregorianDate and getEventsForHebrewDate both filter
+        // is_exception = 0, so exception/tombstone rows never enter this path.
+        const seen = new Set<string>();
+        const primary = [...gregEvents, ...hebEvents].filter(e => {
+          if (seen.has(e.id)) return false;
+          seen.add(e.id);
+          return true;
+        });
+        const allPrimaryNotes = primary.map(eventToCalendarNote);
 
-      // Merge strategy with composite ids:
-      // - instances now carry composite ids (masterId:YYYY-MM-DD) — they are
-      //   the authoritative placement for ALL recurring notes on this date.
-      // - Recurring masters returned by the primary Hebrew/Gregorian queries
-      //   would collide: primary uses the master id, instance uses composite id.
-      //   Fix: only non-recurring primary notes enter the map; all recurring
-      //   placements come exclusively from `instances` (composite id).
-      //   expandRecurringNotes is guaranteed to emit an instance for the current
-      //   date for any recurring master the primary query matched, so nothing is lost.
-      const combinedById = new Map<string, CalendarNote>();
-      for (const n of allPrimaryNotes) {
-        if (!n.recurring) combinedById.set(n.id, n);
+        // Secondary path: expand recurring notes to this day.
+        // Fixes Gregorian recurring notes (birthday/yahrzeit saved with
+        // calendarType: 'gregorian') which previously only fired on their
+        // original start_date and never on subsequent years.
+        const recurringNotes = recurringEvents.map(eventToCalendarNote);
+        const exceptionNotes = exceptionEvents.map(eventToCalendarNote);
+        const instances = expandRecurringNotes(recurringNotes, d, d, exceptionNotes);
+
+        // Merge strategy with composite ids:
+        // - instances now carry composite ids (masterId:YYYY-MM-DD) — they are
+        //   the authoritative placement for ALL recurring notes on this date.
+        // - Recurring masters returned by the primary Hebrew/Gregorian queries
+        //   would collide: primary uses the master id, instance uses composite id.
+        //   Fix: only non-recurring primary notes enter the map; all recurring
+        //   placements come exclusively from `instances` (composite id).
+        //   expandRecurringNotes is guaranteed to emit an instance for the current
+        //   date for any recurring master the primary query matched, so nothing is lost.
+        const combinedById = new Map<string, CalendarNote>();
+        for (const n of allPrimaryNotes) {
+          if (!n.recurring) combinedById.set(n.id, n);
+        }
+        for (const inst of instances) combinedById.set(inst.note.id, inst.note);
+
+        if (!cancelled) setNotes(Array.from(combinedById.values()));
+      } catch (err) {
+        console.error('useNotes load failed:', err);
+        if (!cancelled) setNotes([]);
       }
-      for (const inst of instances) combinedById.set(inst.note.id, inst.note);
-
-      setNotes(Array.from(combinedById.values()));
     }
-    load().catch(console.error);
+
+    load();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date?.getTime(), notesVersion]);
 
   const saveNote = useCallback(async (params: {

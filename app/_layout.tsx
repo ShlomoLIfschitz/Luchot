@@ -11,6 +11,7 @@ import { useLocationStore } from '../src/providers/LocationProvider';
 import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
 import { NotificationService } from '../src/services/NotificationService';
+import { isIsraelCoords } from '../src/utils/isIsraelCoords';
 import * as Updates from 'expo-updates';
 
 if (I18nManager.isRTL) {
@@ -41,12 +42,15 @@ export default function RootLayout() {
       await NotificationService.ensureRecurringReminders();
       const { omerRemindersEnabled, omerReminderTime } = useSettingsStore.getState();
       await NotificationService.ensureOmerReminders(omerRemindersEnabled, omerReminderTime);
-      const { candleLightingRemindersEnabled, candleLightingLeadMinutes, candleLightingCity } =
+      const { candleLightingRemindersEnabled, candleLightingLeadMinutes } =
         useSettingsStore.getState();
+      const { latitude, longitude, placeName } = useLocationStore.getState();
       await NotificationService.ensureCandleLightingReminders(
         candleLightingRemindersEnabled,
         candleLightingLeadMinutes,
-        candleLightingCity,
+        candleLightingRemindersEnabled
+          ? { lat: latitude, lng: longitude, il: isIsraelCoords(latitude, longitude), placeName }
+          : null,
       );
     }
     init().catch(console.error);

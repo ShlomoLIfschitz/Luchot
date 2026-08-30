@@ -1,6 +1,6 @@
 // src/services/DateService.ts
 
-import { HDate, HebrewCalendar, Event as HebcalEvent, flags, DailyLearning } from '@hebcal/core';
+import { HDate, HebrewCalendar, Event as HebcalEvent, flags, DailyLearning, ParshaEvent, getSedra } from '@hebcal/core';
 import '@hebcal/learning'; // side-effect: registers daily learning schedules into DailyLearning registry
 
 // ── Types ─────────────────────────────────────────────────
@@ -32,6 +32,14 @@ export interface DayData {
   holidays: string[];         // Holiday names (Hebrew)
   holidaysEn: string[];
   parasha?: string;           // Only on Shabbat
+  // Wave 1B (Task 7) — Hebrew name of the parasha of the COMING Shabbat,
+  // populated every day of the week (including Shabbat itself, where it
+  // duplicates `parasha` — harmless). Does not change `parasha`'s existing
+  // "Shabbat only" semantics; existing consumers of `parasha` are
+  // unaffected. undefined when the coming Shabbat's reading is a special
+  // holiday reading rather than a regular weekly parasha (e.g. Shabbat
+  // Chol HaMoed, or a Shabbat that coincides with a Yom Tov).
+  upcomingParasha?: string;
   isYomTov: boolean;
   isCholHamoed: boolean;
   omerDay?: number;           // 1-49 during Sefirat HaOmer
@@ -149,6 +157,28 @@ function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningI
   return { display, url };
 }
 
+// ── Upcoming Parasha Helper (Wave 1B, Task 7) ──────────────────────────────
+// Resolves the parasha of the Shabbat on/after `hdate` WITHOUT an extra
+// HebrewCalendar.calendar() call per day (buildDayData runs per-day for a
+// whole month grid — that would be one full calendar sweep per day).
+// @hebcal/core's getSedra(hyear, il) is itself cached (internal QuickLRU,
+// keyed by `${hyear}-${il}`), so repeated calls across the days of a month
+// (all sharing the same Hebrew year + il) reuse the same Sedra instance —
+// no extra caching needed on our side. Sedra.lookup() also handles the
+// Hebrew-year boundary internally (it transparently recurses into next
+// year's Sedra via getSedra() when the date's Shabbat falls just over the
+// year line), so no special-casing is needed here either.
+function lookupUpcomingParasha(hdate: HDate, il: boolean): string | undefined {
+  const sedra = getSedra(hdate.getFullYear(), il);
+  const result = sedra.lookup(hdate);
+  // A Shabbat whose reading is a special holiday (Shabbat Chol HaMoed, a
+  // Shabbat that falls on/adjacent to a Yom Tov, etc.) has no regular
+  // parasha this week — return undefined rather than a wrong value.
+  if (result.chag) return undefined;
+  const ev = new ParshaEvent(result.hdate, result.parsha, il, result.num);
+  return ev.renderBrief('he');
+}
+
 // ── Core DateService ──────────────────────────────────────
 
 export class DateService {
@@ -211,6 +241,7 @@ export class DateService {
     }
 
     const monthInfo = HEBREW_MONTH_NAMES[hdate.getMonth()] ?? { he: '', en: '' };
+    const upcomingParasha = lookupUpcomingParasha(hdate, !this.diaspora);
 
     return {
       gregorianDate: date,
@@ -227,6 +258,7 @@ export class DateService {
       holidays,
       holidaysEn,
       parasha,
+      upcomingParasha,
       isYomTov,
       isCholHamoed,
       omerDay,

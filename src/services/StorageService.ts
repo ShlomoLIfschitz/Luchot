@@ -16,7 +16,7 @@ import {
   type ResultSet,
 } from 'expo-sqlite/legacy';
 import { HDate } from '@hebcal/core';
-import { CalendarEvent, NoteCategory } from '../schemas/EventSchema';
+import { CalendarEvent, CalendarEventSchema, NoteCategory } from '../schemas/EventSchema';
 import { formatDateKey, generateUUID } from '../utils/dateUtils';
 
 // ── DB handle ──────────────────────────────────────────────────────────────────
@@ -342,7 +342,7 @@ export class StorageService {
          AND is_exception = 0`,
       [dateStr, dateStr],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   static async getEventsForHebrewDate(hebrewDay: number, hebrewMonth: number): Promise<CalendarEvent[]> {
@@ -352,7 +352,7 @@ export class StorageService {
        AND calendar_type = 'hebrew' AND status != 'cancelled' AND is_exception = 0`,
       [hebrewDay, hebrewMonth],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -424,7 +424,7 @@ export class StorageService {
          AND is_exception = 0`,
       [endStr, startStr],   // arg1 = gridEnd, arg2 = gridStart (see predicate above)
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -437,7 +437,7 @@ export class StorageService {
       `SELECT * FROM events WHERE status != 'cancelled' ORDER BY start_date ASC`,
       [],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -462,7 +462,7 @@ export class StorageService {
          AND is_exception = 0`,
       [],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -484,7 +484,7 @@ export class StorageService {
       `SELECT * FROM events WHERE is_exception = 1`,
       [],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -689,8 +689,18 @@ export class StorageService {
 
   // ── Row Mapper ────────────────────────────────────────────
 
+  /**
+   * Maps a raw SQLite row to a CalendarEvent and validates it against
+   * CalendarEventSchema before returning it.
+   *
+   * Returns null (never throws) when a row fails validation — a single
+   * malformed/corrupted row must never crash the calendar or wipe a user's
+   * data. A concise warning is logged with the row id and the validation
+   * issue so the problem is discoverable without taking down the read path.
+   * Callers MUST filter out nulls (see `mapRows`) before returning to the UI.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private static rowToEvent(row: any): CalendarEvent {
+  private static rowToEvent(row: any): CalendarEvent | null {
     let recurrence: string[] | undefined;
     try {
       const parsed = JSON.parse(row.recurrence || '[]');
@@ -698,7 +708,7 @@ export class StorageService {
     } catch {
       recurrence = [];
     }
-    return {
+    const candidate: CalendarEvent = {
       id: row.id,
       summary: row.summary,
       description: row.description,
@@ -733,6 +743,31 @@ export class StorageService {
         : { useDefault: false },
       location: row.location ?? undefined,
     };
+
+    const result = CalendarEventSchema.safeParse(candidate);
+    if (!result.success) {
+      const issues = result.error.issues
+        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+        .join('; ');
+      console.warn(
+        `[StorageService] Skipping malformed event row (id=${row?.id ?? 'unknown'}): ${issues}`,
+      );
+      return null;
+    }
+    // Return the originally-constructed candidate (not result.data): the
+    // candidate already matches CalendarEvent's undefined-for-absent
+    // convention exactly, whereas the parsed Zod output may hold `null`
+    // for nullish fields — validation-only use of Zod here, no reshaping.
+    return candidate;
+  }
+
+  /** Maps + validates a batch of rows, silently dropping any row that fails
+   *  CalendarEventSchema validation (see rowToEvent). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static mapRows(rows: any[]): CalendarEvent[] {
+    return rows
+      .map(StorageService.rowToEvent)
+      .filter((e): e is CalendarEvent => e !== null);
   }
 
   /**
@@ -758,7 +793,7 @@ export class StorageService {
       `SELECT * FROM events WHERE reminder_minutes IS NOT NULL AND status != 'cancelled'`,
       [],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -778,7 +813,7 @@ export class StorageService {
          AND is_exception = 0`,
       [],
     );
-    return rows.map(StorageService.rowToEvent);
+    return StorageService.mapRows(rows);
   }
 
   /**
@@ -816,7 +851,7 @@ export class StorageService {
       [],
     );
 
-    const events = rows.map(StorageService.rowToEvent);
+    const events = StorageService.mapRows(rows);
 
     const today = new Date();
     // Local midnight today — used for "is occurrence on or before today?" check.

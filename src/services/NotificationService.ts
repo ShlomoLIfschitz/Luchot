@@ -8,7 +8,63 @@ import { StorageService } from './StorageService';
 import { getOmerForDate } from './DateService';
 import { getZmanim } from './ZmanimService';
 import { getCandleLightingOffset } from '../utils/candleLightingOffset';
-import { getCityCoordinates, findCityByKey } from '../utils/locationLookup';
+
+/**
+ * A single notification this run wants to (re)schedule. Sweeps build up an
+ * array of these instead of scheduling inline, so the shared notification
+ * budget (see applyNotificationBudget) can trim — nearest triggerDate
+ * first — before anything is actually scheduled.
+ */
+interface NotificationCandidate {
+  id: string;
+  title: string;
+  body: string;
+  triggerDate: Date;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Global ceiling on total scheduled local notifications, shared across all
+ * four sweeps (annual, recurring, omer, candle-lighting). Comfortably under
+ * the ~64 OS-enforced pending-notification limit (the historical reason
+ * candle-lighting alone self-capped at 64 — see WORK_LOG/DECISIONS). Before
+ * this, only candle-lighting self-limited; a user with several recurring
+ * reminders plus Omer plus candle-lighting could silently blow past the OS
+ * limit with zero signal. Every sweep below enforces this same ceiling by
+ * querying the CURRENT live scheduled count immediately before trimming —
+ * since app/_layout.tsx awaits each sweep in sequence, this naturally
+ * accounts for every other sweep's contribution without needing a separate
+ * orchestrating function or shared mutable counter object threaded through
+ * every call. It's also correct when a single sweep is re-run in isolation
+ * later (e.g. a settings toggle), since it always measures ground truth.
+ */
+const NOTIFICATION_BUDGET_CEILING = 60;
+
+/**
+ * Trims `candidates` — nearest triggerDate first — so that
+ * `alreadyScheduledCount + kept.length` never exceeds
+ * NOTIFICATION_BUDGET_CEILING. Warns (console.warn, once per call) exactly
+ * when trimming actually occurs, naming how many were dropped — silent
+ * truncation is what made the original bug invisible.
+ */
+function applyNotificationBudget(
+  candidates: NotificationCandidate[],
+  alreadyScheduledCount: number,
+  sweepName: string,
+): NotificationCandidate[] {
+  const remaining = Math.max(NOTIFICATION_BUDGET_CEILING - alreadyScheduledCount, 0);
+  if (candidates.length <= remaining) return candidates;
+
+  const sorted = [...candidates].sort((a, b) => a.triggerDate.getTime() - b.triggerDate.getTime());
+  const kept = sorted.slice(0, remaining);
+  const dropped = sorted.length - kept.length;
+  console.warn(
+    `[NotificationService] notification budget exceeded during ${sweepName} sweep — ` +
+    `dropping ${dropped} of ${sorted.length} candidate reminder(s) ` +
+    `(ceiling ${NOTIFICATION_BUDGET_CEILING}, ${alreadyScheduledCount} already scheduled).`,
+  );
+  return kept;
+}
 
 /**
  * Returns true if `date` is erev Yom Tov Rishon (first-day eve).
@@ -125,6 +181,8 @@ export class NotificationService {
     const scheduled = await NotificationService.getScheduled();
     const scheduledIds = new Set(scheduled.map(n => n.identifier));
 
+    const candidates: NotificationCandidate[] = [];
+
     for (const event of recurring) {
       const reminderMinutes = event.reminders?.overrides?.[0]?.minutes;
       if (reminderMinutes == null) continue;
@@ -164,14 +222,21 @@ export class NotificationService {
       // Skip if trigger is in the past
       if (triggerDate <= new Date()) continue;
 
-      if (!scheduledIds.has(event.id)) {
-        await NotificationService.scheduleLocalNotification({
-          id: event.id,
-          title: event.summary,
-          body: `תזכורת: ${event.summary}`,
-          triggerDate,
-        });
-      }
+      // Already scheduled — idempotent, nothing to do (and it already
+      // counts against `scheduled.length` used as the budget baseline below).
+      if (scheduledIds.has(event.id)) continue;
+
+      candidates.push({
+        id: event.id,
+        title: event.summary,
+        body: `תזכורת: ${event.summary}`,
+        triggerDate,
+      });
+    }
+
+    const toSchedule = applyNotificationBudget(candidates, scheduled.length, 'annual');
+    for (const c of toSchedule) {
+      await NotificationService.scheduleLocalNotification(c);
     }
   }
 
@@ -237,6 +302,10 @@ export class NotificationService {
 
     // Local midnight today — all occurrence generation is relative to this.
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Collected across ALL events — budget-trimmed once, below, after every
+    // event's stale notifications have been cancelled (step 2 per event).
+    const allCandidates: NotificationCandidate[] = [];
 
     for (const event of events) {
       const reminderMinutes = event.reminders?.overrides?.[0]?.minutes;
@@ -346,13 +415,21 @@ export class NotificationService {
           `${String(occ.getDate()).padStart(2, '0')}`;
         const notifId = `evt-${event.id}-${occDateStr}`;
 
-        await NotificationService.scheduleLocalNotification({
+        allCandidates.push({
           id: notifId,
           title: event.summary,
           body: `תזכורת: ${event.summary}`,
           triggerDate: fireDate,
         });
       }
+    }
+
+    // Baseline queried AFTER every event's stale evt-* entries have been
+    // cancelled above, so it accurately reflects what's staying scheduled.
+    const postCancelScheduled = await NotificationService.getScheduled();
+    const toSchedule = applyNotificationBudget(allCandidates, postCancelScheduled.length, 'recurring');
+    for (const c of toSchedule) {
+      await NotificationService.scheduleLocalNotification(c);
     }
   }
 
@@ -379,6 +456,7 @@ export class NotificationService {
     const [hh, mm] = time.split(':').map(Number);
 
     const now = new Date();
+    const candidates: NotificationCandidate[] = [];
     for (let offset = 0; offset < 10; offset++) {
       const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
 
@@ -400,7 +478,7 @@ export class NotificationService {
 
       if (triggerDate <= new Date()) continue; // in the past
 
-      await NotificationService.scheduleLocalNotification({
+      candidates.push({
         id,
         title: 'ספירת העומר',
         body: omerInfo.text,
@@ -408,61 +486,52 @@ export class NotificationService {
         data: { type: 'omer', day: omerInfo.day },
       });
     }
+
+    const toSchedule = applyNotificationBudget(candidates, scheduled.length, 'omer');
+    for (const c of toSchedule) {
+      await NotificationService.scheduleLocalNotification(c);
+    }
   }
 
   /**
    * Sweep-on-init model for candle-lighting reminders.
-   * Cancels all candle-* notifications first (handles city/lead-time changes),
-   * then sweeps 13 weeks (91 days) scheduling Shabbat + Yom Tov Rishon eves.
-   * Fire time: candle-lighting timestamp (shkia − city offset) − leadMinutes.
-   * Max 64 notifications (iOS limit).
+   * Cancels all candle-* notifications first (handles location/lead-time
+   * changes), then sweeps 13 weeks (91 days) scheduling Shabbat + Yom Tov
+   * Rishon eves. Fire time: candle-lighting timestamp (shkia − city offset)
+   * − leadMinutes.
+   *
+   * Wave 1B: location is now passed in explicitly by the caller (unified
+   * LocationProvider is the single source of truth — see LocationProvider
+   * report) instead of being resolved here from a city key. `loc === null`
+   * (no location available) cancels cleanly rather than scheduling garbage.
+   * The old per-call 64-notification self-cap is gone — the shared
+   * NOTIFICATION_BUDGET_CEILING (60, applied via applyNotificationBudget)
+   * covers it, together with every other sweep.
    */
   static async ensureCandleLightingReminders(
     enabled: boolean,
     leadMinutes: number,
-    city: string | null,
-    override?: { lat: number; lng: number; placeName: string; il: boolean },
+    loc: { lat: number; lng: number; il: boolean; placeName?: string } | null,
   ): Promise<void> {
-    // 1. Always cancel all candle-* first (city or lead-time change requires full reset)
+    // 1. Always cancel all candle-* first (location or lead-time change requires full reset)
     const scheduled = await NotificationService.getScheduled();
     for (const n of scheduled) {
       if (n.identifier.startsWith('candle-')) {
         await NotificationService.cancelNotification(n.identifier);
       }
     }
-    if (!enabled) return;
-    if (!override && !city) return;
+    if (!enabled || !loc) return;
 
-    // 2. Resolve coordinates + display name + il flag
-    let lat: number;
-    let lng: number;
-    let cityNameHe: string;
-    let il: boolean;
+    const { lat, lng, il, placeName } = loc;
+    const cityNameHe = placeName ?? '';
 
-    if (override) {
-      // GPS override path — skip city-key resolution entirely
-      lat = override.lat;
-      lng = override.lng;
-      cityNameHe = override.placeName;
-      il = override.il;
-    } else {
-      // Existing city-key path (back-compat) — city is non-null here (guarded above)
-      const coords = getCityCoordinates(city!);
-      if (!coords) return; // unknown key — defensive
-      lat = coords.lat;
-      lng = coords.lng;
-      const cityEntry = findCityByKey(city!);
-      cityNameHe = cityEntry?.nameHe ?? city!;
-      il = cityEntry?.country === 'IL';
-    }
-
-    // 3. City-specific candle-lighting offset (Jerusalem 40 min, Haifa 30, Safed 40, others 18)
+    // City-specific candle-lighting offset (Jerusalem 40 min, Haifa 30, Safed 40, others 18)
     const clOffsetMinutes = getCandleLightingOffset(lat, lng).minutes;
 
-    // 4. Sweep 91 days (13 weeks rolling window)
+    // Sweep 91 days (13 weeks rolling window)
     const now = new Date();
-    let count = 0;
-    for (let dayOffset = 0; dayOffset < 91 && count < 64; dayOffset++) {
+    const candidates: NotificationCandidate[] = [];
+    for (let dayOffset = 0; dayOffset < 91; dayOffset++) {
       const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
 
       const isErevShabbat = date.getDay() === 5; // Friday
@@ -485,13 +554,19 @@ export class NotificationService {
         hour12: false,
       });
 
-      await NotificationService.scheduleLocalNotification({
+      candidates.push({
         id: `candle-${dateStr}`,
         title: 'הדלקת נרות',
-        body: `${cityNameHe}, ${hhmm}`,
+        body: cityNameHe ? `${cityNameHe}, ${hhmm}` : hhmm,
         triggerDate: fireDate,
       });
-      count++;
+    }
+
+    // Baseline queried AFTER the unconditional candle-* reset above.
+    const postCancelScheduled = await NotificationService.getScheduled();
+    const toSchedule = applyNotificationBudget(candidates, postCancelScheduled.length, 'candle-lighting');
+    for (const c of toSchedule) {
+      await NotificationService.scheduleLocalNotification(c);
     }
   }
 }

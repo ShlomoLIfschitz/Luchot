@@ -37,15 +37,16 @@ export default function ZmanimScreen() {
   const zmanim = useZmanim(selectedDate);
 
   // Location chip data
-  const { cityHebcalKey, latitude, longitude, source } = useLocationStore();
+  const { cityHebcalKey, latitude, longitude, source, placeName } = useLocationStore();
   const currentCityName = useMemo(() => {
+    if (placeName) return placeName;
     if (cityHebcalKey) {
       const entry = findCityByKey(cityHebcalKey);
       if (entry) return entry.nameHe;
     }
     const { city } = findNearestCity(latitude, longitude);
     return city.nameHe;
-  }, [cityHebcalKey, latitude, longitude]);
+  }, [placeName, cityHebcalKey, latitude, longitude]);
 
   // Date picker — Phase 4.4
   const { openPicker, picker } = useDatePicker(selectedDate, setSelectedDate);

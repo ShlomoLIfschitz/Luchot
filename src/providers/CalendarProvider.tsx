@@ -1,6 +1,7 @@
 // src/providers/CalendarProvider.tsx
 
 import { create } from 'zustand';
+import { AppState, type AppStateStatus } from 'react-native';
 import { HDate } from '@hebcal/core';
 import { dateService, DayData } from '../services/DateService';
 
@@ -29,6 +30,7 @@ interface CalendarState {
   navigateHebrewMonth: (direction: 1 | -1) => void;
   refreshHebrewMonth: () => void;
   navigateToHebrewMonth: (hYear: number, hMonth: number) => void;
+  refreshToday: () => void;
 }
 
 // Compute today's Hebrew date once at store creation
@@ -102,4 +104,51 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     get().refreshHebrewMonth();          // reads updated cursor via get()
     get().setSelectedDate(anchor.greg()); // sync Gregorian selectedDate
   },
+
+  refreshToday: () => set({ today: new Date() }),
 }));
+
+// ── Task 5: keep `today` from going stale ──────────────────────────────────
+// `today` was previously set once at store creation and never refreshed —
+// MonthGrid/WeekGrid use it for the "today" highlight, so leaving the app
+// open across midnight left the highlight on yesterday until a full
+// restart. Two mechanisms, both set up exactly once here (this module is
+// evaluated once per process — the module cache guarantees no duplicate
+// listeners/timers):
+//   1. AppState 'change' -> 'active': catches the common case (app was
+//      backgrounded overnight, user reopens it the next day).
+//   2. A self-rescheduling setTimeout firing just after local midnight:
+//      catches the rarer case of the app staying foregrounded, unused,
+//      across midnight (no background/foreground transition to hook into).
+// Both paths funnel through the same day-changed check before calling
+// refreshToday(), so this can never fire more than once per actual day
+// change — no re-render storm.
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleMidnightRefresh(): void {
+  if (midnightTimer) clearTimeout(midnightTimer);
+  const now = new Date();
+  // A few seconds past local midnight, to be safely on the new day's side.
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5, 0);
+  midnightTimer = setTimeout(() => {
+    useCalendarStore.getState().refreshToday();
+    scheduleMidnightRefresh(); // reschedule for the following midnight
+  }, nextMidnight.getTime() - now.getTime());
+}
+scheduleMidnightRefresh();
+
+AppState.addEventListener('change', (state: AppStateStatus) => {
+  if (state !== 'active') return;
+  const { today } = useCalendarStore.getState();
+  if (isSameLocalDay(today, new Date())) return;
+  useCalendarStore.getState().refreshToday();
+  scheduleMidnightRefresh(); // resync the midnight timer to the (now current) day
+});

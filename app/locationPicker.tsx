@@ -18,7 +18,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
 import { MapPin, Navigation, Search } from 'lucide-react-native';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useLocationStore } from '../src/providers/LocationProvider';
@@ -30,7 +29,6 @@ export default function LocationPickerScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const currentKey       = useLocationStore((s) => s.cityHebcalKey);
-  const setFromGps       = useLocationStore((s) => s.setLocationFromGps);
   const setFromCity      = useLocationStore((s) => s.setLocationFromCity);
 
   const [query, setQuery]           = useState('');
@@ -54,19 +52,41 @@ export default function LocationPickerScreen() {
   const handleUseGps = async () => {
     setGpsLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'הרשאה נדרשת',
-          'אשר גישה למיקום בהגדרות המכשיר כדי לחשב זמנים מדויקים.',
-        );
+      const result = await useLocationStore.getState().acquireFromDeviceGps();
+      if (result.ok) {
+        router.back();
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({});
-      setFromGps(pos.coords.latitude, pos.coords.longitude);
-      router.back();
-    } catch {
-      Alert.alert('שגיאה', 'לא הצלחנו לקבל את המיקום שלך. נסה שוב.');
+      switch (result.reason) {
+        case 'servicesDisabled':
+          Alert.alert(
+            'שירותי מיקום כבויים',
+            'הפעל את שירותי המיקום בהגדרות המכשיר כדי לחשב זמנים מדויקים.',
+          );
+          break;
+        case 'permissionDenied':
+          Alert.alert(
+            'הרשאה נדרשת',
+            'אשר גישה למיקום כדי לחשב זמנים מדויקים.',
+          );
+          break;
+        case 'permissionBlocked':
+          Alert.alert(
+            'הרשאה חסומה',
+            'הרשאת המיקום נחסמה. יש לאפשר אותה בהגדרות המערכת של המכשיר.',
+          );
+          break;
+        case 'timeout':
+          Alert.alert(
+            'לא הצלחנו לקבל מיקום',
+            'ניסיון קבלת המיקום ארך זמן רב מדי. נסה שוב.',
+          );
+          break;
+        case 'error':
+        default:
+          Alert.alert('שגיאה', 'לא הצלחנו לקבל את המיקום שלך. נסה שוב.');
+          break;
+      }
     } finally {
       setGpsLoading(false);
     }
