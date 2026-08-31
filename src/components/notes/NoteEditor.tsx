@@ -22,6 +22,7 @@ import { toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { COLOR_OPTIONS, type ColorTokenKey } from '../../utils/colorResolver';
 import { reverseGeocodeNominatim } from '../../utils/reverseGeocode';
 import { useSettingsStore } from '../../providers/SettingsProvider';
+import { useModalStateStore } from '../../providers/ModalStateProvider';
 import { useTimeOfDayPicker } from '../../hooks/useTimeOfDayPicker';
 import { splitInstanceId } from '../../utils/recurringId';
 import { formatDateKey } from '../../utils/dateUtils';
@@ -321,6 +322,21 @@ export function NoteEditor({
     picker: reminderTimePicker,
   } = useTimeOfDayPicker(reminderTime, handleReminderTimeChange, use24hTime);
 
+
+  // ── Shared "a modal is open" flag (see useOtaUpdates) ──────────────────────────
+  // `visible` is the single source of truth for this component's open/closed
+  // state — every close path (X button, Cancel, backdrop tap, Android back via
+  // the Modal's onRequestClose, delete-then-close, save-new-then-close) funnels
+  // through the parent flipping this prop to false; NoteEditor never closes
+  // itself independently of it. Watching it here — rather than instrumenting
+  // each onPress — covers every close path automatically, including ones added
+  // later. The cleanup runs on every dependency change (setting the flag to
+  // match the outgoing `visible` before the new effect body runs) and on
+  // unmount, so a crash or a navigation away can never leave this stuck true.
+  useEffect(() => {
+    useModalStateStore.getState().setModalOpen(visible);
+    return () => useModalStateStore.getState().setModalOpen(false);
+  }, [visible]);
 
   // ── Reset state when modal opens / note changes ───────────────────────────────
   useEffect(() => {

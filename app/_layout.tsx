@@ -19,6 +19,7 @@ import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
 import { NotificationService } from '../src/services/NotificationService';
 import { isIsraelCoords } from '../src/utils/isIsraelCoords';
+import { useOtaUpdates } from '../src/hooks/useOtaUpdates';
 import * as Updates from 'expo-updates';
 
 if (I18nManager.isRTL) {
@@ -43,6 +44,12 @@ export default function RootLayout() {
     Heebo_700Bold,
   });
   const fontsReady = fontsLoaded || !!fontError;
+
+  // OTA: check for a newly published update on every foreground return, so
+  // a bundle published mid-session doesn't sit undetected until the user
+  // fully relaunches. Deliberately never auto-reloads — see hook doc for
+  // why (NoteEditor's unsaved draft has no cross-module "is open" signal).
+  useOtaUpdates();
 
   useEffect(() => {
     async function init() {

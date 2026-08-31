@@ -9,6 +9,21 @@
 //   user has to pick a tab. Everything below ScreenHeader now lives in ONE
 //   ScrollView (highlights → tab bar → tab content), replacing the previous
 //   fixed-outside-ScrollView tab bar.
+// Phase 6 device-feedback pass (three fixes, one screen):
+//   1. Tab bar — each tab now takes an even flex:1 share of the row instead of
+//      hugging its own content width, so the active-tab underline reads as
+//      "half the bar", not a stray line lost against the full-width row.
+//   2. Outer auto-scroll REMOVED entirely (it used to scroll the whole page —
+//      including the highlights strip above it — to bring "now" into view,
+//      which on a Friday pushed the parasha/candle-lighting content off
+//      screen). Replaced with a data-driven hour WINDOW: the hourly grid only
+//      renders the hours that could plausibly matter (a default daytime band,
+//      widened to cover any actual timed events with 1hr of padding), so it's
+//      short enough that no scrolling is needed to see today's content.
+//   3. The former "תורה וזמנים" tab is split: the always-useful zmanim moved
+//      UP into the highlights strip as a compact KeyZmanimCard (every day),
+//      and the tab itself is renamed "לימוד", keeping only the daily learning
+//      rows (Daf Yomi / Rambam / Tanach-Nach) that have no home in the strip.
 //
 // NoteEditor adaptation note (vs. original Phase 3.5 spec):
 //   NoteEditor is a React Native Modal component, not a @gorhom/bottom-sheet.
@@ -17,7 +32,7 @@
 //   useThemeColors internally. The ref-based pattern in the spec was adapted
 //   to a useState boolean accordingly.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -26,9 +41,9 @@ import {
   Pressable,
   Linking,
 } from 'react-native';
-import type { LayoutChangeEvent } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { BookOpenText } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
@@ -37,8 +52,8 @@ import { useThemeColors } from '../../src/hooks/useThemeColors';
 import type { ThemeColors } from '../../src/hooks/useThemeColors';
 import { useZmanim } from '../../src/hooks/useZmanim';
 import { useNotes, type CalendarNote } from '../../src/hooks/useNotes';
-import { ZmanimList } from '../../src/components/zmanim/ZmanimList';
 import { ShabbatCard } from '../../src/components/zmanim/ShabbatCard';
+import { formatZmanTime, type ZmanimResult } from '../../src/services/ZmanimService';
 import { NoteEditor } from '../../src/components/notes/NoteEditor';
 import { NoteList } from '../../src/components/notes/NoteList';
 import { Card } from '../../src/components/ui/Card';
@@ -55,19 +70,14 @@ import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
 import { swipeDirection } from '../../src/constants/layout';
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
-
-// Hourly grid layout constants — shared between the row style (below) and
-// the auto-scroll offset math, so there is a single source of truth instead
-// of a magic number duplicated in two places.
+// Hourly grid layout constant — row height, used by the row style.
 const HOUR_ROW_HEIGHT = 40;
-// Default hour brought into view on mount for a non-today day (no "current
-// hour" makes sense there) — a sensible mid-morning anchor.
-const DEFAULT_TIMELINE_HOUR = 8;
-// Mirrors styles.scrollContent.paddingTop — the vertical offset of the
-// scrollable content's first child, needed to convert an onLayout-measured
-// child position into an absolute ScrollView.scrollTo() offset.
-const SCROLL_TOP_PADDING = 16;
+// Default hourly-grid window when the day has no timed events at all —
+// "roughly 07:00–22:00", a sensible daytime band with no wall of empty rows.
+const DEFAULT_TIMELINE_START_HOUR = 7;
+const DEFAULT_TIMELINE_END_HOUR = 22;
+// Vertical padding above the first item in the ScrollView's content.
+const CONTENT_TOP_PADDING = 16;
 
 // Hourly-grid event block color: mirrors NoteList's colorId/noteType → tag
 // token mapping (that helper is local/unexported to NoteList.tsx, which is
@@ -87,6 +97,7 @@ function resolveNoteCategoryKey(note: CalendarNote): CategoryColorKey {
 
 export default function DayScreen() {
   const colors = useThemeColors();
+  const router = useRouter();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const use24hTime = useSettingsStore((s) => s.use24hTime);
@@ -128,10 +139,12 @@ export default function DayScreen() {
   const [gridEditNote, setGridEditNote] = useState<CalendarNote | undefined>(undefined);
 
   // Internal tab state — defaults to 'events', no persistence.
-  const [activeTab, setActiveTab] = useState<'events' | 'torah'>('events');
+  // Phase 6: 'torah' renamed 'learning' — the tab now holds ONLY the daily
+  // learning rows; zmanim moved up into the always-visible highlights strip.
+  const [activeTab, setActiveTab] = useState<'events' | 'learning'>('events');
 
   // C2: Reset to events tab whenever the selected date changes.
-  // This prevents the user from landing on the torah tab when swiping days.
+  // This prevents the user from landing on the learning tab when swiping days.
   useEffect(() => {
     setActiveTab('events');
   }, [selectedDate]);
@@ -170,6 +183,13 @@ export default function DayScreen() {
       if (Math.abs(e.velocityX) > 400) runOnJS(onSwipe)(e.velocityX);
     });
 
+  // Navigate to the dedicated Zmanim tab — used by the "כל הזמנים →" link on
+  // the compact KeyZmanimCard. `(tabs)` is a route group (doesn't appear in
+  // the URL), so the sibling screen is addressed as `/zmanim`.
+  const goToZmanimTab = useCallback(() => {
+    router.push('/zmanim' as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+  }, [router]);
+
   // C2: Real hour bucketing — timed notes bucketed by their start hour (0–23).
   // All-day notes (isAllDay === true) are excluded; they appear in NoteList above.
   const notesByHour = useMemo(() => {
@@ -198,28 +218,32 @@ export default function DayScreen() {
     });
   }, [use24hTime]);
 
-  // Auto-scroll the hourly timeline so a useful hour is in view on mount,
-  // instead of opening on a wall of empty pre-dawn rows. Fires once per
-  // selected date (guarded by autoScrolledDateRef) from the timeline
-  // section's onLayout — the layout pass is the correct signal that the
-  // section's position is known, avoiding a timing race with a useEffect.
-  const scrollRef = useRef<ScrollView>(null);
-  const autoScrolledDateRef = useRef<number | null>(null);
+  // Hourly-grid window — data-driven, NOT an auto-scroll. Replaces the old
+  // "scroll the page to the current hour" behavior (removed: it scrolled the
+  // OUTER ScrollView, which also contains the highlights strip above the
+  // grid, pushing the parasha card and — on Fridays — the candle-lighting
+  // table off screen). Instead, the grid itself is sized to a useful window:
+  // a default daytime band, widened just enough to cover the day's actual
+  // timed events (with 1hr of padding on each side) when there are any.
+  // Clamped to the valid 0–23 hour range.
+  const timelineHourRange = useMemo(() => {
+    const eventHours = Object.keys(notesByHour).map(Number);
+    if (eventHours.length === 0) {
+      return { start: DEFAULT_TIMELINE_START_HOUR, end: DEFAULT_TIMELINE_END_HOUR };
+    }
+    const earliestEventHour = Math.min(...eventHours);
+    const latestEventHour = Math.max(...eventHours);
+    return {
+      start: Math.max(0, Math.min(earliestEventHour - 1, DEFAULT_TIMELINE_START_HOUR)),
+      end: Math.min(23, Math.max(latestEventHour + 1, DEFAULT_TIMELINE_END_HOUR)),
+    };
+  }, [notesByHour]);
 
-  const handleTimelineSectionLayout = useCallback((e: LayoutChangeEvent) => {
-    const dateKey = selectedDate.getTime();
-    if (autoScrolledDateRef.current === dateKey) return;
-    autoScrolledDateRef.current = dateKey;
-
-    const sectionY = e.nativeEvent.layout.y;
-    const today = new Date();
-    const isToday = selectedDate.toDateString() === today.toDateString();
-    const targetHour = isToday
-      ? Math.min(23, Math.max(0, today.getHours()))
-      : DEFAULT_TIMELINE_HOUR;
-    const offsetY = SCROLL_TOP_PADDING + sectionY + targetHour * HOUR_ROW_HEIGHT;
-    scrollRef.current?.scrollTo({ y: offsetY, animated: false });
-  }, [selectedDate]);
+  const timelineHours = useMemo(() => {
+    const hours: number[] = [];
+    for (let h = timelineHourRange.start; h <= timelineHourRange.end; h++) hours.push(h);
+    return hours;
+  }, [timelineHourRange]);
 
   const isHoliday = dayData.isYomTov || dayData.holidays.length > 0;
   const primaryHoliday = dayData.holidays[0];
@@ -240,6 +264,14 @@ export default function DayScreen() {
   const hasRoshChodeshHoliday = dayData.holidaysEn.some((h) => h.startsWith('Rosh Chodesh'));
   const showRoshChodesh = dayData.hebrewDate.isRoshChodesh && !dayData.isYomTov && !hasRoshChodeshHoliday;
 
+  // Learning tab content — Daf Yomi + Rambam (as before) plus a single
+  // Tanach/Nach row: Nach Yomi preferred, falling back to Tanakh Yomi when
+  // Nach Yomi has no item for the day. (The full 7-schedule breakdown lives
+  // in the dedicated Details screen via the drawer — not duplicated here.)
+  const tanachItem = dayData.nachYomi ?? dayData.tanakhYomi;
+  const tanachLabel = dayData.nachYomi ? 'נ״ך יומי' : 'תנ״ך יומי';
+  const hasLearningItems = !!(dayData.dafYomi || dayData.rambamOneChapter || tanachItem);
+
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -249,7 +281,6 @@ export default function DayScreen() {
         <ScreenHeader date={selectedDate} onDatePress={openPicker} />
 
         <ScrollView
-          ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -307,13 +338,27 @@ export default function DayScreen() {
               locationName={resolvedLocationName}
               use24h={use24hTime}
             />
+
+            {/* Key zmanim — every day, right after ShabbatCard. A short
+                "checked daily" subset; the full 14-row list lives in the
+                dedicated זמנים tab (link below). Candle-lighting is skipped
+                here on Fridays — ShabbatCard already shows it above. */}
+            <KeyZmanimCard
+              colors={colors}
+              zmanim={zmanim}
+              use24h={use24hTime}
+              onSeeAll={goToZmanimTab}
+            />
           </View>
 
           {/* Tab bar — pinned to the top via stickyHeaderIndices={[1]} above
               once the highlights strip (index 0) scrolls past it. Needs an
               explicit opaque background (colors.background, matching the
               screen root) or content scrolling underneath would show
-              through while it's docked. */}
+              through while it's docked. Each tab is an even flex:1 share of
+              the row (not sized to its own text), so the active-tab
+              underline reads clearly as "this tab", not a stray line lost
+              against a full-width row. */}
           <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
             {/* RTL: 'אירועים' first in JSX → renders on the right */}
             <Pressable
@@ -326,15 +371,15 @@ export default function DayScreen() {
                 אירועים
               </Text>
             </Pressable>
-            {/* 'תורה וזמנים' second in JSX → renders on the left */}
+            {/* 'לימוד' second in JSX → renders on the left */}
             <Pressable
-              onPress={() => setActiveTab('torah')}
-              style={[styles.tabItem, activeTab === 'torah' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+              onPress={() => setActiveTab('learning')}
+              style={[styles.tabItem, activeTab === 'learning' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
               accessibilityRole="tab"
-              accessibilityLabel="תורה וזמנים"
+              accessibilityLabel="לימוד"
             >
-              <Text style={[styles.tabText, { color: activeTab === 'torah' ? colors.textPrimary : colors.textTertiary }]}>
-                תורה וזמנים
+              <Text style={[styles.tabText, { color: activeTab === 'learning' ? colors.textPrimary : colors.textTertiary }]}>
+                לימוד
               </Text>
             </Pressable>
           </View>
@@ -362,8 +407,9 @@ export default function DayScreen() {
 
               {/* Hourly schedule — C2: moved from torah tab to events tab.
                   Timed notes bucketed by getHours() of startDateTime.
-                  onLayout drives the once-per-date auto-scroll above. */}
-              <View style={styles.section} onLayout={handleTimelineSectionLayout}>
+                  Renders only the computed timelineHours window (see
+                  timelineHourRange above) — no auto-scroll needed. */}
+              <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
                   לוח שעות
                 </Text>
@@ -374,7 +420,7 @@ export default function DayScreen() {
                   </Text>
                 )}
 
-                {HOURS.map((hour) => {
+                {timelineHours.map((hour) => {
                   const hourLabel = hour.toString().padStart(2, '0') + ':00';
                   const hourNotes = notesByHour[hour] ?? [];
 
@@ -422,43 +468,51 @@ export default function DayScreen() {
               </View>
             </>
           ) : (
-            // ── Torah & Zmanim tab ─────────────────────────────────────────
-            // Parasha, Omer and holiday banner now live in the highlights
-            // strip above (shown every day, not just here) — kept out of
-            // this tab to avoid duplicating them. This tab keeps only the
-            // learning details that have no home in the strip (Daf Yomi,
-            // Rambam) plus the full Zmanim list.
-            <>
-              {(dayData.dafYomi || dayData.rambamOneChapter) && (
-                <View style={styles.section}>
-                  <SectionLabel title="פרטים תורניים" colors={colors} />
-                  <Card colors={colors}>
-                    {dayData.dafYomi && (
-                      <DetailRow
-                        label="דף יומי"
-                        value={dayData.dafYomi.display}
-                        colors={colors}
-                        actionLabel="→ ספריא"
-                        onAction={() => Linking.openURL(dayData.dafYomi!.url)}
-                      />
-                    )}
+            // ── Learning tab ───────────────────────────────────────────────
+            // Parasha, Omer, holiday banner and zmanim now live in the
+            // highlights strip above (shown every day, not just here) — kept
+            // out of this tab to avoid duplicating them. This tab keeps only
+            // the daily learning rows with no home in the strip: Daf Yomi,
+            // Rambam, and a single Tanach/Nach row (see tanachItem above).
+            <View style={styles.section}>
+              {hasLearningItems ? (
+                <Card colors={colors}>
+                  {dayData.dafYomi && (
+                    <DetailRow
+                      label="דף יומי"
+                      value={dayData.dafYomi.display}
+                      colors={colors}
+                      actionLabel="→ ספריא"
+                      onAction={() => Linking.openURL(dayData.dafYomi!.url)}
+                    />
+                  )}
 
-                    {dayData.rambamOneChapter && (
-                      <DetailRow
-                        label='רמב״ם יומי'
-                        value={dayData.rambamOneChapter.display}
-                        colors={colors}
-                        actionLabel="→ ספריא"
-                        onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
-                      />
-                    )}
-                  </Card>
-                </View>
+                  {dayData.rambamOneChapter && (
+                    <DetailRow
+                      label='רמב״ם יומי'
+                      value={dayData.rambamOneChapter.display}
+                      colors={colors}
+                      actionLabel="→ ספריא"
+                      onAction={() => Linking.openURL(dayData.rambamOneChapter!.url)}
+                    />
+                  )}
+
+                  {tanachItem && (
+                    <DetailRow
+                      label={tanachLabel}
+                      value={tanachItem.display}
+                      colors={colors}
+                      actionLabel="→ ספריא"
+                      onAction={() => Linking.openURL(tanachItem.url)}
+                    />
+                  )}
+                </Card>
+              ) : (
+                <Text style={[styles.timelineEmptyHint, { color: colors.textTertiary }]}>
+                  אין פריטי לימוד ליום זה
+                </Text>
               )}
-
-              {/* Zmanim */}
-              <ZmanimList zmanim={zmanim} />
-            </>
+            </View>
           )}
         </ScrollView>
 
@@ -514,6 +568,88 @@ function ParashaCard({
   );
 }
 
+// Compact "checked every day" zmanim card — shown in the highlights strip on
+// every day. Reuses the same zmanim data (`useZmanim`, already computed by
+// the parent) and the same Card/SectionLabel visual language as the rest of
+// the app; does not compute or touch any zmanim/halachic math itself. The
+// full 14-row breakdown lives in ZmanimList on the dedicated זמנים tab —
+// this card links there via `onSeeAll` rather than duplicating it.
+function KeyZmanimCard({
+  colors,
+  zmanim,
+  use24h,
+  onSeeAll,
+}: {
+  colors: ThemeColors;
+  zmanim: ZmanimResult;
+  use24h: boolean;
+  onSeeAll: () => void;
+}) {
+  const rows: [string, Date | null][] = [
+    ['עלות השחר', zmanim.alotHashachar],
+    ['הנץ החמה', zmanim.netz],
+    ['סוף זמן ק״ש (גר״א)', zmanim.sofZmanShmaGRA],
+    ['חצות', zmanim.chatzot],
+    ['שקיעה', zmanim.shkia],
+    ['צאת הכוכבים', zmanim.tzeitHakochavim],
+  ];
+
+  return (
+    <View style={styles.keyZmanimWrap}>
+      <SectionLabel title="זמני היום" colors={colors} />
+      <Card colors={colors}>
+        {rows.map(([label, time]) => (
+          <KeyZmanRow key={label} label={label} time={time} use24h={use24h} colors={colors} />
+        ))}
+      </Card>
+      <Pressable
+        onPress={onSeeAll}
+        style={styles.seeAllZmanimBtn}
+        accessibilityRole="button"
+        accessibilityLabel="כל הזמנים, מעבר למסך זמנים"
+        hitSlop={8}
+      >
+        <Text style={[styles.seeAllZmanimText, { color: colors.accent }]}>
+          כל הזמנים →
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// Single zmanim row inside KeyZmanimCard — `isLast` auto-injected by Card
+// (see Card.tsx) so the bottom hairline is correctly suppressed on the last
+// visible row. Mirrors ZmanimList's ZmanRow.
+function KeyZmanRow({
+  label,
+  time,
+  use24h,
+  colors,
+  isLast = false,
+}: {
+  label: string;
+  time: Date | null;
+  use24h: boolean;
+  colors: ThemeColors;
+  isLast?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.keyZmanRow,
+        { backgroundColor: colors.surface },
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+      ]}
+    >
+      {/* row-reverse, JSX order: label (flex:1, right) → time (left) */}
+      <Text style={[styles.keyZmanLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.keyZmanTime, { color: colors.textPrimary }]}>
+        {formatZmanTime(time, use24h)}
+      </Text>
+    </View>
+  );
+}
+
 function DetailRow({
   label,
   value,
@@ -565,7 +701,7 @@ function DetailRow({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: SCROLL_TOP_PADDING, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: CONTENT_TOP_PADDING, paddingBottom: 100 },
 
   // Highlights-strip banner — shared visual language for the holiday banner,
   // Omer count and Rosh Chodesh; only colors differ per use.
@@ -589,7 +725,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Detail rows (Torah details) — card row: bottom hairline suppressed on
+  // Detail rows (learning tab) — card row: bottom hairline suppressed on
   // the last visible row via the `isLast` prop Card auto-injects.
   detailRow: {
     flexDirection: 'row-reverse',
@@ -653,8 +789,9 @@ const styles = StyleSheet.create({
   },
   hourNoteTitle: { ...withFontFamily(typography.bodySmall, '700'), textAlign: 'right' },
   hourNoteTime: { ...withFontFamily(typography.micro), textAlign: 'right', marginTop: 2, opacity: 0.75 },
-  // Quiet empty-state hint shown above the grid (grid stays visible below
-  // it) when the day has zero timed events.
+  // Quiet empty-state hint (grid stays visible below it on the events tab;
+  // shown alone on the learning tab when there is nothing to learn) shown
+  // when there is nothing to show.
   timelineEmptyHint: {
     ...withFontFamily(typography.bodySmall),
     textAlign: 'center',
@@ -674,19 +811,47 @@ const styles = StyleSheet.create({
   parashaCaption: { ...withFontFamily(typography.caption), textAlign: 'right' },
   parashaName: { ...withFontFamily(typography.displaySmall), textAlign: 'right' },
 
-  // Tab bar — normal (scrolling) child of the ScrollView content.
-  tabBar: {
+  // Key zmanim card (highlights strip, every day) — Card + SectionLabel
+  // language shared with ZmanimList's full-list version.
+  keyZmanimWrap: { marginBottom: 16 },
+  keyZmanRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 48,
+    gap: 12,
+  },
+  keyZmanLabel: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
+  keyZmanTime: { ...withFontFamily(typography.bodyLarge, '700') },
+  // Quiet "see everything" affordance — right-aligned (the app's native base
+  // is locked LTR, so `flex-end` on a column lands the cross-axis on the
+  // right, matching Hebrew reading order) under the key-zmanim card.
+  seeAllZmanimBtn: {
+    alignSelf: 'flex-end',
+    minHeight: 48,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
+  seeAllZmanimText: {
+    ...withFontFamily(typography.bodySmall, '600'),
+    textAlign: 'right',
+  },
+
+  // Tab bar — normal (scrolling) child of the ScrollView content. Each tab
+  // is an even flex:1 share of the row so the active-tab underline spans
+  // only its own half, never the full row.
+  tabBar: {
+    flexDirection: 'row-reverse',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 8,
     marginBottom: 4,
   },
   tabItem: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    minHeight: 48,
   },
   tabText: {
     ...withFontFamily(typography.bodyMedium, '600'),

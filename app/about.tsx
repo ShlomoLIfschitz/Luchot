@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useThemeColors } from '../src/hooks/useThemeColors';
+import { getRunningUpdateInfo } from '../src/hooks/useOtaUpdates';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { Card } from '../src/components/ui/Card';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
@@ -64,6 +65,21 @@ export default function AboutScreen() {
     (Constants as any).manifest?.version ??
     'unknown';
 
+  // Diagnostic only — answers "did my change actually land?" without device
+  // logs (see useOtaUpdates.ts). Quiet and secondary by design; not a
+  // feature, so no loading/error state — these fields are static for the
+  // life of the running JS instance (a reload restarts the whole app).
+  const runningUpdate = getRunningUpdateInfo();
+  const runningUpdateLabel = runningUpdate.isEmbeddedLaunch
+    ? 'גרסה מוטמעת (ללא עדכון מקוון)'
+    : runningUpdate.updateId
+      ? `עדכון מקוון: ${runningUpdate.updateId.slice(0, 8)}${
+          runningUpdate.createdAt
+            ? ` · ${runningUpdate.createdAt.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+            : ''
+        }`
+      : null;
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScreenHeader title="אודות" />
@@ -82,6 +98,14 @@ export default function AboutScreen() {
           <Text style={[styles.version, { color: colors.textTertiary }]}>
             גרסה {version}
           </Text>
+          {runningUpdateLabel && (
+            <Text
+              style={[styles.updateInfo, { color: colors.textTertiary }]}
+              accessibilityLabel={`מידע אבחון: ${runningUpdateLabel}`}
+            >
+              {runningUpdateLabel}
+            </Text>
+          )}
         </View>
 
         {/* Description — shared Card, so its gutters match the Credits
@@ -169,6 +193,9 @@ const styles = StyleSheet.create({
   appName:  { ...withFontFamily(typography.displayMedium), letterSpacing: -0.5, textAlign: 'center' },
   tagline:  { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
   version:  { ...withFontFamily(typography.caption), marginTop: 12, textAlign: 'center' },
+  // Diagnostic, secondary to `version` — same token, tighter top margin so
+  // it reads as an appendix to the version line rather than a peer of it.
+  updateInfo: { ...withFontFamily(typography.caption), marginTop: 2, textAlign: 'center' },
 
   cardBody: {
     ...withFontFamily(typography.bodyMedium),
