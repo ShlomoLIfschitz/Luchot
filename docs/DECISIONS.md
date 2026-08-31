@@ -864,3 +864,32 @@
 - Implications: this supersedes the DayCell sketch in DESIGN.md. Row heights now
   flex to fill the screen WITH an explicit minHeight floor - never fully inferred,
   or the Yoga circular-height collapse returns.
+
+## A sticky header's own style is hoisted by React Native - never put layout on it
+- Date: 2026-08-31
+- Context: The Day screen's tab bar rendered its two tabs stacked vertically,
+  each full width, instead of side by side. Two rounds of "fixing" the styles
+  changed nothing, because the styles were already correct. The tab-bar View
+  was the element targeted by `stickyHeaderIndices`.
+- Cause (React Native, not us): `ScrollViewStickyHeader.js` renders the sticky
+  child as
+    `<Animated.View style={[child.props.style, styles.header, {transform}]}>`
+    `  {React.cloneElement(child, {style: styles.fill, onLayout: undefined})}`
+  where `styles.fill` is `{flex: 1}`. The child's style is MOVED to the wrapper
+  and the child is left with only `flex: 1`. Our `flexDirection: 'row-reverse'`
+  landed on the wrapper - which has a single child, so it did nothing - and the
+  tab bar fell back to the default `column`, with `alignItems: 'stretch'`
+  giving each tab full width. Exactly the observed rendering.
+- Choice: the element pointed at by `stickyHeaderIndices` must be a plain
+  wrapper carrying only "chrome" that BELONGS on the hoisted wrapper -
+  background, bottom border, margin. Any layout (flexDirection, gap,
+  justifyContent) goes on an inner View one level down, where it survives.
+- Alternatives considered: dropping the sticky behaviour (rejected - the tab bar
+  scrolling away is a real usability loss now that the highlights strip sits
+  above it); a fixed non-scrolling region (rejected - the highlights must scroll
+  away or they would permanently occupy most of a Friday screen).
+- Implications: applies to EVERY future sticky header in this app. The
+  background must sit on the outer/hoisted View specifically - if it ends up
+  only on the inner View, content shows through while the header is docked.
+  Note that `tsc`, `expo-doctor` and a production bundle are all green in the
+  broken state; this is only observable by looking at the screen.

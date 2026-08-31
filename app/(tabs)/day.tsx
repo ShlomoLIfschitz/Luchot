@@ -352,36 +352,57 @@ export default function DayScreen() {
           </View>
 
           {/* Tab bar — pinned to the top via stickyHeaderIndices={[1]} above
-              once the highlights strip (index 0) scrolls past it. Needs an
-              explicit opaque background (colors.background, matching the
-              screen root) or content scrolling underneath would show
-              through while it's docked. Each tab is an even flex:1 share of
-              the row (not sized to its own text), so the active-tab
-              underline reads clearly as "this tab", not a stray line lost
-              against a full-width row. */}
-          <View style={[styles.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-            {/* RTL: 'אירועים' first in JSX → renders on the right */}
-            <Pressable
-              onPress={() => setActiveTab('events')}
-              style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-              accessibilityRole="tab"
-              accessibilityLabel="אירועים"
-            >
-              <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
-                אירועים
-              </Text>
-            </Pressable>
-            {/* 'לימוד' second in JSX → renders on the left */}
-            <Pressable
-              onPress={() => setActiveTab('learning')}
-              style={[styles.tabItem, activeTab === 'learning' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-              accessibilityRole="tab"
-              accessibilityLabel="לימוד"
-            >
-              <Text style={[styles.tabText, { color: activeTab === 'learning' ? colors.textPrimary : colors.textTertiary }]}>
-                לימוד
-              </Text>
-            </Pressable>
+              once the highlights strip (index 0) scrolls past it.
+
+              IMPORTANT — do not collapse this back into a single View.
+              React Native's ScrollViewStickyHeader (Libraries/Components/
+              ScrollView/ScrollViewStickyHeader.js) hoists whatever style is
+              on the sticky child onto ITS OWN wrapper Animated.View, then
+              hands the original child back only `{ flex: 1 }`:
+                style={[child.props.style, styles.header, {transform: ...}]}
+                {React.cloneElement(child, { style: styles.fill, ... })}
+              If the sticky element itself were the row (flexDirection:
+              'row-reverse'), that row-reverse would land on the wrapper —
+              which has a single child, so it does nothing — while the row
+              View underneath is left with only flex:1 and falls back to the
+              column/stretch default, stacking the two tabs full-width
+              instead of side by side. The fix is to give
+              stickyHeaderIndices={[1]} a plain OUTER View (tabBarOuter,
+              chrome only: background + bottom border), and keep the actual
+              row (tabBarRow, flexDirection row-reverse) as an inner child
+              one level down, where RN's hoisting can't reach it.
+
+              The outer View must carry the opaque background (matching the
+              screen root) and the bottom border, because that style is what
+              ends up on the wrapper Animated.View — the element that
+              actually paints while the bar is docked at the top. If the
+              background were only on the inner row, content scrolling
+              underneath would show through around/behind it while docked. */}
+          <View style={[styles.tabBarOuter, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+            <View style={styles.tabBarRow}>
+              {/* RTL: 'אירועים' first in JSX → renders on the right */}
+              <Pressable
+                onPress={() => setActiveTab('events')}
+                style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+                accessibilityRole="tab"
+                accessibilityLabel="אירועים"
+              >
+                <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
+                  אירועים
+                </Text>
+              </Pressable>
+              {/* 'לימוד' second in JSX → renders on the left */}
+              <Pressable
+                onPress={() => setActiveTab('learning')}
+                style={[styles.tabItem, activeTab === 'learning' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
+                accessibilityRole="tab"
+                accessibilityLabel="לימוד"
+              >
+                <Text style={[styles.tabText, { color: activeTab === 'learning' ? colors.textPrimary : colors.textTertiary }]}>
+                  לימוד
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           {activeTab === 'events' ? (
@@ -838,13 +859,19 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Tab bar — normal (scrolling) child of the ScrollView content. Each tab
-  // is an even flex:1 share of the row so the active-tab underline spans
-  // only its own half, never the full row.
-  tabBar: {
-    flexDirection: 'row-reverse',
+  // Tab bar — the sticky child pointed at by stickyHeaderIndices={[1]}.
+  // Split into an outer (chrome: background + border, hoisted onto RN's
+  // sticky-header wrapper while docked) and an inner row (flexDirection,
+  // safe from that hoisting) — see the long comment at the JSX call site
+  // for why this split exists. Do not merge them back into one View.
+  tabBarOuter: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     marginBottom: 4,
+  },
+  // Each tab is an even flex:1 share of the row so the active-tab underline
+  // spans only its own half, never the full row.
+  tabBarRow: {
+    flexDirection: 'row-reverse',
   },
   tabItem: {
     flex: 1,
