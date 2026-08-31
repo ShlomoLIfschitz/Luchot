@@ -631,3 +631,50 @@ slow:    400ms   — מעברי דף
 - מתחת ל-250ms לרוב משוב UI
 - בלי אנימציות מעל 400ms
 - כיבוד הגדרת `reduceMotion` (דילוג על אנימציות כשפעיל)
+
+---
+
+## Deliberate deviations from the Figma mock
+
+> The Figma file (`Luchot — Design System & Screens`) is the visual source of
+> truth, and as of 2026-08-31 the code was audited element-by-element against it
+> and brought to parity. The two exceptions below are **intentional and
+> user-approved**. Do not "correct" them toward the mock.
+
+### Zmanim rows are 48px tall, not Figma's 44
+
+Figma draws zmanim rows at 44px (padding 11/14). The code uses `minHeight: 48`.
+
+**48dp is Android's minimum touch-target size**, and Android is this project's
+primary target. Figma does not model accessibility constraints. A 44px row is
+below the floor for a control the user taps to reach the full zmanim list.
+
+Applies to `ZmanimList`, `ZmanimFullList`, and the key-zmanim card on the Day
+screen. Cost: roughly 4px × 10 rows of extra vertical density. Accepted.
+
+### Day-cell tag chips are 17px tall, not Figma's 15
+
+Figma draws the calendar's tag chips at 15px. The code uses 17.
+
+Raised deliberately after device testing showed real Hebrew holiday names
+truncating inside the chip — the mock used short placeholder text
+(`פסח ראשון`) while hebcal returns longer strings. The extra 2px plus the
+increased inter-chip spacing is what lets a two-word Hebrew name fit.
+
+Applies to `DayCell`'s `tagChip` and `SEGMENT_CHIP_HEIGHT`.
+
+### Why these are recorded here
+
+Both were flagged during the parity audit and confirmed by the user rather than
+silently kept. The general rule stands: **where code and Figma differ, Figma
+wins** — unless the deviation is written down here with its reason. Anything not
+listed above is drift and should be fixed toward the mock.
+
+### How to re-run the audit
+
+The Figma file can be queried directly for ground truth rather than read by eye —
+that is how the 2026-08-31 pass found a systematic 1–2px drift across 35 styles.
+Extract every text node's `fontSize` + `fontName.style` per screen, and frames'
+`cornerRadius` / padding / dimensions, then diff against the tokens the code
+actually consumes. Agents cannot see Figma; only the orchestrator can, so this
+comparison has to be produced and handed to them as an explicit table.

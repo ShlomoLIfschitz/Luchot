@@ -541,13 +541,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  valueText: { ...withFontFamily(typography.bodySmall) },
+  // Figma: row value = 14 Medium.
+  valueText: { ...withFontFamily(typography.label, '500') },
   // No exact type-scale step matches the previous hand-picked 22 — nearest
   // step is displaySmall (20); delta of -2 noted, matches the row's Icon
   // size (20) so the chevron reads consistently with the leading glyph.
   chevron:   { ...withFontFamily(typography.displaySmall) },
+  // Figma: explanatory note under a card = 11 Regular.
   note: {
-    ...withFontFamily(typography.caption),
+    ...withFontFamily(typography.caption, '400'),
     textAlign: 'right',
     paddingHorizontal: 20,
     paddingTop: 6,

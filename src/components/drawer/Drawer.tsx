@@ -324,14 +324,18 @@ const styles = StyleSheet.create({
     ...withFontFamily(typography.displayMedium),
   },
   headerHebDate: {
+    // Figma target: 14 Medium — exact match via typography.label (14/400
+    // default) with weight overridden to 500.
     textAlign: 'right',
     marginTop: 4,
-    ...withFontFamily(typography.bodyLarge),
+    ...withFontFamily(typography.label, '500'),
   },
   headerGregDate: {
+    // Figma target: 11 Regular — exact match via typography.caption (11/500
+    // default) with weight overridden to 400.
     textAlign: 'right',
     marginTop: 2,
-    ...withFontFamily(typography.bodySmall),
+    ...withFontFamily(typography.caption, '400'),
   },
   items: {
     paddingHorizontal: 10,
@@ -343,10 +347,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   version: {
+    // Figma target: 11 Regular — exact match via typography.caption (11/500
+    // default) with weight overridden to 400.
     marginTop: 'auto',
     textAlign: 'right',
     paddingHorizontal: 20,
     paddingTop: 8,
-    ...withFontFamily(typography.caption),
+    ...withFontFamily(typography.caption, '400'),
   },
 });

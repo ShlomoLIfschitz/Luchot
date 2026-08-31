@@ -388,7 +388,8 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   gpsButtonDisabled: { opacity: 0.6 },
-  gpsButtonText: { ...withFontFamily(typography.bodyMedium, '600') },
+  // Figma: primary GPS button = 15 Bold.
+  gpsButtonText: { ...withFontFamily(typography.bodyMedium, '700') },
 
   searchContainer: {
     flexDirection: 'row-reverse',
@@ -400,9 +401,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 16,
   },
+  // Figma: search placeholder / input text = 14 Regular.
   searchInput: {
     flex: 1,
-    ...withFontFamily(typography.bodyMedium),
+    ...withFontFamily(typography.label),
     paddingVertical: 8,
   },
 
@@ -449,6 +451,7 @@ const stripStyles = StyleSheet.create({
   },
   textBlock: { flex: 1 },
   iconSlot: { width: 24, alignItems: 'center' },
-  headline: { ...withFontFamily(typography.bodyMedium, '700'), textAlign: 'right' },
-  detail:   { ...withFontFamily(typography.caption), marginTop: 2, textAlign: 'right' },
+  // Figma: GPS status headline = 13 Bold; detail line = 10 Regular.
+  headline: { ...withFontFamily(typography.bodySmall, '700'), textAlign: 'right' },
+  detail:   { ...withFontFamily(typography.micro, '400'), marginTop: 2, textAlign: 'right' },
 });

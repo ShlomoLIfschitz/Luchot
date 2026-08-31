@@ -134,23 +134,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    // Nearest token: typography.cardTitle (17/700/22) — exact fontSize match;
-    // fontWeight delta 600→700 (matches MonthGrid's analogous title-line role).
-    ...withFontFamily(typography.cardTitle),
+    // Figma target: 19 Bold — exact match via typography.screenTitle.
+    ...withFontFamily(typography.screenTitle),
     textAlign: 'center',
   },
   dateLineLarge: {
-    // Nearest token: typography.cellPrimary (15/600/20) — exact fontSize AND
-    // fontWeight match, no delta.
-    ...withFontFamily(typography.cellPrimary),
+    // Figma target: 19 Bold — exact match via typography.screenTitle.
+    ...withFontFamily(typography.screenTitle),
     letterSpacing: -0.2,
     textAlign: 'center',
   },
   dateLineSmall: {
-    // Nearest token: typography.caption (11/500/14) — exact fontSize match;
-    // fontWeight delta 400(default)→500. Mirrors the caption-subtitle role
-    // used under MonthGrid's title line.
-    ...withFontFamily(typography.caption),
+    // Figma target: 13 Regular — exact match via typography.bodySmall.
+    ...withFontFamily(typography.bodySmall),
     marginTop: 1,
     textAlign: 'center',
   },

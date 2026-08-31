@@ -245,8 +245,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  primaryRange:   { ...withFontFamily(typography.screenTitle), textAlign: 'center' },
-  secondaryRange: { ...withFontFamily(typography.bodySmall), marginTop: 2, textAlign: 'center' },
+  // Figma: week-range title = 17 Bold; Gregorian sub-line = 11 Medium.
+  primaryRange:   { ...withFontFamily(typography.cardTitle), textAlign: 'center' },
+  secondaryRange: { ...withFontFamily(typography.caption), marginTop: 2, textAlign: 'center' },
 
   parashaBanner: {
     paddingVertical: 12,

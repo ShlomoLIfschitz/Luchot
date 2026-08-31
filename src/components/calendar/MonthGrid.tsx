@@ -587,11 +587,11 @@ const styles = StyleSheet.create({
   },
   titleBlock: { flex: 1, alignItems: 'center' },
   monthTitle: {
-    ...withFontFamily(typography.cardTitle),
+    ...withFontFamily(typography.screenTitle),
     textAlign: 'center',
   },
   monthSubtitle: {
-    ...withFontFamily(typography.caption),
+    ...withFontFamily(typography.subtitle),
     marginTop: 1,
     textAlign: 'center',
   },

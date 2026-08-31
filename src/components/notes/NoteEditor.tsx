@@ -850,7 +850,10 @@ export function NoteEditor({
                             ]}
                           >
                             <Icon size={18} color={active ? colors.textInverse : colors.textSecondary} />
-                            <Text style={[s.typeLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>{label}</Text>
+                            {/* Figma target: 13 Bold (active) / 13 Medium (inactive) — exact
+                                match via typography.bodySmall (13/400 default) with weight
+                                overridden per active state. */}
+                            <Text style={[withFontFamily(typography.bodySmall, active ? '700' : '500'), { color: active ? colors.textInverse : colors.textSecondary }]}>{label}</Text>
                           </Pressable>
                         );
                       })}
@@ -880,7 +883,10 @@ export function NoteEditor({
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                           >
-                            <Text style={[s.recurrenceChipLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>
+                            {/* Figma target: 13 Bold (active) / 13 Medium (inactive) — exact
+                                match via typography.bodySmall (13/400 default) with weight
+                                overridden per active state. */}
+                            <Text style={[withFontFamily(typography.bodySmall, active ? '700' : '500'), { color: active ? colors.textInverse : colors.textSecondary }]}>
                               {label}
                             </Text>
                           </Pressable>
@@ -907,7 +913,10 @@ export function NoteEditor({
                                 accessibilityRole="button"
                                 accessibilityState={{ selected: active }}
                               >
-                                <Text style={[s.anchorLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>
+                                {/* Figma target: 13 Bold (active) / 13 Medium (inactive) — exact
+                                    match via typography.bodySmall (13/400 default) with weight
+                                    overridden per active state. */}
+                                <Text style={[{ textAlign: 'center' as const }, withFontFamily(typography.bodySmall, active ? '700' : '500'), { color: active ? colors.textInverse : colors.textSecondary }]}>
                                   {ct === 'hebrew' ? 'לפי לוח עברי' : 'לפי לוח לועזי'}
                                 </Text>
                               </Pressable>
@@ -1122,7 +1131,10 @@ export function NoteEditor({
                                   { backgroundColor: active ? colors.accent : colors.surfaceMuted },
                                 ]}
                               >
-                                <Text style={[s.leadChipLabel, { color: active ? colors.textInverse : colors.textSecondary }]}>
+                                {/* Figma target: 13 Bold (active) / 13 Medium (inactive) — exact
+                                    match via typography.bodySmall (13/400 default) with weight
+                                    overridden per active state. */}
+                                <Text style={[withFontFamily(typography.bodySmall, active ? '700' : '500'), { color: active ? colors.textInverse : colors.textSecondary }]}>
                                   {label}
                                 </Text>
                               </Pressable>
@@ -1180,16 +1192,18 @@ const s = StyleSheet.create({
   sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36, maxHeight: '85%' },
   handle: { width: 38, height: 4, borderRadius: radius.full, alignSelf: 'center', marginBottom: 16 },
   headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
-  title: { flex: 1, textAlign: 'right', ...withFontFamily(typography.displaySmall) },
+  // Figma target: 18 Bold — exact match via typography.sheetTitle.
+  title: { flex: 1, textAlign: 'right', ...withFontFamily(typography.sheetTitle) },
   // Nearest token: typography.displaySmall (20/600/26) — exact fontSize AND
   // fontWeight match, no delta.
   closeBtn: { ...withFontFamily(typography.displaySmall) },
   // Visual size stays modest; the Pressable itself is padded to reach the 48dp target.
   closeBtnHit: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   input: {
+    // Figma target: 16 Medium — exact match via typography.emphasis.
     borderWidth: 1, borderRadius: radius.md, padding: 12,
     minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
-    ...withFontFamily(typography.bodyMedium),
+    ...withFontFamily(typography.emphasis),
   },
   sectionLabel: {
     textAlign: 'right', marginBottom: 8,
@@ -1203,7 +1217,7 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse', alignItems: 'center', gap: 6,
     borderRadius: radius.full, paddingVertical: 9, paddingHorizontal: 14,
   },
-  typeLabel: { ...withFontFamily(typography.bodySmall) },
+  // typeLabel removed — font now applied inline per active state (see JSX; Figma: 13 Bold/Medium).
   recurrenceRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
@@ -1215,17 +1229,18 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
-  recurrenceChipLabel: {
-    ...withFontFamily(typography.bodySmall),
-  },
+  // recurrenceChipLabel removed — font now applied inline per active state (Figma: 13 Bold/Medium).
   // Calendar anchor chips (shown only for yearly)
   anchorRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   anchorChip: { borderRadius: radius.full, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' },
-  anchorLabel: { textAlign: 'center', ...withFontFamily(typography.bodySmall) },
+  // anchorLabel removed — font now applied inline per active state (Figma: 13 Bold/Medium);
+  // textAlign: 'center' preserved inline alongside it.
   // Footer — row-reverse, [Save, Cancel] JSX order puts Save on the RIGHT.
   actions: { flexDirection: 'row-reverse', gap: 10, marginTop: 4 },
   btn: { flex: 1, minHeight: 48, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  btnText: { ...withFontFamily(typography.bodyLarge) },
+  // Figma target: 15 Bold — exact match via typography.bodyMedium (15/400
+  // default) with weight overridden to 700.
+  btnText: { ...withFontFamily(typography.bodyMedium, '700') },
   // Field-group card — used for view-mode metadata and edit-mode toggle groups.
   // Rows are separated by hairlines; the card itself clips to radius.lg.
   fieldGroup: {
@@ -1245,13 +1260,16 @@ const s = StyleSheet.create({
   fieldRowLast: {
     borderBottomWidth: 0,
   },
+  // Figma target: 14 Regular — exact match via typography.label.
   fieldLabel: {
     textAlign: 'right',
-    ...withFontFamily(typography.bodyMedium),
+    ...withFontFamily(typography.label),
   },
+  // Figma target: 14 Medium — exact match via typography.label (14/400
+  // default) with weight overridden to 500.
   fieldValue: {
     textAlign: 'right',
-    ...withFontFamily(typography.bodyMedium),
+    ...withFontFamily(typography.label, '500'),
   },
   timeChip: {
     borderRadius: radius.md,
@@ -1288,9 +1306,7 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
-  leadChipLabel: {
-    ...withFontFamily(typography.bodySmall),
-  },
+  // leadChipLabel removed — font now applied inline per active state (Figma: 13 Bold/Medium).
   customRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

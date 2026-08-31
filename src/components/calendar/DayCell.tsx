@@ -285,7 +285,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Today's circled numeral is a distinct, smaller weight (13 Bold) than the
+  // regular primaryLabel (15 SemiBold) — overrides fontFamily/size by being
+  // later in the style array alongside styles.primaryLabel at the call site.
   todayLabel: {
+    ...withFontFamily(typography.bodySmall, '700'),
     textAlign: 'center',
   },
   secondaryGroup: {

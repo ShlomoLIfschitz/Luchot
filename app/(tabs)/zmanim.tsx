@@ -239,6 +239,6 @@ const styles = StyleSheet.create({
   shitaSegmentActive: {
     ...elevation.sm,
   },
-  shitaSegmentText: { ...withFontFamily(typography.bodyMedium) },
-  shitaSegmentTextActive: { ...withFontFamily(typography.bodyMedium, '700') },
+  shitaSegmentText: { ...withFontFamily(typography.bodySmall, '500') },
+  shitaSegmentTextActive: { ...withFontFamily(typography.bodySmall, '700') },
 });

@@ -56,7 +56,10 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
       <Text
         style={[
           styles.label,
-          withFontFamily(typography.bodyLarge, active ? '700' : '500'),
+          // Figma target: 15 Regular (inactive) / 15 Bold (active) — exact
+          // match via typography.bodyMedium (15/400 default; override to
+          // 700 when active).
+          withFontFamily(typography.bodyMedium, active ? '700' : undefined),
           {
             color: active ? colors.accent : colors.textPrimary,
           },
@@ -82,6 +85,6 @@ const styles = StyleSheet.create({
   label: {
     flex: 1,
     textAlign: 'right',
-    ...withFontFamily(typography.bodyLarge),
+    ...withFontFamily(typography.bodyMedium),
   },
 });

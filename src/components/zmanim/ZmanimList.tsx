@@ -110,8 +110,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 12,
   },
-  label: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
-  time:  { ...withFontFamily(typography.bodyLarge, '700') },
+  label: { ...withFontFamily(typography.label), flex: 1, textAlign: 'right' },
+  time:  { ...withFontFamily(typography.bodyMedium, '700') },
   candleValueBlock: { alignItems: 'flex-start' },
   offsetHint: { ...withFontFamily(typography.micro), marginTop: 1, textAlign: 'right' },
 });

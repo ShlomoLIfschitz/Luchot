@@ -387,7 +387,11 @@ export default function DayScreen() {
                 accessibilityRole="tab"
                 accessibilityLabel="אירועים"
               >
-                <Text style={[styles.tabText, { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary }]}>
+                <Text style={[
+                  styles.tabText,
+                  activeTab === 'events' && styles.tabTextActive,
+                  { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary },
+                ]}>
                   אירועים
                 </Text>
               </Pressable>
@@ -398,7 +402,11 @@ export default function DayScreen() {
                 accessibilityRole="tab"
                 accessibilityLabel="לימוד"
               >
-                <Text style={[styles.tabText, { color: activeTab === 'learning' ? colors.textPrimary : colors.textTertiary }]}>
+                <Text style={[
+                  styles.tabText,
+                  activeTab === 'learning' && styles.tabTextActive,
+                  { color: activeTab === 'learning' ? colors.textPrimary : colors.textTertiary },
+                ]}>
                   לימוד
                 </Text>
               </Pressable>
@@ -791,7 +799,7 @@ const styles = StyleSheet.create({
   },
   hourLabel: {
     width: 38,
-    ...withFontFamily(typography.micro),
+    ...withFontFamily(typography.caption),
     paddingTop: 4,
     textAlign: 'left',
   },
@@ -808,8 +816,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: radius.md,
   },
-  hourNoteTitle: { ...withFontFamily(typography.bodySmall, '700'), textAlign: 'right' },
-  hourNoteTime: { ...withFontFamily(typography.micro), textAlign: 'right', marginTop: 2, opacity: 0.75 },
+  hourNoteTitle: { ...withFontFamily(typography.caption), textAlign: 'right' },
+  hourNoteTime: { ...withFontFamily(typography.caption, '400'), textAlign: 'right', marginTop: 2, opacity: 0.75 },
   // Quiet empty-state hint (grid stays visible below it on the events tab;
   // shown alone on the learning tab when there is nothing to learn) shown
   // when there is nothing to show.
@@ -830,7 +838,7 @@ const styles = StyleSheet.create({
   },
   parashaTextBlock: { flex: 1, gap: 2 },
   parashaCaption: { ...withFontFamily(typography.caption), textAlign: 'right' },
-  parashaName: { ...withFontFamily(typography.displaySmall), textAlign: 'right' },
+  parashaName: { ...withFontFamily(typography.displaySmall, '700'), textAlign: 'right' },
 
   // Key zmanim card (highlights strip, every day) — Card + SectionLabel
   // language shared with ZmanimList's full-list version.
@@ -843,8 +851,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 12,
   },
-  keyZmanLabel: { ...withFontFamily(typography.bodyMedium), flex: 1, textAlign: 'right' },
-  keyZmanTime: { ...withFontFamily(typography.bodyLarge, '700') },
+  keyZmanLabel: { ...withFontFamily(typography.label), flex: 1, textAlign: 'right' },
+  keyZmanTime: { ...withFontFamily(typography.bodyMedium, '700') },
   // Quiet "see everything" affordance — right-aligned (the app's native base
   // is locked LTR, so `flex-end` on a column lands the cross-axis on the
   // right, matching Hebrew reading order) under the key-zmanim card.
@@ -881,7 +889,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   tabText: {
-    ...withFontFamily(typography.bodyMedium, '600'),
+    ...withFontFamily(typography.bodySmall, '500'),
+  },
+  tabTextActive: {
+    ...withFontFamily(typography.bodySmall, '700'),
   },
 
   // Inline add-event button (events tab)

@@ -100,14 +100,16 @@ export function ShabbatCard({
                   >
                     {row.nameHe}
                   </Text>
-                  {/* (b) Candle lighting — fixed ~74, center */}
+                  {/* (b) Candle lighting — fixed ~74, center. 13 SemiBold on
+                      regular rows (heavier than the plain city-name/havdalah
+                      columns), 13 Bold on the user row like every other column. */}
                   <Text
                     style={[
                       styles.timeCell,
                       styles.candleCell,
                       {
                         color: row.isUserRow ? colors.accent : colors.textPrimary,
-                        ...withFontFamily(typography.bodySmall, row.isUserRow ? '700' : '400'),
+                        ...withFontFamily(typography.bodySmall, row.isUserRow ? '700' : '600'),
                       },
                     ]}
                   >
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardHeaderTitle: {
-    ...withFontFamily(typography.cardTitle),
+    ...withFontFamily(typography.bodyMedium, '700'),
   },
 
   // ── Saturday branch (row/label/value — kept exactly as before) ──────────

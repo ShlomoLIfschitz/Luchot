@@ -264,8 +264,9 @@ const styles = StyleSheet.create({
   hebrewDate:  { ...withFontFamily(typography.displaySmall), letterSpacing: -0.5 },
   gregDate:    { ...withFontFamily(typography.bodySmall), marginTop: 4 },
 
+  // Figma: footer hint = 11 Regular.
   emptyState: {
-    ...withFontFamily(typography.bodySmall),
+    ...withFontFamily(typography.caption, '400'),
     textAlign: 'center',
     marginTop: 40,
     fontStyle: 'italic',
@@ -298,8 +299,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     textAlign: 'right',  // Hebrew label anchors to right edge
   },
+  // Figma target: learning value = 16 Bold.
   rowValue: {
-    ...withFontFamily(typography.cardTitle),
+    ...withFontFamily(typography.emphasis, '700'),
     textAlign: 'right',  // Hebrew value anchors to right edge
   },
 

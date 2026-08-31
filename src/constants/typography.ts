@@ -2,6 +2,23 @@
 // Type scale — matches docs/DESIGN.md Typography section, extended with the
 // additional steps used by the redesign (screenTitle, cardTitle, cellPrimary,
 // cellSecondary, cellTag).
+//
+// 2026-08-31 typography drift fix: the scale was missing two steps the
+// actual (post-redesign) Figma file relies on — 14px and 12px — so every
+// call site that needed one of those sizes mapped to the nearest existing
+// step instead, compounding into a visible drift (most visibly, zmanim row
+// times rendering at 17 Bold against a 15 Regular label instead of the
+// correct 15 Bold / 14 Regular). `label` (14/400) and `subtitle` (12/500)
+// were added to close that gap. No existing step's values were changed.
+//
+// 2026-08-31 (same pass, part 2): Figma also relies on 16px and 18px, which
+// the scale still could not express. Added `emphasis` (16/500) and
+// `sheetTitle` (18/700). Their lineHeight values were derived by linear
+// interpolation from the immediate neighbours already in the scale (NOT
+// invented): sheetTitle sits between cardTitle (17/22) and screenTitle
+// (19/24) — slope 1px lineHeight per 1px fontSize — giving 18/23; emphasis
+// sits between bodyMedium (15/22) and bodyLarge (17/24) — same slope —
+// giving 16/23. No existing step's values were changed.
 
 import type { TextStyle } from 'react-native';
 
@@ -25,10 +42,14 @@ export const typography = {
   displayMedium:  { fontSize: 24, fontWeight: '700', lineHeight: 30 },
   displaySmall:   { fontSize: 20, fontWeight: '600', lineHeight: 26 },
   screenTitle:    { fontSize: 19, fontWeight: '700', lineHeight: 24 },
+  sheetTitle:     { fontSize: 18, fontWeight: '700', lineHeight: 23 },
   cardTitle:      { fontSize: 17, fontWeight: '700', lineHeight: 22 },
   bodyLarge:      { fontSize: 17, fontWeight: '500', lineHeight: 24 },
+  emphasis:       { fontSize: 16, fontWeight: '500', lineHeight: 23 },
   bodyMedium:     { fontSize: 15, fontWeight: '400', lineHeight: 22 },
+  label:          { fontSize: 14, fontWeight: '400', lineHeight: 19 },
   bodySmall:      { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  subtitle:       { fontSize: 12, fontWeight: '500', lineHeight: 16 },
   caption:        { fontSize: 11, fontWeight: '500', lineHeight: 14 },
   captionBold:    { fontSize: 11, fontWeight: '700', lineHeight: 14 },
   micro:          { fontSize: 10, fontWeight: '500', lineHeight: 13 },

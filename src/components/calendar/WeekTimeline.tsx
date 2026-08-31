@@ -535,8 +535,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingRight: 4,
   },
+  // Figma: all-day gutter label = 8 Medium. No 8px step exists (and none
+  // will be added — see 8px-problem note at file top); using the smallest
+  // existing step, cellTag (9/500), as a deliberate 1px deviation.
   gutterLabel: {
-    ...withFontFamily(typography.micro),
+    ...withFontFamily(typography.cellTag),
   },
 
   // Day-columns header — full-width relative coordinate space; cells are
@@ -568,11 +571,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Figma: today numeral = 14 Bold.
   todayNumeral: {
-    ...withFontFamily(typography.cellPrimary),
+    ...withFontFamily(typography.label, '700'),
   },
+  // Figma: Gregorian day number = 9 Regular.
   gregNumber: {
-    ...withFontFamily(typography.cellSecondary),
+    ...withFontFamily(typography.cellTag, '400'),
     writingDirection: 'ltr',
   },
 
@@ -624,6 +629,10 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
 
+  // Figma: timed event block corner = r5. No 5px step exists; radius.sm (6)
+  // is a 1px deviation, same rationale as the cellTag font-size deviations
+  // below — a 1px corner-radius difference on a ~small event block is not
+  // visually perceptible, so this doesn't warrant a new single-use token.
   timedBlock: {
     position: 'absolute',
     borderRadius: radius.sm,
@@ -640,8 +649,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.sm,
     borderBottomRightRadius: radius.sm,
   },
+  // Figma: timed event title = 8 SemiBold. No 8px step exists (deliberate
+  // 1px deviation, same rationale as gutterLabel above) — using cellTag
+  // (9px) with a SemiBold ('600') weight override.
   timedTitle: {
-    ...withFontFamily(typography.cellTag, '700'),
+    ...withFontFamily(typography.cellTag, '600'),
     textAlign: 'right',
   },
 
