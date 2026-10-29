@@ -1,0 +1,42 @@
+# The Definition of Done on every PR (see docs/agentic/integration-checks.md).
+# No native build and no EAS: `eas build` costs build minutes and `eas submit`
+# is a red line. Reads the repo only: no secrets, no EXPO_TOKEN.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.18.1 # eas.json build.base.node
+          cache: npm
+
+      - name: Install
+        run: npm ci # postinstall runs scripts/patch-expo-sqlite-imports.cjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Expo doctor
+        run: npx expo-doctor
+
+      # Proves the JS bundle builds (broken imports, unresolved assets) without a native toolchain.
+      - name: Export bundle
+        run: npx expo export --platform android --output-dir dist-ci
