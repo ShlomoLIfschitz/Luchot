@@ -1,0 +1,6 @@
+{
+  "workLog": "docs/WORK_LOG.md",
+  "requireCommit": true,
+  "stopMode": "remind",
+  "longSessionBytes": 3145728
+}
