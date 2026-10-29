@@ -24,6 +24,21 @@ Merges: run `gh pr checks <n>`; when every check passed, Claude merges and says 
 | Branch protection | Private repo on GitHub Free: not available (API returns 403). Gate = the guard + `gh pr checks` before merge. |
 | Guard | Blocks `eas update --branch production` and `eas submit` (Shlomo's). `eas update --branch preview` and `eas build --profile preview` are allowed. |
 
+## Play Store release
+
+Once the app is on Google Play, the `production` channel is real users, and their device holds the only copy of their data (offline-first, no backend, no backup).
+
+**Release order (every step after the merge is Shlomo's; the guard blocks `eas submit` and `eas update --branch production`):**
+1. The PR is merged with every check green.
+2. Upgrade-scenario check on a device with existing data (`docs/agentic/local-first.md`): the migration applies cleanly and no data is lost. Mandatory for every production release, not only schema changes.
+3. A full build: `eas build --profile production` (Android App Bundle, `autoIncrement`).
+4. `eas submit --profile production` to the Play Console track.
+5. Later JS-only fixes: `eas update --branch production --message "..."`, only for builds that share the current `runtimeVersion`.
+
+**`runtimeVersion` trap:** the policy is `sdkVersion`, so an OTA reaches every build on the same Expo SDK. It does NOT detect a new native dependency, an `app.json` change or a native config change within the same SDK: an OTA that needs native code the store build lacks crashes on launch. After any of those, the next production release is a full build (step 3), never an OTA.
+
+**Store requirements (Shlomo's, outside the code):** a privacy policy URL and the Play Console Data safety form. Inference, not verified against the current Play policy text: both are needed because the app requests location and sends rounded coordinates to Nominatim (`src/utils/reverseGeocode.ts`).
+
 ## Open gaps
 
 - None blocking. A production release (`eas update --branch production`, `eas build --profile production`, `eas submit`) is Shlomo's step.

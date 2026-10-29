@@ -6,6 +6,26 @@
 
 ---
 
+## 2026-10-29 — Session: Play Store release rules
+
+**Phase:** tooling (no app code changed)
+**Branch / PR:** `docs/play-store-release`
+
+### What was done
+- `docs/agentic/deploy.md`: a "Play Store release" section — release order, the `runtimeVersion` (`sdkVersion`) trap, and the store requirements (privacy policy, Data safety form).
+- `CLAUDE.md`: one rule — an OTA to `production` or `eas submit` is closed-list stop 1; an OTA to `preview` is free; after a native change the next production release is a full build.
+
+### Decisions made
+- The upgrade-scenario check on a device with existing data is mandatory for every production release, not only schema changes: store users have no backup.
+
+### Open issues / blocked
+- Privacy policy and the Data safety form are Shlomo's, before the first store release.
+
+### Next steps
+- None from this change.
+
+---
+
 ## 2026-10-29 — Session: agentic workflow setup (`/ai-workflow-setup`)
 
 **Phase:** tooling (no app code changed)

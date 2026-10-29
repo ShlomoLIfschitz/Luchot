@@ -96,6 +96,7 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 - **Dependencies:** add them only with `npx expo install <pkg>` (never `npm install <pkg>`). A native dependency forces a full EAS build: flag it in the report. If a peer dep is missing, surface it (`npx expo install --check`) and fix it; never install silently.
 - **Do not** change `src/schemas/EventSchema.ts` without architect approval — Google Calendar compatible by design.
 - **`app.json` / `eas.json`:** an edit forces a full EAS build: flag it in the report.
+- **Play Store releases:** an OTA to `production` or `eas submit` is a production deploy (closed-list stop 1, Shlomo's); an OTA to `preview` is free. After a native dependency or `app.json`/native config change, the next production release is a full build, never an OTA. Release order and the store checklist: `docs/agentic/deploy.md`.
 - **Do not** commit `.env` or secrets.
 - **Do not** rewrite `DateService.ts`, `ZmanimService.ts`, or `StorageService.ts` wholesale — they work and are battle-tested. Add to them; don't replace.
 - **Do not** introduce a backend, API client, or analytics — offline-first by core principle.
