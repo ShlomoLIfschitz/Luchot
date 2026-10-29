@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-10-29 — Session: agentic workflow setup (`/ai-workflow-setup`)
+
+**Phase:** tooling (no app code changed)
+**Branch / PR:** `chore/agentic-workflow`
+
+### What was done
+- **Context:** `CLAUDE.md` 451 → 145 lines. Orchestration model, roster, execution sequence, ownership, delegation, the seven parallel-dispatch rules, the full DoD rationale, state discipline and the project tree moved verbatim to `docs/agentic/` behind one-line pointers. Added the agentic workflow block (handoff files, verify command), `docs/handoffs/_TEMPLATE.md`, `docs/agentic/local-first.md`, `security.md`, `deploy.md`, and a stub `docs/API.md`. Lost-text check: 0 lost lines, 0 broken pointers.
+- **Guardrails:** project hooks in `.claude/hooks/` (track changes, lint the changed file, stop reminder in `remind` mode pointing at `docs/WORK_LOG.md`). No ESLint config, so the lint hook passes silently.
+- **CI:** `.github/workflows/ci.yml` runs typecheck, `expo-doctor` and `expo export --platform android` on every PR (Node 20.18.1, no secrets).
+- **Deploy audit:** `docs/agentic/deploy.md` filled in. Repo classified `free` in `~/.claude/guard-merge.json` (a merge deploys nothing; releases are manual `eas` commands).
+
+### Decisions made
+- The global "Claude decides and does" replaces "approval before any task"; the closed list of stops lives in `~/.claude/CLAUDE.md`.
+- Work moves from direct commits on `main` to one branch + PR per task; CI must be green; Claude merges.
+- Dependencies: `npx expo install` only; a native dependency, or an `app.json`/`eas.json` edit, forces a full EAS build and is flagged in the report instead of asked first.
+- `eas update --branch preview` is not a stop: only Shlomo uses the preview APK. `eas update --branch production` and `eas submit` stay blocked by the guard.
+- The Hebrew summary section of `CLAUDE.md` was dropped: it duplicated the English section.
+
+### Open issues / blocked
+- None from this session. The 2026-08-31 "START HERE NEXT SESSION" list below still stands.
+
+### Next steps
+- Next app task follows the new flow: branch → PR → CI green → merge.
+
+---
+
 ## 2026-08-31 — Session: device-test rounds + NEXT-SESSION PLAN
 
 **Phase:** Phase 5
