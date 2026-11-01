@@ -4,13 +4,13 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import {
-  useFonts,
-  Heebo_400Regular,
-  Heebo_500Medium,
-  Heebo_600SemiBold,
-  Heebo_700Bold,
-} from '@expo-google-fonts/heebo';
+import { useFonts } from 'expo-font';
+// Per-weight entry points: importing from the package index pulls all 9 weights
+// into the bundle, though only these 4 are used.
+import { Heebo_400Regular } from '@expo-google-fonts/heebo/400Regular';
+import { Heebo_500Medium } from '@expo-google-fonts/heebo/500Medium';
+import { Heebo_600SemiBold } from '@expo-google-fonts/heebo/600SemiBold';
+import { Heebo_700Bold } from '@expo-google-fonts/heebo/700Bold';
 import { StorageService } from '../src/services/StorageService';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
