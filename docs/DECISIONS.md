@@ -64,6 +64,8 @@
   to make v14 work — rejected; out of scope, heavier risk.
 - Implications: StorageService uses the legacy API. A future SDK upgrade (Phase 5+)
   may revisit this.
+- **Superseded 2026-11-02** by "Expo SDK 58 upgrade" below: `expo-sqlite/legacy` was
+  removed in SDK 52, and the async API now ships in Expo Go.
 
 ## Google Calendar interoperability is one-way via .ics files (not live sync)
 - Date: 2026-05-28
@@ -931,3 +933,33 @@
   - "Notifications and export are user-triggered" (2026-05-28) is narrowed, not
     revoked: turning sync on is the explicit user action; after that, writes to
     the chosen calendar follow the user's own create/edit/delete in Luchot.
+
+## Expo SDK 58 upgrade (Play target API 36), async expo-sqlite, fingerprint runtime
+- Date: 2026-11-02
+- Context: Google Play requires new apps and updates to target "Android 16 (API
+  level 36) or higher" since 2026-08-31. SDK 51 targets API 34, so Luchot could not
+  ship. Shlomo approved the plan (handoff 2026-11-01, Phase 1) with
+  "expo-sqlite/legacy replaced" as an acceptance criterion.
+- Choice: jump straight to the current stable SDK 58 (RN 0.88, React 19, New
+  Architecture, Reanimated 4 + worklets, Gesture Handler 3, expo-router 58,
+  TypeScript 6). StorageService moves to `openDatabaseAsync` behind a `Txn` adapter;
+  `runExclusive` stays. `runtimeVersion` policy becomes `fingerprint`. Unused native
+  modules dropped (`expo-dev-client`, `@shopify/flash-list`) and the unused
+  `date-fns`; only the 4 used Heebo weights are bundled.
+- Alternatives considered: SDK 54 (last Old-Architecture SDK, smaller jump) -
+  rejected: it would need another full upgrade within a year for the next Play
+  target bump, and EAS support for older SDKs runs out first; hopping one SDK at a
+  time - rejected: seven native rebuilds for no extra safety without device tests
+  at each step; forcing targetSdk 36 on SDK 51 via expo-build-properties - rejected:
+  Android 16 enforces edge-to-edge, which RN 0.74 does not handle.
+- Implications:
+  - The next build must be a FULL EAS build; no OTA reaches SDK 51 builds.
+  - Same database file as before (`<filesDir>/SQLite/calendar.db`, both drivers);
+    the upgrade-scenario check on a device with existing data is mandatory before
+    any release.
+  - Android 16 edge-to-edge is enforced: every screen's top/bottom insets need a
+    visual check.
+  - `@gorhom/bottom-sheet` is now v5 (Reanimated 4 support); the manual
+    `BackHandler` wiring still applies.
+  - `react-dom` is a direct dependency only to satisfy expo-router's peer; it is
+    not bundled on native.

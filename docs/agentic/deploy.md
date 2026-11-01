@@ -17,7 +17,7 @@ Merges: run `gh pr checks <n>`; when every check passed, Claude merges and says 
 | Does it run before or after CI? | Manual, after the PR is merged with CI green. Before any `eas build`, run `npx expo export --platform android` locally (see `docs/agentic/integration-checks.md`). |
 | Previews | The `preview` channel / profile (internal APK distribution). |
 | DB migrations on deploy | None on a server. SQLite upgrade logic runs on app launch on the device (see `docs/agentic/local-first.md`). |
-| OTA config | `expo-updates`, URL `https://u.expo.dev/73dcf406-9cd1-4bec-a83c-cde688268f4a` in `app.json`; `runtimeVersion` policy `sdkVersion`; `checkAutomatically: ON_LOAD`. Channels: `preview` → preview profile, `production` → production profile (`eas.json`). |
+| OTA config | `expo-updates`, URL `https://u.expo.dev/73dcf406-9cd1-4bec-a83c-cde688268f4a` in `app.json`; `runtimeVersion` policy `fingerprint` (since the SDK 58 upgrade, 2026-11-02); `checkAutomatically: ON_LOAD`. Channels: `preview` → preview profile, `production` → production profile (`eas.json`). |
 | Secrets live in | EAS (Expo account login). No app secrets: offline-first, no API keys. Nothing in GitHub. |
 | Rollback | OTA: republish the previous update to the branch (`eas update:republish`), or publish a revert. Build: reinstall the previous APK/AAB. |
 | CI workflow | `.github/workflows/ci.yml` (typecheck, expo-doctor, `expo export --platform android`; no secrets) |
@@ -35,7 +35,7 @@ Once the app is on Google Play, the `production` channel is real users, and thei
 4. `eas submit --profile production` to the Play Console track.
 5. Later JS-only fixes: `eas update --branch production --message "..."`, only for builds that share the current `runtimeVersion`.
 
-**`runtimeVersion` trap:** the policy is `sdkVersion`, so an OTA reaches every build on the same Expo SDK. It does NOT detect a new native dependency, an `app.json` change or a native config change within the same SDK: an OTA that needs native code the store build lacks crashes on launch. After any of those, the next production release is a full build (step 3), never an OTA.
+**`runtimeVersion`:** the policy is `fingerprint` (it was `sdkVersion` until 2026-11-02). The runtime version is a hash of the native project, so a new native dependency, an `app.json` change or a native config change produces a new runtime version and an OTA no longer reaches older builds — the crash-on-launch trap of `sdkVersion` is closed. After any of those, the next production release is still a full build (step 3); run `npx expo-updates fingerprint:generate` to see whether the runtime version moved.
 
 **Store requirements (Shlomo's, outside the code):** a privacy policy URL and the Play Console Data safety form. Inference, not verified against the current Play policy text: both are needed because the app requests location and sends rounded coordinates to Nominatim (`src/utils/reverseGeocode.ts`).
 

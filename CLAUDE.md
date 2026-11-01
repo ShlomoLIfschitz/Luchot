@@ -6,7 +6,7 @@
 
 **Luchot** — A bilingual Hebrew/Gregorian calendar app for iOS and Android, built with React Native and Expo Router.
 
-- **Stack:** React Native 0.74.5, Expo SDK 51, TypeScript (strict), Expo Router, Zustand, SQLite (`expo-sqlite/legacy`), @hebcal/core (v5.x pinned), kosher-zmanim, react-native-svg, lucide-react-native
+- **Stack:** React Native 0.88, Expo SDK 58 (New Architecture), React 19, TypeScript 6 (strict), Expo Router, Zustand, SQLite (`expo-sqlite` async API), @hebcal/core (v5.x pinned), kosher-zmanim, react-native-svg, lucide-react-native
 - **Architecture:** Offline-first, no backend, no account, no network. All data is local (SQLite). See `docs/VISION.md`.
 - **Status:** Post-MVP (`mvp-1.0.0` tagged). Phases 4.5–4.7 closed. APK distribution in progress (EAS Build, preview profile). Phase 5 backlog defined in ROADMAP.
 - **Language:** UI is Hebrew RTL with parallel Gregorian. Code comments and docs can be English.
@@ -90,7 +90,7 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 
 ### 🚫 Things You Must NOT Do
 
-- **Do not** revisit locked decisions (see `docs/DECISIONS.md`) unless the user reopens them. The locked set: offline-first / no backend ever; `EventSchema.ts` stays Google-Calendar-compatible; 4 bottom tabs + hamburger drawer; `@hebcal/core` pinned to v5.x (v6 deferred to Phase 5); `flexDirection: 'row-reverse'` for Hebrew RTL; `expo-sqlite/legacy` import path (for Expo Go compatibility).
+- **Do not** revisit locked decisions (see `docs/DECISIONS.md`) unless the user reopens them. The locked set: offline-first / no backend ever; `EventSchema.ts` stays Google-Calendar-compatible; 4 bottom tabs + hamburger drawer; `@hebcal/core` pinned to v5.x (v6 deferred to Phase 5); `flexDirection: 'row-reverse'` for Hebrew RTL.
 - **Do not** modify `node_modules/` directly (use patches).
 - **Do not** delete `kosher-zmanim-0.9.0.tgz` (orphan) without confirming.
 - **Dependencies:** add them only with `npx expo install <pkg>` (never `npm install <pkg>`). A native dependency forces a full EAS build: flag it in the report. If a peer dep is missing, surface it (`npx expo install --check`) and fix it; never install silently.
@@ -108,11 +108,11 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 ### ⚠️ Known Issues / Quirks
 
 - `kosher-zmanim` 0.9.x ships extensionless ESM imports. `scripts/patch-expo-sqlite-imports.cjs` (postinstall) handles `expo-sqlite`. Similar new deps may need similar patches.
-- SQLite uses the **`expo-sqlite/legacy`** entry point (classic v13 path: `openDatabase` + `transactionAsync`/`executeSqlAsync`). The non-legacy v14 API (`openDatabaseAsync`/`openDatabaseSync`) routes through a native module not present in Expo Go and will crash there. (Locked — docs/DECISIONS.md.)
+- SQLite uses the `expo-sqlite` async API (`openDatabaseAsync` + `withTransactionAsync`); `expo-sqlite/legacy` no longer exists (removed in SDK 52). StorageService keeps a small `Txn` adapter so the migration code still reads `txn.executeSqlAsync(sql, args)`. The database file is the same one the legacy driver used (`<filesDir>/SQLite/calendar.db`). (docs/DECISIONS.md, 2026-11-02.)
 - `react-native-svg` is a required peer dep of `lucide-react-native`. Expo Go bundles its own copy, which masks the dependency — but a standalone APK needs it installed explicitly, or it crashes on first icon render. `expo doctor` must show no new failures beyond baseline (17/17 — all checks pass) before any EAS build.
 - `@gorhom/bottom-sheet` v4 does NOT handle the Android hardware back button. Always wire `BackHandler` manually (see docs/SCREENS.md).
 - New settings must be referenced in **both** `save()` and `loadFromStorage()` (the `use24hTime` persistence bug). Watch for this whenever adding a setting.
-- All SQLite access is serialized through `runExclusive` (single-flight queue) in StorageService. `expo-sqlite/legacy` deadlocks if two `transactionAsync` calls overlap on the one shared connection — the gate makes overlap impossible, so callers may use `Promise.all` / fire-and-forget freely. Do not bypass it. (Locked — docs/DECISIONS.md, 2026-06-03.)
+- All SQLite access is serialized through `runExclusive` (single-flight queue) in StorageService. the legacy driver deadlocked when two transactions overlapped, and `withTransactionAsync` is not exclusive (any query issued meanwhile lands inside the open transaction) — the gate makes overlap impossible, so callers may use `Promise.all` / fire-and-forget freely. Do not bypass it. (Locked — docs/DECISIONS.md, 2026-06-03.)
 
 
 ---
