@@ -1,12 +1,12 @@
 # State Discipline and Project Structure — Luchot
 
-> Read this when writing a WORK_LOG or DECISIONS entry, at session close, or when looking for where a file belongs.
+> Read this when writing a work log or DECISIONS entry, at session close, or when looking for where a file belongs.
 
 ### 📝 State Discipline (docs mapping)
 
 Luchot keeps its own doc set — **do not** introduce a PROGRESS doc (that is a generic-template name). The mapping is:
 
-- **`docs/WORK_LOG.md`** — session log (most-recent-first). The "what happened" record. Append at session close.
+- **`docs/worklog/`** — the "what happened" record: one new file per task, `YYYY-MM-DD-<topic>.md`, written at close. Never edit another task's file. `docs/WORK_LOG.md` is the archive (most-recent-first, frozen on 2026-11-02): read it, never append to it.
 - **`docs/ROADMAP.md`** — phases and backlog. Update when a phase closes or priorities shift.
 - **`docs/DECISIONS.md`** — locked architectural decisions with rationale. Append whenever a non-trivial architectural choice is made. Format:
   ```markdown
@@ -20,7 +20,7 @@ Luchot keeps its own doc set — **do not** introduce a PROGRESS doc (that is a 
 - **`docs/SCHEMA.md`** — human-readable DB schema (owned by `database-architect`).
 - **`docs/API.md`** — data-layer hook documentation (owned by `local-data-builder`; "API" here means the internal data hooks, since there is no network API).
 
-WORK_LOG entry format (unchanged):
+Work log entry format (unchanged; also in `docs/worklog/_TEMPLATE.md`):
 ```markdown
 ## [YYYY-MM-DD]
 ### What was done
@@ -71,7 +71,7 @@ luchot/
 ### 📝 End-of-Session Checklist
 
 1. `npm run typecheck` — fix any errors; never end with broken types.
-2. Update `docs/WORK_LOG.md` (format above), noting which sub-agents did what.
+2. Write the `docs/worklog/` entry file (format above), noting which sub-agents did what.
 3. Update `docs/ROADMAP.md` if anything shifted.
 4. Append to `docs/DECISIONS.md` if a new architectural choice was made.
 5. Commit on the task branch, push it (`git push -u origin <branch>`) and open or update the PR. Never push to `main`.

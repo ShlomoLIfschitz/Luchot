@@ -4,10 +4,12 @@
 // committed. Sessions that changed no files are never flagged.
 // Stop fires at the end of every turn, so the default stopMode "remind" only
 // shows the user what is missing; stopMode "block" makes Claude keep going.
+// With workLogDir set, a new or changed file in that folder (one file per entry)
+// counts as the work log update; the single workLog file still counts too.
 // Also suggests a new session when the transcript gets long (never blocks).
 //
 // Config (optional): .claude/workflow.json
-//   { "workLog": "WORK_LOG.md", "requireCommit": true, "stopMode": "remind", "longSessionBytes": 3145728 }
+//   { "workLog": "WORK_LOG.md", "workLogDir": "docs/worklog", "requireCommit": true, "stopMode": "remind", "longSessionBytes": 3145728 }
 
 const fs = require('fs');
 const path = require('path');
@@ -43,8 +45,11 @@ readStdin().then(input => {
   let left = [];
   if (changed.length) {
     const workLog = path.resolve(dir, cfg.workLog);
-    if (!changed.some(f => samePath(f, workLog))) {
-      problems.push(`${cfg.workLog} was not updated this session.`);
+    const logDir = cfg.workLogDir ? path.resolve(dir, cfg.workLogDir) : null;
+    if (!changed.some(f => samePath(f, workLog) || (logDir && isInside(f, logDir)))) {
+      problems.push(logDir
+        ? `No work log entry this session: add ${cfg.workLogDir}/YYYY-MM-DD-<topic>.md.`
+        : `${cfg.workLog} was not updated this session.`);
       missing.push('work-log');
     }
     if (cfg.requireCommit) {
