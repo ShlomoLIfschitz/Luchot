@@ -31,7 +31,7 @@
       "checkAutomatically": "ON_LOAD"
     },
     "runtimeVersion": {
-      "policy": "sdkVersion"
+      "policy": "fingerprint"
     },
     "plugins": [
       "expo-router",

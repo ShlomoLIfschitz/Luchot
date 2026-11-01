@@ -3,7 +3,7 @@
 // No store access. Two columns rendered right-to-left via row-reverse so
 // columns[0] (month) lands on the right and columns[1] (year) on the left.
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, type ComponentRef } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { typography, withFontFamily } from '../../constants/typography';
@@ -40,7 +40,7 @@ interface WheelColumnProps {
 
 function WheelColumn({ items, selectedIndex, onIndexChange, width }: WheelColumnProps) {
   const colors = useThemeColors();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
   // Re-center when selectedIndex changes externally (e.g. month clamp after year change).
   // Scrolling to the already-current offset is harmless — no extra guard needed.

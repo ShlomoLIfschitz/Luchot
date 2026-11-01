@@ -3,7 +3,7 @@
 // events for the current Hebrew year) to a standard iCalendar (.ics) file,
 // then shares it via the OS share sheet.
 
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { HebrewCalendar, HDate } from '@hebcal/core';
 import { StorageService } from './StorageService';
@@ -161,17 +161,11 @@ export async function exportCalendar(includeHebcal: boolean): Promise<void> {
 
   const today    = new Date().toISOString().split('T')[0];
   const fileName = `luchot-${today}.ics`;
-  const cacheDir = FileSystem.cacheDirectory;
-  if (!cacheDir) {
-    throw new Error('תיקיית המטמון אינה זמינה');
-  }
-  const uri = cacheDir + fileName;
+  const file = new File(Paths.cache, fileName);
+  file.create({ overwrite: true });
+  await file.write(icsContent);
 
-  await FileSystem.writeAsStringAsync(uri, icsContent, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  await Sharing.shareAsync(uri, {
+  await Sharing.shareAsync(file.uri, {
     mimeType: 'text/calendar',
     dialogTitle: 'ייצוא לוח שנה',
   });

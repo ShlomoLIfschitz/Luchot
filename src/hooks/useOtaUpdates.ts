@@ -141,7 +141,8 @@ async function maybeReload(): Promise<void> {
  * against dev noise and crashes.
  */
 export function useOtaUpdates(): void {
-  const appState = useRef<AppStateStatus>(AppState.currentState);
+  // AppState.currentState is typed string | null | undefined in RN 0.88.
+  const appState = useRef<string | null | undefined>(AppState.currentState);
   // Timestamp of the most recent transition into 'background' (not
   // 'inactive' — see module doc, point 2). Null when not currently tracking
   // a background dwell (i.e. we're active, or the last transition out of

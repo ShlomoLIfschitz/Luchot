@@ -90,7 +90,8 @@ export class NotificationService {
   static async init(): Promise<void> {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
       }),
@@ -137,7 +138,7 @@ export class NotificationService {
         body: params.body,
         data: params.data ? { ...params.data } : undefined,
       },
-      trigger: { date: params.triggerDate },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: params.triggerDate },
     });
   }
 

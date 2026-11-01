@@ -1,27 +1,30 @@
 // src/services/StorageService.ts
-// Phase 4.7-1 fix: switched from expo-sqlite v14 "Next" API to legacy API.
-// Both openDatabaseAsync and openDatabaseSync in expo-sqlite v14 use
-// NativeDatabase — the new native module that is NOT present in standard
-// Expo Go. The expo-sqlite/legacy entry point exports the classic
-// openDatabase() which uses the original SQLite native module that ships
-// with Expo Go.
-//
-// Query helpers (dbAll / dbRun / dbFirst) wrap the legacy transactionAsync
-// pattern so callers remain identical to the previous version.
+// Expo SDK 58: expo-sqlite/legacy no longer exists (removed in SDK 52), so this
+// uses the async API (openDatabaseAsync). It opens the same file the legacy
+// driver used — <filesDir>/SQLite/calendar.db on Android — so existing installs
+// keep their data. The tiny `Txn` adapter below keeps the classic
+// `txn.executeSqlAsync(sql, args)` shape, so the migration code and the query
+// helpers (dbAll / dbRun / dbFirst) are unchanged.
 
 import {
-  openDatabase,
+  openDatabaseAsync,
   type SQLiteDatabase,
-  type SQLStatementArg,
-  type ResultSet,
-} from 'expo-sqlite/legacy';
+  type SQLiteBindValue,
+} from 'expo-sqlite';
 import { HDate } from '@hebcal/core';
 import { CalendarEvent, CalendarEventSchema, NoteCategory } from '../schemas/EventSchema';
 import { formatDateKey, generateUUID } from '../utils/dateUtils';
 
 // ── DB handle ──────────────────────────────────────────────────────────────────
 
-let db: SQLiteDatabase | null = null;
+type SQLStatementArg = SQLiteBindValue;
+
+interface Txn {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  executeSqlAsync(sql: string, args: SQLStatementArg[]): Promise<{ rows: any[] }>;
+}
+
+let dbPromise: Promise<SQLiteDatabase> | null = null;
 let schemaInitialized = false;
 let schemaV2Migrated = false;
 let schemaColorMigrated = false;
@@ -29,17 +32,27 @@ let schemaLocationMigrated = false;
 let schemaV5Migrated = false;
 let schemaV6Migrated = false;
 
-function getDb(): SQLiteDatabase {
-  if (!db) {
-    db = openDatabase('calendar.db');
+function getDb(): Promise<SQLiteDatabase> {
+  if (!dbPromise) {
+    dbPromise = openDatabaseAsync('calendar.db');
   }
-  return db;
+  return dbPromise;
+}
+
+/** Runs `work` inside one transaction on the shared connection. */
+async function transactionAsync(work: (txn: Txn) => Promise<void>): Promise<void> {
+  const database = await getDb();
+  const txn: Txn = {
+    executeSqlAsync: async (sql, args) => ({ rows: await database.getAllAsync(sql, args) }),
+  };
+  await database.withTransactionAsync(() => work(txn));
 }
 
 // All transactions run single-file on the one shared connection.
-// expo-sqlite/legacy deadlocks if two transactionAsync calls overlap
-// (confirmed, standalone Android). This gate makes overlap impossible,
-// so callers may use Promise.all / fire-and-forget freely.
+// expo-sqlite/legacy deadlocked if two transactions overlapped (confirmed,
+// standalone Android), and withTransactionAsync is still not exclusive — any
+// query issued while it runs lands inside the transaction. This gate makes
+// overlap impossible, so callers may use Promise.all / fire-and-forget freely.
 let txnTail: Promise<unknown> = Promise.resolve();
 
 function runExclusive<T>(work: () => Promise<T>): Promise<T> {
@@ -50,7 +63,7 @@ function runExclusive<T>(work: () => Promise<T>): Promise<T> {
 
 async function doCreateSchema(): Promise<void> {
   if (schemaInitialized) return;
-  await getDb().transactionAsync(async (txn) => {
+  await transactionAsync(async (txn) => {
     await txn.executeSqlAsync(
       `CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY,
@@ -234,13 +247,11 @@ function ensureSchema(): Promise<void> {
 async function dbAll<T = any>(sql: string, args: SQLStatementArg[]): Promise<T[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rows: any[] = [];
-  // NOTE: no readOnly flag. The expo-sqlite/legacy `transactionAsync(cb, true)`
-  // (read-only) variant hangs and never resolves on the standalone Android
-  // build, deadlocking every read. Plain read-write transactions (the same
-  // path schema creation and writes use) work reliably, so all reads use them.
+  // Reads go through the same transaction path as writes (a read-only
+  // transaction hung forever on the old legacy driver; kept uniform).
   await runExclusive(async () => {
-    await getDb().transactionAsync(async (txn) => {
-      const rs: ResultSet = await txn.executeSqlAsync(sql, args);
+    await transactionAsync(async (txn) => {
+      const rs = await txn.executeSqlAsync(sql, args);
       rows = rs.rows;
     });
   });
@@ -249,7 +260,7 @@ async function dbAll<T = any>(sql: string, args: SQLStatementArg[]): Promise<T[]
 
 async function dbRun(sql: string, args: SQLStatementArg[]): Promise<void> {
   await runExclusive(async () => {
-    await getDb().transactionAsync(async (txn) => {
+    await transactionAsync(async (txn) => {
       await txn.executeSqlAsync(sql, args);
     });
   });

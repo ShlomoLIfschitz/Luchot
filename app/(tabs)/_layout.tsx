@@ -8,11 +8,12 @@
 // <Tabs.Screen> children left-to-right in JSX declaration order — it does
 // NOT auto-flip for Hebrew. To read right-to-left (עברי first, on the
 // RIGHT), the screens are declared in the REVERSE of their logical order
-// (זמנים, יום, לועזי, עברי) while `initialRouteName="index"` keeps עברי as
-// the tab that loads by default when entering the group.
+// (זמנים, יום, לועזי, עברי) while `unstable_settings.initialRouteName`
+// keeps עברי as the tab that loads by default when entering the group.
+// (expo-router 58 dropped the `initialRouteName` prop on <Tabs>.)
 
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookOpenText, Calendar, Sun, Clock, type LucideIcon } from 'lucide-react-native';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
@@ -20,23 +21,30 @@ import { radius } from '../../src/constants/radius';
 import { typography, withFontFamily } from '../../src/constants/typography';
 import type { ThemeColors } from '../../src/hooks/useThemeColors';
 
+export const unstable_settings = { initialRouteName: 'index' };
+
+/** React Navigation hands tab colors as ColorValue; ours are always hex strings. */
+function asColorString(color: ColorValue): string | undefined {
+  return typeof color === 'string' ? color : undefined;
+}
+
 /** Icon wrapped in a pill that lights up with `colors.accentLight` when the tab is active. */
 function TabIcon({ Icon, color, size, focused, colors }: {
   Icon: LucideIcon;
-  color: string;
+  color: ColorValue;
   size: number;
   focused: boolean;
   colors: ThemeColors;
 }) {
   return (
     <View style={[styles.iconPill, focused && { backgroundColor: colors.accentLight }]}>
-      <Icon color={color} size={size} />
+      <Icon color={asColorString(color)} size={size} />
     </View>
   );
 }
 
 /** Label below the pill — bold + accent when active, regular + tertiary otherwise. */
-function TabLabel({ children, color, focused }: { children: string; color: string; focused: boolean }) {
+function TabLabel({ children, color, focused }: { children: string; color: ColorValue; focused: boolean }) {
   return (
     <Text style={[styles.label, { color }, focused && styles.labelActive]}>
       {children}
@@ -50,7 +58,6 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,

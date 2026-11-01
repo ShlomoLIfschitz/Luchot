@@ -24,7 +24,7 @@
 //               as an explicit height on every row — see the constants and
 //               gridArea onLayout below.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Pressable, ScrollView, StatusBar, LayoutChangeEvent } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -138,7 +138,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
   const [hebrewPickerVisible, setHebrewPickerVisible] = useState(false);
   const [actionSheetDate, setActionSheetDate] = useState<Date | null>(null);
   const actionSheetRef = useRef<BottomSheet>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
   // Measured height of the grid-rows area (below the header + day-name row,
   // above the tab bar) — set once via onLayout on the wrapping View. Never
