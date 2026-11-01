@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-11-01 — Session: single orchestration model (handoff files)
+
+**Phase:** tooling (no app code changed)
+**Branch / PR:** `docs/handoff-orchestration`
+
+### What was done
+- `docs/agentic/agents.md`: the two-layer "Architect Claude (separate chat)" model with pasted prompts and pasted-back reports replaced by one model: Shlomo → Claude Code → sub-agents; the task spec is Shlomo's request or a handoff file; small changes are made directly, large or specialized work is delegated.
+- `docs/agentic/ownership.md`: execution-sequence step 1 — stop for a conflict with a spec or a locked decision, or a product decision; other ambiguity is decided and reported.
+- `CLAUDE.md`: `EventSchema.ts` changes need Shlomo's approval (locked decision) instead of "architect approval"; dropped the stale "(new — created alongside this update)".
+
+### Decisions made
+- One orchestration model: no separate Architect chat in the loop. Handoff files carry plans between sessions.
+
+### Open issues / blocked
+- None.
+
+### Next steps
+- None from this change.
+
+---
+
 ## 2026-10-29 — Session: Play Store release rules
 
 **Phase:** tooling (no app code changed)

@@ -4,9 +4,9 @@
 
 ### 🔁 Execution Sequence (per feature)
 
-When the Architect's prompt describes a feature, follow this order. Skip stages that don't apply.
+When a task (Shlomo's request or a handoff file) describes a feature, follow this order. Skip stages that don't apply.
 
-1. **Clarify** — If the prompt is ambiguous or conflicts with a spec file or a locked decision → STOP, report to user, don't improvise.
+1. **Clarify** — If the task conflicts with a spec file or a locked decision, or needs a product decision → STOP and ask Shlomo. Other ambiguity (code or architecture): decide and report the decision in one line.
 2. **Log** — Note the task as in-progress (mention in your plan; full entry goes to WORK_LOG at close).
 3. **Schema layer** (if data model changes) → `database-architect`. Defines tables + **migration/upgrade logic that runs on app launch against real user data**. This is critical — there are real installs with real data.
 4. **Schema/types (Zod + TS)** → `local-data-builder` defines/updates `src/schemas/`.
