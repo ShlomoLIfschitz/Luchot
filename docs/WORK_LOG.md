@@ -6,6 +6,28 @@
 
 ---
 
+## 2026-11-01 — Session: review + Google Calendar sync decision
+
+**Phase:** Phase 5 (planning, no app code changed)
+**Branch / PR:** `docs/device-calendar-sync`
+
+### What was done
+- Full read-only review (code, architecture, app size, UI/UX, Play readiness). Blocker found: Expo SDK 51 targets API 34; Google Play requires API 36 for new apps and updates since 2026-08-31.
+- Shlomo reopened the 2026-05-28 ".ics one-way" decision and chose "יומן המכשיר + ייבוא ics". Recorded in DECISIONS.md (2026-11-01); ROADMAP Wave 4 updated.
+- Plan written: `docs/handoffs/2026-11-01-device-calendar-sync.md` (SDK upgrade → .ics import → device calendar sync).
+
+### Decisions made
+- Google sync through the device calendar provider (`expo-calendar`), no OAuth, no network from Luchot. See DECISIONS.md.
+
+### Open issues / blocked
+- Four product questions in the handoff, section 6 (Shlomo).
+- On-device verification list from 2026-08-31 still open.
+
+### Next steps
+- Answer the handoff questions, then Phase 1: Expo SDK upgrade.
+
+---
+
 ## 2026-11-01 — Session: single orchestration model (handoff files)
 
 **Phase:** tooling (no app code changed)
