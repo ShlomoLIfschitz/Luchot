@@ -1,24 +1,17 @@
 # Agents and Orchestration — Luchot
 
-> Read this before delegating to a sub-agent, or when a task needs an agent not on the roster. Plans now arrive as handoff files in `docs/handoffs/` (see `CLAUDE.md` → Agentic Workflow), not as pasted prompts.
+> Read this before delegating to a sub-agent, or when a task needs an agent not on the roster.
 
-### 🧭 Orchestration Model — Two Layers of Planning
-
-This project runs with a **two-layer orchestration model**. Understand your place in it.
+### 🧭 Orchestration Model
 
 ```
-User (orchestrator / bridge)
+Shlomo — product decisions and the closed list of stops (global ~/.claude/CLAUDE.md)
    │
-   ├──> Architect Claude (separate chat) — meta-planner
-   │        • Receives your final reports (pasted by user)
-   │        • Writes long, precise, structured prompts
-   │        • Owns strategy, vision, cross-session context
-   │
-   └──> Claude Code (YOU) — sub-agent orchestrator
-            • Receives the Architect's prompt (pasted by user)
-            • Decomposes it and delegates to sub-agents
-            • Runs the Definition of Done gate
-            • Reports back up to the user → Architect
+   └──> Claude Code (YOU) — plans, decides, delegates, verifies
+            • Task spec: Shlomo's request, or a handoff file in docs/handoffs/
+            • Delegates large or specialized work to sub-agents
+            • Runs the Definition of Done gate, merges when every check passed
+            • Reports to Shlomo in 3–5 lines
                 │
                 ├──> mobile-ui-builder    (UI, screens, RTL, components)
                 ├──> local-data-builder   (SQLite access, hooks, schemas)
@@ -26,9 +19,7 @@ User (orchestrator / bridge)
                 └──> [test-engineer, security-auditor — dormant, see roster]
 ```
 
-**Your job (Claude Code):** You are the project-level orchestrator. The Architect's prompt is your task spec. You decompose it, delegate to the right sub-agents per the roster and ownership table below, integrate their output, run the DoD gate, and produce one consolidated report for the user to paste back to the Architect.
-
-**You do NOT write feature code directly when a sub-agent owns that area.** Your direct work is: planning, delegation, integration verification, running checks, and state-keeping (docs).
+**Your job (Claude Code):** You are the project-level architect and orchestrator. Decompose the task, delegate to the right sub-agents per the roster and ownership table below when the work is large or specialized, make small changes directly, integrate their output, run the DoD gate, and report. Work that continues in a new session goes into a handoff file (`docs/handoffs/_TEMPLATE.md`), not a pasted prompt.
 
 
 ### 🤖 Active Sub-Agent Roster

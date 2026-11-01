@@ -20,7 +20,7 @@ Before touching any code, read these files in order (all live under `docs/`):
 3. `docs/DESIGN.md` — Color tokens, typography, spacing, component specs
 4. `docs/WORK_LOG.md` — What was done in the previous session, what's open, what's blocked
 5. `docs/ROADMAP.md` — Current phase, what to work on next
-6. `docs/DECISIONS.md` — Locked architectural decisions and their rationale (new — created alongside this update)
+6. `docs/DECISIONS.md` — Locked architectural decisions and their rationale
 
 **Do not skip steps 4 and 6.** If `docs/WORK_LOG.md` says "open issue: X", do not start something unrelated until X is resolved or explicitly deferred. If `docs/DECISIONS.md` locks a choice, do not revisit it unless the user explicitly reopens it.
 
@@ -94,7 +94,7 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 - **Do not** modify `node_modules/` directly (use patches).
 - **Do not** delete `kosher-zmanim-0.9.0.tgz` (orphan) without confirming.
 - **Dependencies:** add them only with `npx expo install <pkg>` (never `npm install <pkg>`). A native dependency forces a full EAS build: flag it in the report. If a peer dep is missing, surface it (`npx expo install --check`) and fix it; never install silently.
-- **Do not** change `src/schemas/EventSchema.ts` without architect approval — Google Calendar compatible by design.
+- **Do not** change `src/schemas/EventSchema.ts` without Shlomo's approval (a locked decision) — Google Calendar compatible by design.
 - **`app.json` / `eas.json`:** an edit forces a full EAS build: flag it in the report.
 - **Play Store releases:** an OTA to `production` or `eas submit` is a production deploy (closed-list stop 1, Shlomo's); an OTA to `preview` is free. After a native dependency or `app.json`/native config change, the next production release is a full build, never an OTA. Release order and the store checklist: `docs/agentic/deploy.md`.
 - **Do not** commit `.env` or secrets.
