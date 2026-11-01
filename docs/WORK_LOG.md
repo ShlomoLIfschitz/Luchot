@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-11-02 — Session: Expo SDK 51 → 58 (handoff Phase 1)
+
+**Phase:** Phase 5 / Wave 4 prerequisite (Play target API 36)
+**Branch / PR:** `chore/expo-sdk-upgrade`
+
+### What was done
+- Google sync product choices recorded (PR #5): live overlay, auto-write personal events, no hebcal holidays, Hebrew-date events 10 years ahead.
+- Expo SDK 58: RN 0.88.1, React 19.3, TypeScript 6.0, Reanimated 4.7 + worklets, Gesture Handler 3.3, expo-router 58, bottom-sheet 5. Dropped `expo-dev-client`, `@shopify/flash-list`, `date-fns`. Node 22.14.0 in EAS and CI (RN 0.88 needs ^22.13).
+- StorageService: `expo-sqlite/legacy` → `openDatabaseAsync` behind a `Txn` adapter; `runExclusive` kept; same DB file.
+- API breaks fixed: tabs `initialRouteName` → `unstable_settings`; ScrollView/TextInput refs → `ComponentRef`; notification handler (`shouldShowBanner/List`) and DATE trigger type; IcsExportService → new `File`/`Paths` API.
+- `runtimeVersion` policy `sdkVersion` → `fingerprint`.
+- Heebo: per-weight imports, bundle carries 4 font files instead of 9.
+- Orchestrator did the work directly (dependency/config upgrade, no sub-agent).
+
+### Decisions made
+- DECISIONS.md 2026-11-02: SDK 58 upgrade (straight jump, not SDK 54); legacy SQLite decision superseded.
+
+### Open issues / blocked
+- **On-device verification NOT done.** Must check before any release: upgrade scenario on a device with existing notes (data still there), Android 16 edge-to-edge insets on every screen, Drawer swipe (Reanimated 4 / RNGH 3), bottom sheets + hardware back, notifications firing, .ics export share.
+- Next build must be a FULL EAS build (native changes, new runtime version).
+- `npm audit` reports vulnerabilities in the dependency tree (not triaged).
+
+### Next steps
+- Shlomo: full preview build + device check. Then Phase 2 (.ics import) — Figma first for the import preview.
+
+---
+
 ## 2026-11-01 — Session: review + Google Calendar sync decision
 
 **Phase:** Phase 5 (planning, no app code changed)

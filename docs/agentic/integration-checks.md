@@ -32,7 +32,7 @@ production. Treat any failure as release-blocking.
 
 If a dependency was added or changed in the task, ALSO run:
 ```bash
-npx expo install --check   # verifies installed versions match SDK 51; reports drift
+npx expo install --check   # verifies installed versions match the installed Expo SDK; reports drift
 ```
 Use `npx expo install <pkg>` (never `npm install <pkg>`) so the SDK-compatible
 version is chosen.

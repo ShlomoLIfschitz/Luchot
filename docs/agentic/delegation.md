@@ -13,7 +13,7 @@ When dispatching a sub-agent, always provide four things:
 
 Example:
 > "local-data-builder: implement the reminders read layer.
-> Context: offline-first, `expo-sqlite/legacy` API only (locked — see docs/DECISIONS.md). EventSchema stays Google-Calendar-compatible.
+> Context: offline-first, `expo-sqlite` async API through StorageService's helpers, never a second connection (see docs/DECISIONS.md). EventSchema stays Google-Calendar-compatible.
 > Task: add `reminders` query helpers + `useReminders(date)` hook.
 > Contracts: extend `src/schemas/` with a `ReminderSchema`; reuse EventSchema fields where they overlap.
 > DoD: hook returns Zod-validated data, parameterized queries only, tsc green, works offline by definition."

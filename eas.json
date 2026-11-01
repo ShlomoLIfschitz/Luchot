@@ -5,7 +5,7 @@
   },
   "build": {
     "base": {
-      "node": "20.18.1"
+      "node": "22.14.0"
     },
     "preview": {
       "channel": "preview",

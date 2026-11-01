@@ -1,6 +1,6 @@
 // src/components/notes/NoteEditor.tsx
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, type ComponentRef } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -249,8 +249,8 @@ export function NoteEditor({
   const [isViewMode, setIsViewMode] = useState(false);
   const [location, setLocation] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
-  const summaryInputRef = useRef<TextInput>(null);
-  const locationInputRef = useRef<TextInput>(null);
+  const summaryInputRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const locationInputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const [focusTarget, setFocusTarget] = useState<'summary' | 'location' | null>(null);
 
   // ── C3 recurrence state (Task 1) ─────────────────────────────────────────────
