@@ -893,3 +893,41 @@
   only on the inner View, content shows through while the header is docked.
   Note that `tsc`, `expo-doctor` and a production bundle are all green in the
   broken state; this is only observable by looking at the screen.
+
+## Google Calendar sync via the device calendar provider + .ics import (supersedes the 2026-05-28 one-way .ics decision)
+- Date: 2026-11-01
+- Context: Shlomo reopened "Google Calendar interoperability is one-way via .ics
+  files" (2026-05-28): users should be able to opt in to syncing Luchot with their
+  Google Calendar, both to import and to export easily. Three paths were weighed in
+  the 2026-10-28 review.
+- Choice: two mechanisms, both opt-in, neither adds a network call from Luchot:
+  1. **Device calendar sync** through Android's CalendarContract via `expo-calendar`.
+     Luchot reads and writes the calendars already on the device; the Google
+     Calendar app's own sync adapter carries changes to and from Google's cloud.
+     Luchot never talks to Google, holds no token, needs no account.
+  2. **.ics import** (the missing half of Wave 4): the user picks or opens an .ics
+     file and its events are added to local SQLite.
+- Alternatives considered: Google Calendar API over OAuth directly from the device
+  (rejected - calendar scopes are "sensitive", so Google app verification, a
+  domain, a demo video and weeks of review; it would put a network client and a
+  token in an offline-first app); .ics only (rejected - manual and one-shot, not
+  the "easy import and export" Shlomo asked for).
+- Implications:
+  - "Offline-first, no backend ever" stands: no backend, no account, no network
+    call from Luchot. Data reaches Google only through the user's own Google
+    Calendar app, after the user turned sync on.
+  - New OS permissions READ_CALENDAR / WRITE_CALENDAR, requested only when the user
+    turns sync on. Triggers a `security-auditor` pass (new permission + new data
+    path) and a Play Data safety update.
+  - Inference, not verified against CalendarContract docs: a calendar Luchot
+    creates itself is a LOCAL-account calendar and does NOT sync to Google. To
+    reach Google, Luchot writes into an existing Google-account calendar the user
+    picks.
+  - Hebrew-date recurrences (yahrzeit, Hebrew birthday) have no RRULE equivalent;
+    on export they are written as concrete yearly occurrences over a fixed window.
+  - `EventSchema.ts` stays as is; sync bookkeeping (which device event id maps to
+    which Luchot event) lives in a separate table, owned by `database-architect`.
+  - The new settings screen and import flow are a new flow: Figma first.
+  - "Notifications and export are user-triggered" (2026-05-28) is narrowed, not
+    revoked: turning sync on is the explicit user action; after that, writes to
+    the chosen calendar follow the user's own create/edit/delete in Luchot.

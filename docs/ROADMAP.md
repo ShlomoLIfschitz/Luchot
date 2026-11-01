@@ -195,9 +195,12 @@ updates LocationProvider.
 
 ### Bug fixes (active) — A: theme persistence · B: event indicators in day cells
 
-### Wave 4 — .ics export/import
-Export Luchot events as .ics via Android share sheet. Import .ics files the user
-selects. No network, no OAuth. EventSchema is already Google-Calendar-compatible.
+### Wave 4 — .ics export/import + device calendar sync
+Export ✅ (`IcsExportService.ts`). Import: not built yet. **Reopened 2026-11-01:**
+opt-in Google Calendar sync through the device calendar provider (`expo-calendar`),
+no network, no OAuth — see DECISIONS.md (2026-11-01) and
+`docs/handoffs/2026-11-01-device-calendar-sync.md`. Prerequisite for the Play Store
+release: Expo SDK upgrade to target API 36.
 
 **Remaining backlog (priority TBD):**
 
@@ -212,7 +215,7 @@ selects. No network, no OAuth. EventSchema is already Google-Calendar-compatible
 - **Accessibility** — dynamic type, screen reader labels (`accessibilityRole`, `accessibilityLabel`), RTL-aware focus order.
 - **Performance audit** — month cache validation on diaspora toggle, scroll perf in Day screen hourly grid.
 - **Onboarding tour** — the "Tour" drawer item (placeholder since Phase 3.7).
-- **iCloud / Google sync** *(lower priority)* — leverages the Google Calendar-compatible EventSchema.
+- **Google sync** — moved into Wave 4 (device calendar sync, 2026-11-01). iCloud: not planned.
 - **Widgets** *(speculative)* — iOS home screen, Android launcher.
 - **Web companion** *(probably never — offline-first is the identity)*.
 
