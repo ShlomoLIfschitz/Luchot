@@ -6,7 +6,7 @@
 
 When dispatching a sub-agent, always provide four things:
 
-1. **Context** — relevant locked decisions (from docs/DECISIONS.md) and current state (from WORK_LOG).
+1. **Context** — relevant locked decisions (from docs/DECISIONS.md) and current state (from the newest docs/worklog/ entry).
 2. **Task** — specific and bounded ("add `useReminders(date)` hook returning Zod-validated rows"), not vague ("work on reminders").
 3. **Contracts** — point to the exact schema/types in `src/schemas/` the agent must respect or produce.
 4. **DoD for this task** — what output proves it's done.

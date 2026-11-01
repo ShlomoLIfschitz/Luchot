@@ -18,11 +18,11 @@ Before touching any code, read these files in order (all live under `docs/`):
 1. `docs/VISION.md` — What Luchot is, who it's for, what it must never be
 2. `docs/SCREENS.md` — The complete screen map, interactions, and navigation
 3. `docs/DESIGN.md` — Color tokens, typography, spacing, component specs
-4. `docs/WORK_LOG.md` — What was done in the previous session, what's open, what's blocked
+4. The newest `docs/worklog/` entry — What was done in the previous session, what's open, what's blocked (`docs/WORK_LOG.md` is the archive, until 2026-11-02)
 5. `docs/ROADMAP.md` — Current phase, what to work on next
 6. `docs/DECISIONS.md` — Locked architectural decisions and their rationale
 
-**Do not skip steps 4 and 6.** If `docs/WORK_LOG.md` says "open issue: X", do not start something unrelated until X is resolved or explicitly deferred. If `docs/DECISIONS.md` locks a choice, do not revisit it unless the user explicitly reopens it.
+**Do not skip steps 4 and 6.** If the newest work log entry says "open issue: X", do not start something unrelated until X is resolved or explicitly deferred. If `docs/DECISIONS.md` locks a choice, do not revisit it unless the user explicitly reopens it.
 
 ### Where things are (read on demand)
 
@@ -120,7 +120,7 @@ This is the single highest-risk area in Luchot. **Every one of the six bugs fixe
 ### 📞 When in Doubt
 
 1. Re-read docs/VISION.md, docs/SCREENS.md, docs/DESIGN.md.
-2. Search docs/WORK_LOG.md and docs/DECISIONS.md for prior decisions.
+2. Search docs/worklog/, docs/WORK_LOG.md (archive) and docs/DECISIONS.md for prior decisions.
 3. Architecture and code choices: decide, and report the decision in one line. Design and product decisions, and reopening a locked decision: ask Shlomo (closed list in the global `~/.claude/CLAUDE.md`).
 
 ---
@@ -133,7 +133,7 @@ General rules (DoD, merges, parallel work, session boundaries, UI Figma-first) a
 Plans arrive as files in `docs/handoffs/` (format: `docs/handoffs/_TEMPLATE.md`), never as free-form pasted text.
 When given a handoff file: before any code, (1) restate section 3 verbatim, (2) map each acceptance criterion to the exact command/check that verifies it, (3) list conflicts with existing code. Then continue without waiting; stop only for a conflict with existing code or an item on the closed list (global ~/.claude/CLAUDE.md).
 When a heavy task leaves work for a new session, write it as a handoff file and fill in section 8 (State at handoff).
-A new session starts by reading the last `docs/WORK_LOG.md` entry and the handoff file it points to, and nothing else.
+A new session starts by reading the newest `docs/worklog/` entry and the handoff file it points to, and nothing else.
 
 ### This project
 - Verification command (the Definition of Done runs it and pastes its output; details and the visual-check rule in `docs/agentic/integration-checks.md`):
@@ -141,6 +141,6 @@ A new session starts by reading the last `docs/WORK_LOG.md` entry and the handof
   npm run typecheck; if ($?) { npx expo-doctor }
   ```
   Before any `eas build`, also: `npx expo export --platform android`.
-- Work log: `docs/WORK_LOG.md` (newest first: add entries at the top).
+- Work log: one new file per task, `docs/worklog/YYYY-MM-DD-<topic>.md` (format: `docs/worklog/_TEMPLATE.md`). Never edit `docs/WORK_LOG.md`: it is the frozen archive, and a shared log file makes every pair of open branches conflict.
 - How this project deploys: `docs/agentic/deploy.md`.
 - Parallel-work details for this project: `docs/agentic/parallel-policy.md`.

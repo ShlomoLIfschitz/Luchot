@@ -23,7 +23,7 @@ function workflowConfig(dir) {
   // stopMode "remind" (default) tells the user what is missing; "block" makes
   // Claude keep going. Stop fires at the end of every turn, not only at the end
   // of a session, so "block" forces a commit before every reply.
-  const defaults = { workLog: 'WORK_LOG.md', requireCommit: true, stopMode: 'remind', longSessionBytes: 3 * 1024 * 1024 };
+  const defaults = { workLog: 'WORK_LOG.md', workLogDir: null, requireCommit: true, stopMode: 'remind', longSessionBytes: 3 * 1024 * 1024 };
   try {
     return { ...defaults, ...JSON.parse(fs.readFileSync(path.join(dir, '.claude', 'workflow.json'), 'utf8')) };
   } catch {
@@ -61,6 +61,27 @@ function addChanged(sessionId, file) {
 function isInside(file, dir) {
   const rel = path.relative(key(dir), key(file));
   return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+// workLogDir (e.g. "docs/worklog"): one file per entry, "YYYY-MM-DD-<topic>.md", so two
+// branches never edit the same log file. Returns the entry files oldest first: by
+// name (the date prefix), then by mtime for the same name prefix. Skips _TEMPLATE.md
+// and README.md. Empty when workLogDir is unset or missing.
+function workLogEntryFiles(dir, cfg) {
+  if (!cfg.workLogDir) return [];
+  const folder = path.resolve(dir, cfg.workLogDir);
+  let names = [];
+  try { names = fs.readdirSync(folder); } catch { return []; }
+  return names
+    .filter(n => /\.md$/i.test(n) && !/^(_TEMPLATE|README)\.md$/i.test(n))
+    .map(n => {
+      const file = path.join(folder, n);
+      let st = null;
+      try { st = fs.statSync(file); } catch { /* vanished */ }
+      return st && st.isFile() ? { file, name: n, date: (n.match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || null, mtime: st.mtimeMs } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => ((a.date || '') === (b.date || '') ? a.mtime - b.mtime : (a.date || '') < (b.date || '') ? -1 : 1));
 }
 
 // ---------- event log ----------
@@ -118,4 +139,4 @@ function logEvent(input, hook, details) {
   } catch { /* logging is best effort */ }
 }
 
-module.exports = { readStdin, projectDir, workflowConfig, readChanged, addChanged, isInside, samePath, logEvent, redact };
+module.exports = { readStdin, projectDir, workflowConfig, readChanged, addChanged, isInside, samePath, workLogEntryFiles, logEvent, redact };

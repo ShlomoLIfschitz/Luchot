@@ -68,7 +68,7 @@ If any check fails: identify the owner from the ownership table, delegate the fi
 
 No automated tests yet — `test-engineer` is dormant. Verification is:
 1. `npm run typecheck` — must pass.
-2. Manual test on Android — describe what was tested in WORK_LOG.
+2. Manual test on Android — describe what was tested in the work log entry.
 3. Visual check against docs/DESIGN.md tokens (no rogue hex codes).
 
 Activating Jest + React Native Testing Library is a Phase 5 decision. When activated, flip `test-engineer` to active in the roster and add `npm test` to the DoD gate.
