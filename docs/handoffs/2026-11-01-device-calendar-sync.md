@@ -49,10 +49,11 @@ Phase 3 — Device calendar sync
 - Play Console account, privacy policy page, Data safety form (Shlomo's).
 
 ## 6. Open questions
-- Reading Google events: show them live in Luchot (read-through overlay, edited in Google) or copy them into Luchot's SQLite? Recommendation: live overlay — no duplicates, always current. — owner: Shlomo
-- Writing Luchot events: automatically on every create/edit/delete once sync is on, or a manual "send to Google" per event? Recommendation: automatic, behind the opt-in toggle. — owner: Shlomo
-- Which Luchot events go out: all, or only some categories (e.g. not Torah/holiday tags)? Recommendation: personal events only; hebcal holidays never. — owner: Shlomo
-- Hebrew-date yearly events (yahrzeit, Hebrew birthday): how many years ahead to write? Recommendation: 10 years, extended on app launch. — owner: Shlomo
+Answered 2026-11-02. Shlomo chose "תצוגה חיה" for the first; for the rest he accepted the recommendations ("בשאר השאלות הפתוחות בתוכנית אלך עם ההמלצות שלי, אלא אם תגיד אחרת" — no objection).
+- Reading Google events → **live overlay**: shown in Luchot's views, never copied into SQLite, edited in Google. — answered: Shlomo
+- Writing Luchot events → **automatic** on every create/edit/delete once sync is on. — answered: recommendation accepted
+- Which events go out → **personal events only**; hebcal holidays never. — answered: recommendation accepted
+- Hebrew-date yearly events → **10 years ahead**, extended on app launch. — answered: recommendation accepted
 - Settings screen and import preview are a new flow: Figma frames before UI code. — owner: agent designs, Shlomo approves
 
 ## 7. Independent parts

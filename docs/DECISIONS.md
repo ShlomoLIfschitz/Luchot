@@ -931,3 +931,8 @@
   - "Notifications and export are user-triggered" (2026-05-28) is narrowed, not
     revoked: turning sync on is the explicit user action; after that, writes to
     the chosen calendar follow the user's own create/edit/delete in Luchot.
+- Product choices (2026-11-02): Google events are a LIVE read-through overlay in
+  Luchot's views (never copied into SQLite, edited in Google); Luchot personal
+  events are written automatically on create/edit/delete once sync is on;
+  hebcal holidays are never written; Hebrew-date yearly events are written 10
+  years ahead and extended on app launch.
