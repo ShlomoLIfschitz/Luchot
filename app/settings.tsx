@@ -43,6 +43,7 @@ import { typography, withFontFamily } from '../src/constants/typography';
 import { findNearestCity } from '../src/utils/locationLookup';
 import { Card } from '../src/components/ui/Card';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
+import { ImportEntryRow } from '../src/components/import/ImportEntryRow';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
@@ -497,6 +498,12 @@ export default function SettingsScreen() {
               right={<ChevronValue value={omerReminderTime} colors={colors} />}
             />
           )}
+        </Card>
+
+        {/* ── ייבוא ── */}
+        <SectionLabel title="ייבוא" colors={colors} />
+        <Card colors={colors}>
+          <ImportEntryRow colors={colors} />
         </Card>
 
       </ScrollView>
