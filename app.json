@@ -42,7 +42,14 @@
           "locationWhenInUsePermission": "Luchot uses your location to calculate zmanim (halachic times)."
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/luchot_reminder.wav"
+          ]
+        }
+      ],
       "expo-font"
     ],
     "extra": {
