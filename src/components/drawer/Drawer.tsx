@@ -31,6 +31,7 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import {
+  ArrowLeftRight,
   CalendarArrowUp,
   Calendar,
   BookOpenText,
@@ -245,6 +246,11 @@ export function Drawer() {
               Icon={Library}
               label="פרטי לימוד"
               onPress={() => navigateTo('/details')}
+            />
+            <DrawerItem
+              Icon={ArrowLeftRight}
+              label="ממיר תאריכים"
+              onPress={() => navigateTo('/converter')}
             />
             <DrawerItem
               Icon={MapPin}
