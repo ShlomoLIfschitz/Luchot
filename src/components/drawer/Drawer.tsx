@@ -41,6 +41,7 @@ import {
   MapPin,
   Settings as SettingsIcon,
   Info,
+  Heart,
 } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -267,6 +268,11 @@ export function Drawer() {
               Icon={SettingsIcon}
               label="הגדרות"
               onPress={() => navigateTo('/settings')}
+            />
+            <DrawerItem
+              Icon={Heart}
+              label="תמיכה בפרויקט"
+              onPress={() => navigateTo('/support')}
             />
             {/* NEW in 3.7c — final item */}
             <DrawerItem
