@@ -17,7 +17,7 @@ A converter screen, opened from the hamburger drawer, that turns any Gregorian d
 - Shlomo (2026-11-03): "יושב בתפריט המבורגר ורק מציג המרה בשני הכיוונים"
 - Shlomo (2026-11-03, approving the Phase 2–3 frames, a standing rule): "הייתי רוצה שתשמור על רמת הפיקסלים בעיצוב". Build the approved frames pixel for pixel, and list any deviation in the PR.
 
-## 4. Figma frames (designed 2026-11-03, **waiting for Shlomo's approval**)
+## 4. Figma frames (designed 2026-11-03, **approved by Shlomo 2026-11-03**: "מאשר, תבנה")
 File "Luchot — Design System & Screens", page `05 · Sync & Import (Phase 2–3)`. Base URL:
 `https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=`
 - [ ] Light section — [52-3](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=52-3)

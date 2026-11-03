@@ -7,6 +7,6 @@
 - Year as a numeric input, with the gematria shown under it; day and month as pickers limited to valid values.
 - "After sunset" switch for Gregorian→Hebrew; a note for dates before 1582 (proleptic Gregorian, to be verified).
 ### Open issues / blocked
-- Waiting for Shlomo's approval of the frames before any UI code.
+- Approved 2026-11-03, Shlomo: "מאשר, תבנה".
 ### Next steps
 - After approval: implement on `feat/date-converter` per the handoff.
