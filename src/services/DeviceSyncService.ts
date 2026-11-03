@@ -80,10 +80,25 @@ async function createOnDevice(calendarId: string, d: DesiredDeviceEvent): Promis
   return ev.id;
 }
 
-async function deleteOnDevice(deviceEventId: string): Promise<void> {
+/**
+ * The device event a mapping row points to, only if it is still in the
+ * calendar Luchot wrote it to. Guards against touching a foreign event should
+ * the provider ever hand the same id to another event after ours was deleted
+ * in Google (security review 2026-11-03, LOW-1).
+ */
+async function ownDeviceEvent(deviceEventId: string, calendarId: string): Promise<ExpoCalendarEvent | null> {
   try {
     const ev = await ExpoCalendarEvent.get(deviceEventId);
-    await ev.delete();
+    return ev.calendarId === calendarId ? ev : null;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteOnDevice(deviceEventId: string, calendarId: string): Promise<void> {
+  try {
+    const ev = await ownDeviceEvent(deviceEventId, calendarId);
+    if (ev) await ev.delete();
   } catch {
     // Already gone (deleted in Google, or the account was removed): nothing to do.
   }
@@ -121,22 +136,26 @@ async function syncNow(id: string): Promise<void> {
   const diff = diffPlan(desired, rows, window);
 
   for (const r of diff.remove) {
-    await deleteOnDevice(r.deviceEventId);
+    await deleteOnDevice(r.deviceEventId, r.calendarId);
     await StorageService.deleteSyncMapping(masterId, r.occKey);
   }
   for (const { desired: d, row: r } of diff.recreate) {
-    await deleteOnDevice(r.deviceEventId);
+    await deleteOnDevice(r.deviceEventId, r.calendarId);
     await record(masterId, calendarId, d, await createOnDevice(calendarId, d));
   }
   for (const { desired: d, row: r } of diff.update) {
-    try {
-      const ev = await ExpoCalendarEvent.get(r.deviceEventId);
-      await ev.update(eventFields(d.payload)); // null fields are cleared
-      await record(masterId, r.calendarId, d, r.deviceEventId);
-    } catch {
-      // Deleted on the device side: write it again.
-      await record(masterId, calendarId, d, await createOnDevice(calendarId, d));
+    const ev = await ownDeviceEvent(r.deviceEventId, r.calendarId);
+    if (ev) {
+      try {
+        await ev.update(eventFields(d.payload)); // null fields are cleared
+        await record(masterId, r.calendarId, d, r.deviceEventId);
+        continue;
+      } catch {
+        // fall through: write it again
+      }
     }
+    // Deleted on the device side (or no longer ours): write it again.
+    await record(masterId, calendarId, d, await createOnDevice(calendarId, d));
   }
   for (const d of diff.create) {
     await record(masterId, calendarId, d, await createOnDevice(calendarId, d));

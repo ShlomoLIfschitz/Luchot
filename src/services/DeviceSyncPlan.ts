@@ -409,6 +409,17 @@ export interface DeviceOccurrence {
 }
 
 const UNTITLED = '(ללא כותרת)'; // = IcsParser.UNTITLED_SUMMARY (kept local: type-only import)
+// Same caps as IcsParser: text from other apps' calendars is untrusted
+// (security review 2026-11-03, INFO-3).
+const MAX_TITLE = 500;
+const MAX_NOTES = 20000;
+const MAX_LOCATION = 500;
+
+function capText(s: string | null | undefined, max: number): string | undefined {
+  const t = s?.trim();
+  if (!t) return undefined;
+  return t.length > max ? t.slice(0, max) : t;
+}
 
 function utcDateKey(d: Date): string {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
@@ -423,9 +434,9 @@ export function deviceOccurrenceToParsed(o: DeviceOccurrence): ParsedIcsEvent | 
   if (isNaN(start.getTime())) return null;
   const rawEnd = o.endDate ? new Date(o.endDate) : start;
   const end = isNaN(rawEnd.getTime()) || rawEnd < start ? start : rawEnd;
-  const summary = (o.title ?? '').trim() || UNTITLED;
-  const description = o.notes?.trim() || undefined;
-  const location = o.location?.trim() || undefined;
+  const summary = capText(o.title, MAX_TITLE) ?? UNTITLED;
+  const description = capText(o.notes, MAX_NOTES);
+  const location = capText(o.location, MAX_LOCATION);
 
   if (o.allDay) {
     const startDate = utcDateKey(start);

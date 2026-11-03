@@ -355,3 +355,13 @@ test('isUpcoming: every recurring series is pushed, even if it started in the pa
   assert.equal(isUpcoming(hebrewYearly(15, 9, old), '2026-11-03'), true);
   assert.equal(isUpcoming(ev({ start: { date: old }, end: { date: old }, hebrewExtensions: { recurrenceType: 'weekly' } }), '2026-11-03'), true);
 });
+
+test('device text is capped like the .ics import (500 / 20000 / 500)', () => {
+  const p = deviceOccurrenceToParsed({
+    title: 'x'.repeat(5000), notes: 'n'.repeat(50000), location: 'l'.repeat(900),
+    allDay: true, startDate: '2026-11-12T00:00:00.000Z', endDate: '2026-11-13T00:00:00.000Z',
+  });
+  assert.equal(p.summary.length, 500);
+  assert.equal(p.description.length, 20000);
+  assert.equal(p.location.length, 500);
+});
