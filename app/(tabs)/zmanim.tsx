@@ -7,7 +7,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { MapPin, ChevronLeft, Navigation } from 'lucide-react-native';
+import { PinIcon, GpsIcon } from '../../src/components/icons/FigmaIcons';
+import { weekdayNameHe, hebrewDayMonth } from '../../src/utils/hebrewLabels';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import type { ThemeColors } from '../../src/hooks/useThemeColors';
@@ -16,7 +17,6 @@ import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { useLocationStore } from '../../src/providers/LocationProvider';
 import type { LocationSource } from '../../src/providers/LocationProvider';
 import { ZmanimFullList } from '../../src/components/zmanim/ZmanimFullList';
-import { dateService, toHebrewNumeral, toHebrewYear } from '../../src/services/DateService';
 import type { ZmanimMethod } from '../../src/services/ZmanimService';
 import { radius } from '../../src/constants/radius';
 import { typography, withFontFamily } from '../../src/constants/typography';
@@ -40,8 +40,8 @@ function sourceBadge(source: LocationSource, colors: ThemeColors) {
 }
 
 const SHITA_OPTIONS: { value: ZmanimMethod; label: string }[] = [
-  { value: 'GRA', label: 'גר״א' },
-  { value: 'MGA', label: 'מג״א' },
+  { value: 'GRA', label: 'הגר״א' },
+  { value: 'MGA', label: 'מגן אברהם' },
 ];
 
 export default function ZmanimScreen() {
@@ -70,23 +70,8 @@ export default function ZmanimScreen() {
 
   const zmanimMethod = useSettingsStore((s) => s.zmanimMethod);
   const setZmanimMethod = useSettingsStore((s) => s.setZmanimMethod);
-  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
 
   // Day data for header
-  const dayData = useMemo(
-    () => dateService.getDayData(selectedDate),
-    [selectedDate],
-  );
-
-  const hebrewFormatted = `${toHebrewNumeral(dayData.hebrewDate.day)} ${dayData.hebrewDate.monthName} ${toHebrewYear(dayData.hebrewDate.year)}`;
-  const gregFormatted = selectedDate.toLocaleDateString('he-IL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  // Day navigation — swipe left/right (consistent with Day screen)
   const navigateDay = useCallback(
     (direction: 1 | -1) => {
       const next = new Date(selectedDate);
@@ -108,21 +93,18 @@ export default function ZmanimScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader date={selectedDate} onDatePress={openPicker} />
+        <ScreenHeader
+          title="זמני היום"
+          subtitle={`${weekdayNameHe(selectedDate)} · ${hebrewDayMonth(selectedDate)}`}
+          subtitleAbove
+          onTitlePress={openPicker}
+          titleAccessibilityLabel="זמני היום, בחר תאריך"
+          onJumpToToday={() => setSelectedDate(new Date())}
+        />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header — date */}
-          <View style={styles.header}>
-            <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-              {hebrewOnTop ? hebrewFormatted : gregFormatted}
-            </Text>
-            <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-              {hebrewOnTop ? gregFormatted : hebrewFormatted}
-            </Text>
-          </View>
-
           {/* Location card — tappable; opens picker. Shows a source badge
               (gps / manual / default) so users always know where the shown
               zmanim are computed for. */}
@@ -133,18 +115,19 @@ export default function ZmanimScreen() {
             accessibilityLabel={`מיקום נוכחי: ${currentCityName}, לחיצה לשינוי מיקום`}
           >
             {/* row-reverse, JSX order: pin (right) → text block (flex:1) → chevron (left) */}
-            <MapPin size={20} color={colors.accent} />
+            <PinIcon size={24} color={colors.accent} />
             <View style={styles.locationTextBlock}>
               <Text style={[styles.locationName, { color: colors.textPrimary }]}>
                 {currentCityName}
               </Text>
               <View style={[styles.sourceBadge, { backgroundColor: badge.bg }]}>
-                {/* JSX order: text first (right) → glyph last (left) */}
+                {/* Figma: the GPS glyph sits to the RIGHT of the text —
+                    JSX order: glyph first (right) → text (left). */}
+                {badge.showIcon && <GpsIcon size={12} color={badge.fg} />}
                 <Text style={[styles.sourceBadgeText, { color: badge.fg }]}>{badge.label}</Text>
-                {badge.showIcon && <Navigation size={10} color={badge.fg} />}
               </View>
             </View>
-            <ChevronLeft size={18} color={colors.textTertiary} />
+            <Text style={[styles.chevron, { color: colors.textTertiary }]}>‹</Text>
           </Pressable>
 
           {/* Shita segmented control — selecting persists via SettingsProvider.
@@ -156,6 +139,7 @@ export default function ZmanimScreen() {
                 <Pressable
                   key={value}
                   onPress={() => setZmanimMethod(value)}
+                  hitSlop={{ top: 8, bottom: 8 }}
                   style={[
                     styles.shitaSegment,
                     active && [styles.shitaSegmentActive, { backgroundColor: colors.surface }],
@@ -166,7 +150,7 @@ export default function ZmanimScreen() {
                 >
                   <Text style={[
                     styles.shitaSegmentText,
-                    { color: active ? colors.textPrimary : colors.textSecondary },
+                    { color: active ? colors.textPrimary : colors.textTertiary },
                     active && styles.shitaSegmentTextActive,
                   ]}>
                     {label}
@@ -189,50 +173,44 @@ export default function ZmanimScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
+  // Figma: content padding 14 / 16, items 14 apart.
+  scrollContent: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 40 },
 
-  // Header
-  header: { alignItems: 'center', marginBottom: 16 },
-  hebrewDate: { ...withFontFamily(typography.displayMedium), letterSpacing: -0.5, textAlign: 'center' },
-  gregDate:   { ...withFontFamily(typography.bodyMedium), marginTop: 4, textAlign: 'center' },
-
-  // Location card — row-reverse: pin (right) → text block (flex:1) → chevron (left)
   locationCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 16,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    marginBottom: 14,
     minHeight: 48,
   },
   locationTextBlock: { flex: 1, gap: 4 },
   locationName: { ...withFontFamily(typography.cardTitle), textAlign: 'right' },
-  // Source badge pill — right-aligned under the location name (column parent,
-  // so alignSelf controls horizontal position).
+  chevron: { ...withFontFamily(typography.glyph), width: 20, textAlign: 'center' },
   sourceBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     alignSelf: 'flex-end',
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.full,
   },
   sourceBadgeText: { ...withFontFamily(typography.micro, '700') },
 
-  // Shita selector — surfaceMuted track, surface pill for the active segment.
+  // Figma: segments 33 tall (padding 7); hitSlop keeps 48 dp targets.
   shitaTrack: {
     flexDirection: 'row-reverse',
     borderRadius: radius.full,
     padding: 3,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   shitaSegment: {
     flex: 1,
-    paddingVertical: 13, // combined with typography.bodyMedium lineHeight → ≥48dp touch target
+    paddingVertical: 7,
     borderRadius: radius.full,
     alignItems: 'center',
   },
