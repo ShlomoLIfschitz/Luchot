@@ -43,6 +43,7 @@ import {
   WeekIcon,
 } from '../icons/FigmaIcons';
 import { hebrewFullDate, gregFullDate } from '../../utils/hebrewLabels';
+import { ArrowLeftRight } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { overlay } from '../../constants/overlay';
@@ -250,6 +251,12 @@ export function Drawer() {
               label="לימוד יומי"
               active={isActive('/details')}
               onPress={() => navigateTo('/details')}
+            />
+            <DrawerItem
+              Icon={ArrowLeftRight}
+              label="ממיר תאריכים"
+              active={isActive('/converter')}
+              onPress={() => navigateTo('/converter')}
             />
             <DrawerItem
               Icon={PinIcon}
