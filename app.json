@@ -28,10 +28,18 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["DEFAULT"],
+          "category": [
+            "DEFAULT"
+          ],
           "data": [
-            { "scheme": "content", "mimeType": "text/calendar" },
-            { "scheme": "file", "mimeType": "text/calendar" }
+            {
+              "scheme": "content",
+              "mimeType": "text/calendar"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "text/calendar"
+            }
           ]
         }
       ]
@@ -60,7 +68,9 @@
           ]
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sharing",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {
