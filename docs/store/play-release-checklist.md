@@ -45,12 +45,12 @@ Facts marked *(verified)* were checked against Google's help pages on 2026-11-03
 | Approximate location (rounded ~110 m to Nominatim, on user action) | Yes, to a third party | Collected, processed ephemerally, optional, purpose "App functionality"; decide on "shared" with the form's definitions |
 | Precise location | No (only rounded coords leave) | Not collected *(check: the form may treat the GPS read itself as collection only if transmitted)* |
 | Expo update check (app/OS version, random install ID) | Yes, to Expo | Check whether "Device or other IDs" applies |
-| Purchases (tips) | Handled by Google Play | Check whether Play Billing data must be declared |
 | Encryption in transit | Nominatim and Expo use HTTPS | Yes |
 | Deletion | Uninstall removes everything | No account, so no deletion request flow |
 
-## 6. Tips via Play Billing (PR #18 decision, `feat/support-project`) — S
+## 6. Tips via Play Billing (PR #18 decision, `feat/support-project`) — NOT in the first release
+Shlomo, 2026-11-03: "בלי, בעדכון מאוחר". The first Play release ships without the tips screen, so the account stays non-monetizing. When tips ship in a later update:
+- Add back a "supporting the project" section to the privacy policy (payment handled by Google Play, we receive no payment details) and a Purchases row to the Data safety form.
 - Selling in-app products makes the account a **monetizing** account. The signup screen says: "If you choose to earn money, your full legal address will be shown publicly".
 - Needs a Google Payments merchant profile linked to the Play Console, and the three products (`support_10`, `support_25`, `support_50`) created as managed products before the screen can load prices.
 - Tax/VAT on the income in Israel: outside this checklist, ask an accountant.
-- Option to avoid the public address at launch: ship the first release without the tips screen and add it in a later update.

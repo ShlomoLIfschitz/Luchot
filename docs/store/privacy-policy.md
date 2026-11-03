@@ -18,11 +18,10 @@
 - **התראות מדויקות (exact alarms)** — כדי שתזכורת תופיע בדיוק בשעה שקבעת.
 
 ## מתי האפליקציה מתחברת לאינטרנט
-האפליקציה לא שולחת לנו שום מידע. יש שלושה מקרים שבהם היא פונה לשירות חיצוני:
+האפליקציה לא שולחת לנו שום מידע. יש שני מקרים שבהם היא פונה לשירות חיצוני:
 
 1. **שם המקום לפי מיקום.** כשאתה מבקש מיקום נוכחי ואין עיר מוכרת קרובה, או כשאתה מצרף מיקום להערה, האפליקציה שולחת קואורדינטות **מעוגלות לכ-110 מטר** לשירות [Nominatim של OpenStreetMap](https://osmfoundation.org/wiki/Privacy_Policy) כדי לקבל שם מקום. לא נשלח שום מידע אחר. זה קורה רק בתגובה לפעולה שלך, אף פעם ברקע.
 2. **עדכוני אפליקציה.** כשהאפליקציה נפתחת היא בודקת אם יש עדכון תוכנה, דרך שירות העדכונים של Expo ([מדיניות הפרטיות של Expo](https://expo.dev/privacy)). הבדיקה כוללת פרטים טכניים בלבד, כמו גרסת האפליקציה ומערכת ההפעלה ומזהה התקנה אקראי. היא לא כוללת שום מידע שכתבת באפליקציה.
-3. **תמיכה בפרויקט.** אם תבחר לתמוך בפרויקט בתשלום, התשלום מתבצע כולו דרך Google Play ובהתאם ל[מדיניות הפרטיות של Google](https://policies.google.com/privacy). אנחנו לא מקבלים את פרטי התשלום שלך. התמיכה לא פותחת שום תכונה, וכל התכונות חינמיות לכולם.
 
 קישורים חיצוניים באפליקציה (למשל לספריא) נפתחים בדפדפן שלך, ועליהם חלה מדיניות האתר שנפתח.
 
@@ -60,11 +59,10 @@ Luchot is a Hebrew/Gregorian calendar app that runs on your device. It has no us
 - **Exact alarms**: so a reminder appears at the exact time you set.
 
 ## When the app connects to the internet
-The app sends no data to us. It contacts an outside service in three cases:
+The app sends no data to us. It contacts an outside service in two cases:
 
 1. **Place names from location.** When you ask for your current location and no known city is nearby, or when you tag a note with your location, the app sends coordinates **rounded to about 110 meters** to [OpenStreetMap's Nominatim service](https://osmfoundation.org/wiki/Privacy_Policy) to get a place name. Nothing else is sent. This happens only in response to your action, never in the background.
 2. **App updates.** When the app opens it checks for a software update through the Expo update service ([Expo privacy policy](https://expo.dev/privacy)). The check carries technical details only, such as the app and OS version and a random installation identifier, and none of the content you entered.
-3. **Supporting the project.** If you choose to support the project with a payment, the payment is handled entirely by Google Play under [Google's privacy policy](https://policies.google.com/privacy). We do not receive your payment details. A tip unlocks nothing; every feature is free for everyone.
 
 External links in the app (for example to Sefaria) open in your browser, under that site's own policy.
 
