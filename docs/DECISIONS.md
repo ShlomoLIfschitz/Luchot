@@ -968,3 +968,24 @@
     `BackHandler` wiring still applies.
   - `react-dom` is a direct dependency only to satisfy expo-router's peer; it is
     not bundled on native.
+
+## Reminders use USE_EXACT_ALARM (calendar-app exemption) and the HIGH channel
+- Date: 2026-11-03
+- Context: on the first SDK 58 build (target API 36) a reminder 2 minutes ahead
+  was saved but never showed. expo-notifications schedules with
+  `setExactAndAllowWhileIdle` only when `canScheduleExactAlarms()` is true;
+  otherwise it falls back to `setAndAllowWhileIdle`, which Doze may defer by a
+  long time. The app declared neither exact-alarm permission. Separately, the
+  trigger carried no `channelId`, so notifications went to expo's fallback
+  channel instead of our HIGH-importance `default` channel (no heads-up).
+- Choice: declare `android.permission.USE_EXACT_ALARM` (granted at install, no
+  prompt) and pass `channelId: 'default'` on every scheduled trigger.
+- Alternatives considered: SCHEDULE_EXACT_ALARM (denied by default on Android 14+
+  for new installs; the user would have to find a system settings screen) -
+  rejected; `delivery: 'alarmClock'` (shows an alarm icon in the status bar
+  until delivery; meant for alarm clocks) - rejected; keep inexact delivery -
+  rejected: a calendar reminder that arrives late is a broken feature.
+- Implications: Play allows USE_EXACT_ALARM for calendar apps (per Android docs
+  and secondary sources; current Play policy text not verified) and requires a
+  declaration in Play Console (Shlomo's). `app.json` change: full EAS build.
+  Not yet verified on a device.
