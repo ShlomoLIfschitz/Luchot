@@ -26,7 +26,7 @@ Facts marked *(verified)* were checked against Google's help pages on 2026-11-03
 - [ ] Feature graphic 1024×500 PNG: does not exist yet.
 - [ ] Phone screenshots, at least 2: from a device or emulator.
 - [ ] Support email for the app (can differ from the developer email *(verified, Play Console signup screen)*).
-- [ ] Privacy policy URL: `docs/store/privacy-policy.md`, needs a public page (repo is private, so not GitHub Pages from this repo).
+- [ ] Privacy policy URL: `https://pricelog.fyi/he/luchot/privacy` (English: `/en/luchot/privacy`), live once ShlomoLIfschitz/pricelog.fyi#36 is merged. Source text: `docs/store/privacy-policy.md`; a change to one goes with a change to the other.
 
 ## 5. App content declarations (S answers, C drafts)
 - [ ] Privacy policy URL (above).
