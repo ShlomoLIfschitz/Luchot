@@ -30,10 +30,18 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["DEFAULT"],
+          "category": [
+            "DEFAULT"
+          ],
           "data": [
-            { "scheme": "content", "mimeType": "text/calendar" },
-            { "scheme": "file", "mimeType": "text/calendar" }
+            {
+              "scheme": "content",
+              "mimeType": "text/calendar"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "text/calendar"
+            }
           ]
         }
       ]
@@ -68,7 +76,9 @@
         {
           "calendarPermission": "Luchot reads and writes your device calendars only when you turn on Google Calendar sync in Settings."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {

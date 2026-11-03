@@ -107,9 +107,11 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           // Figma: 8 top, 47 content (28 pill + 3 + 16 label), 18 bottom.
-          height: 8 + 47 + Math.max(insets.bottom, 18),
+          // With a system navigation bar the 18 was swallowed by the inset
+          // and the label touched the bar, so keep 8 clear above any inset.
+          height: 8 + 47 + Math.max(18, insets.bottom + 8),
           paddingTop: 8,
-          paddingBottom: Math.max(insets.bottom, 18),
+          paddingBottom: Math.max(18, insets.bottom + 8),
         },
       }}
     >

@@ -318,14 +318,16 @@ export function MonthGrid({ mode }: MonthGridProps) {
   // Jump-to-today — replaces the removed ‹ › arrows' only remaining common
   // use case. Moves both the navigation cursor (Gregorian month or Hebrew
   // month, whichever this grid is showing) and the selected day.
+  // Select today AFTER navigating: navigateToHebrewMonth resets the
+  // selection to the 15th of the month it opens.
   const handleJumpToToday = useCallback(() => {
-    setSelectedDate(today);
     if (isHebrew) {
       const { year, month } = dateService.getDayData(today).hebrewDate;
       navigateToHebrewMonth(year, month);
     } else {
       navigateToMonth(today.getFullYear(), today.getMonth() + 1);
     }
+    setSelectedDate(today);
   }, [today, isHebrew, setSelectedDate, navigateToHebrewMonth, navigateToMonth]);
 
   // ── Swipe gesture ──────────────────────────────────────────────────────────
