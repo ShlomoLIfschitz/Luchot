@@ -8,6 +8,7 @@
 
 import React from 'react';
 import Svg, { Rect, Ellipse, Path } from 'react-native-svg';
+import { Settings } from 'lucide-react-native';
 
 interface IconProps {
   size?: number;
@@ -105,10 +106,12 @@ export const ShareIcon = makeIcon(21, [
   { k: 'e', x: 12.4, y: 12.4, w: 5.7, h: 5.7, stroke: 1.6 },
 ]);
 
-export const GearIcon = makeIcon(21, [
-  { k: 'e', x: 4.8, y: 4.8, w: 11.5, h: 11.5, stroke: 1.6 },
-  { k: 'e', x: 8.6, y: 8.6, w: 3.8, h: 3.8, stroke: 1.6 },
-]);
+/** Settings: a real cog (lucide `Settings`), not Figma's two concentric
+ *  circles, which read as the jump-to-today target. Shlomo, 2026-11-03.
+ *  Stroke 1.6 in the 21 box, like the other drawer icons. */
+export function GearIcon({ size = 21, color }: IconProps) {
+  return <Settings size={size} color={color} strokeWidth={(1.6 * 24) / 21} />;
+}
 
 export const InfoIcon = makeIcon(21, [
   { k: 'e', x: 1.9, y: 1.9, w: 17.2, h: 17.2, stroke: 1.6 },
