@@ -41,6 +41,18 @@ Phase 3 — Device calendar sync
 - [ ] `security-auditor` pass on the new permission and data path — verified by: its report
 - [ ] Gate — verified by: `npm run typecheck; if ($?) { npx expo-doctor }` and `npx expo export --platform android`
 
+Figma frames for Phases 2–3 (designed 2026-11-03, **waiting for Shlomo's approval: no UI code before it**).
+File "Luchot — Design System & Screens", page `05 · Sync & Import (Phase 2–3)`. Base URL:
+`https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=`
+- [ ] Page (everything below) — [36-5](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=36-5)
+- [ ] Phase 2 · .ics import, Light — [37-2](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=37-2) · Dark — [40-68](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=40-68)
+  - A1 preview (file, count, date range, duplicates skipped, list preview, "ייבא 37 אירועים" / "ביטול") `37-3` · A2 parsing `37-97` · A3 empty file `37-120` · A4 everything already imported `37-146` · A5 invalid file `37-170` · A6 success `37-199`
+- [ ] Phase 3 · sync settings inside Settings, Light — [38-2](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=38-2) · Dark — [40-293](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=40-293)
+  - B1 sync off (default) + import entry `38-3` · B2 system permission dialog `38-66` · B3 sync on: calendars to show (multi) + calendar to write to (single) + "holidays are never written" (full scroll) `38-142` · B4 permission denied `38-254` · B5 permanently blocked → open system settings `38-328` · B6 no Google calendar on the device `38-405`
+- [ ] Phase 3 · Google events vs Luchot events, Light — [39-2](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=39-2) · Dark — [39-369](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=39-369)
+  - C1 month cell (outlined chip) `39-3` · C2 day list (outlined block + external-link icon + calendar name) `39-223` · C3 legend `40-2`
+- [ ] Tablet 768 (A1, B3; light + dark) — [40-785](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=40-785)
+
 ## 5. Out of scope
 - Google Calendar API, OAuth, any network client.
 - iCloud / iOS calendar specifics beyond what `expo-calendar` gives for free (Android first).
