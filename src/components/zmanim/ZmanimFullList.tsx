@@ -120,16 +120,17 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
       )}
 
       {/* Morning zmanim */}
-      <SectionLabel title="זמני בוקר" colors={colors} />
-      <Card colors={colors}>
+      <SectionLabel title="זמני בוקר" colors={colors} inset={0} gapAbove={0} gapBelow={14} />
+      <Card colors={colors} inset={0}>
         <Row label="עלות השחר"  time={zmanim.alotHashachar} />
         <Row label="משיכיר"     time={zmanim.misheyakir} />
         <Row label="נץ החמה"    time={zmanim.netz} />
       </Card>
+      <View style={styles.cardGap} />
 
       {/* Shita-dependent — both schools side-by-side */}
-      <SectionLabel title="סוף זמני קריאת שמע ותפילה" colors={colors} />
-      <Card colors={colors}>
+      <SectionLabel title="סוף זמני קריאת שמע ותפילה" colors={colors} inset={0} gapAbove={0} gapBelow={14} />
+      <Card colors={colors} inset={0}>
         <ShitaRow
           label='סוף זמן ק״ש'
           gra={zmanim.sofZmanShmaGRA}
@@ -141,23 +142,26 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
           mga={zmanim.sofZmanTfillaMGA}
         />
       </Card>
+      <View style={styles.cardGap} />
 
       {/* Midday + mincha */}
-      <SectionLabel title="זמני יום" colors={colors} />
-      <Card colors={colors}>
+      <SectionLabel title="זמני יום" colors={colors} inset={0} gapAbove={0} gapBelow={14} />
+      <Card colors={colors} inset={0}>
         <Row label="חצות"          time={zmanim.chatzot} />
         <Row label="מנחה גדולה"    time={zmanim.minchaGedola} />
         <Row label="מנחה קטנה"     time={zmanim.minchaKetana} />
         <Row label="פלג המנחה"     time={zmanim.plagHamincha} />
       </Card>
+      <View style={styles.cardGap} />
 
       {/* Evening */}
-      <SectionLabel title="זמני ערב" colors={colors} />
-      <Card colors={colors}>
+      <SectionLabel title="זמני ערב" colors={colors} inset={0} gapAbove={0} gapBelow={14} />
+      <Card colors={colors} inset={0}>
         <Row label="שקיעה"          time={zmanim.shkia} />
         <Row label="צאת הכוכבים"   time={zmanim.tzeitHakochavim} />
         <Row label='צאת רבינו תם'  time={zmanim.tzeitRabbeinu} />
       </Card>
+      <View style={styles.cardGap} />
 
       {/* Saturday-only: havdalah prominent at bottom if present */}
       {zmanim.havdalah && (
@@ -173,7 +177,9 @@ export function ZmanimFullList({ zmanim, preferredMethod }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingVertical: 8 },
+  // Figma: label → card and card → next label are both 14 apart.
+  container: {},
+  cardGap: { height: 14 },
 
   // row-reverse, JSX order: label (flex:1, right) → time (left). Bottom
   // hairline is applied conditionally per-row (suppressed on the last row of
@@ -182,8 +188,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    // Figma: padding 11 / 14. minHeight 48 is the approved deviation
+    // (DESIGN.md: Figma draws 44).
+    paddingVertical: 11,
+    paddingHorizontal: 14,
     minHeight: 48,
     gap: 12,  // guarantees breathing room between label and time value
   },
@@ -201,9 +209,9 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     borderWidth: 1,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   candleLabel: { ...withFontFamily(typography.cellPrimary), flex: 1 },
   candleTime:  { ...withFontFamily(typography.cardTitle) },
@@ -214,9 +222,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     borderWidth: 1,
-    marginTop: 16,
   },
 
   // Phase 4.3 — shown below candle lighting time when offset is non-default

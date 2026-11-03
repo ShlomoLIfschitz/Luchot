@@ -57,6 +57,9 @@ export const Colors = {
     successBg:        '#E8F5E9',   // GPS "located" state background
     warningBg:        '#FCEFE0',   // GPS "services disabled" state background
     errorBg:          '#FDEAEA',   // GPS "blocked / failed" state background
+
+    // Switch thumb — Figma: white in light, textPrimary in dark.
+    switchThumb:      '#FFFFFF',
   },
 
   dark: {
@@ -113,5 +116,8 @@ export const Colors = {
     successBg:        '#1B2E1D',   // GPS "located" state background
     warningBg:        '#2E2218',   // GPS "services disabled" state background
     errorBg:          '#2E1822',   // GPS "blocked / failed" state background
+
+    // Switch thumb — Figma: white in light, textPrimary in dark.
+    switchThumb:      '#F0F0EC',
   },
 };

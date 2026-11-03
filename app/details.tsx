@@ -21,23 +21,14 @@ import {
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import {
-  BookOpen,
-  BookMarked,
-  BookText,
-  Sparkles,
-  ExternalLink,
-} from 'lucide-react-native';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
-import { useSettingsStore } from '../src/providers/SettingsProvider';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
-import { Card } from '../src/components/ui/Card';
+import { BookIcon } from '../src/components/icons/FigmaIcons';
+import { hebrewFullDate } from '../src/utils/hebrewLabels';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
 import {
   dateService,
-  toHebrewNumeral,
-  toHebrewYear,
   type DayData,
   type LearningItem,
 } from '../src/services/DateService';
@@ -47,16 +38,18 @@ import { useDatePicker } from '../src/hooks/useDatePicker';
 import { swipeDirection } from '../src/constants/layout';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+/** `#RRGGBB` + alpha byte. Figma fills the Details badges with the item's
+ *  colour at 12 % opacity (not the tag-bg token). */
+function withAlpha(hex: string, alpha: number): string {
+  return hex + Math.round(alpha * 255).toString(16).padStart(2, '0').toUpperCase();
+}
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type IconComponent = React.ComponentType<any>;
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface LearningSectionData {
   title: string;
-  color: string;
-  bg: string;
-  items: { label: string; item: LearningItem | undefined; Icon: IconComponent }[];
+  /** Per item: Figma colours each badge by item, not by section. */
+  items: { label: string; item: LearningItem | undefined; color: string }[];
 }
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
@@ -65,7 +58,6 @@ export default function DetailsScreen() {
   const colors = useThemeColors();
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
-  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
 
   const dayData = useMemo<DayData>(
     () => dateService.getDayData(selectedDate),
@@ -95,50 +87,33 @@ export default function DetailsScreen() {
     });
 
   // Header date formatting
-  const hebrewFormatted = `${toHebrewNumeral(dayData.hebrewDate.day)} ${dayData.hebrewDate.monthName} ${toHebrewYear(dayData.hebrewDate.year)}`;
-  const gregFormatted = selectedDate.toLocaleDateString('he-IL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  // Themed sections — regrouped to תלמוד / הלכה / תנ״ך ומוסר. Each section
-  // carries a category tint (color/bg) applied to every item badge in it;
-  // individual items may still use distinct glyphs. Undefined items are
-  // pruned below, then empty sections are pruned.
+  // Figma labels and colours: Talmud blue, Rambam green, Nach orange,
+  // Chofetz Chaim red, Tehillim purple.
   const sections: LearningSectionData[] = [
     {
       title: 'תלמוד',
-      color: colors.tagEvent,
-      bg: colors.tagEventBg,
       items: [
-        { label: 'דף יומי',   item: dayData.dafYomi,   Icon: BookOpen },
-        { label: 'משנה יומי', item: dayData.mishnaYomi, Icon: BookOpen },
+        { label: 'דף יומי',    item: dayData.dafYomi,    color: colors.tagEvent },
+        { label: 'משנה יומית', item: dayData.mishnaYomi, color: colors.tagEvent },
       ],
     },
     {
       title: 'הלכה',
-      color: colors.tagSpecial,
-      bg: colors.tagSpecialBg,
       items: [
-        { label: 'רמב״ם יומי (פרק אחד)', item: dayData.rambamOneChapter, Icon: BookMarked },
+        { label: 'רמב״ם — פרק אחד', item: dayData.rambamOneChapter, color: colors.tagHoliday },
       ],
     },
     {
       title: 'תנ״ך ומוסר',
-      color: colors.tagShabbat,
-      bg: colors.tagShabbatBg,
       items: [
-        { label: 'נ״ך יומי',   item: dayData.nachYomi,      Icon: BookText },
-        { label: 'תנ״ך יומי', item: dayData.tanakhYomi,    Icon: BookText },
-        { label: 'חפץ חיים',  item: dayData.chofetzChaim,  Icon: Sparkles },
-        { label: 'תהילים',    item: dayData.psalms,        Icon: Sparkles },
+        { label: 'נ״ך יומי',   item: dayData.nachYomi,     color: colors.tagSpecial },
+        { label: 'תנ״ך יומי', item: dayData.tanakhYomi,   color: colors.tagSpecial },
+        { label: 'חפץ חיים',  item: dayData.chofetzChaim, color: colors.tagPersonal },
+        { label: 'תהילים',    item: dayData.psalms,       color: colors.tagShabbat },
       ],
     },
   ];
 
-  // Prune undefined items, then prune empty sections.
   const visibleSections = sections
     .map((s) => ({
       ...s,
@@ -149,44 +124,42 @@ export default function DetailsScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <ScreenHeader date={selectedDate} onDatePress={openPicker} />
+        <ScreenHeader
+          leading="back"
+          title="לימוד יומי"
+          subtitle={hebrewFullDate(selectedDate)}
+          subtitleSize="caption"
+          onTitlePress={openPicker}
+          titleAccessibilityLabel="לימוד יומי, בחר תאריך"
+        />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header — date */}
-          <View style={styles.header}>
-            <Text style={[styles.hebrewDate, { color: colors.textPrimary }]}>
-              {hebrewOnTop ? hebrewFormatted : gregFormatted}
-            </Text>
-            <Text style={[styles.gregDate, { color: colors.textSecondary }]}>
-              {hebrewOnTop ? gregFormatted : hebrewFormatted}
-            </Text>
-          </View>
-
           {visibleSections.length === 0 ? (
             <Text style={[styles.emptyState, { color: colors.textTertiary }]}>
               אין פריטי לימוד לתאריך זה
             </Text>
           ) : (
-            visibleSections.map((section) => (
-              <View key={section.title} style={styles.section}>
-                <SectionLabel title={section.title} colors={colors} />
-                <Card colors={colors}>
-                  {section.items.map(({ label, item, Icon }) => (
-                    <LearningRow
+            <>
+              {visibleSections.map((section) => (
+                <View key={section.title} style={styles.section}>
+                  <SectionLabel title={section.title} colors={colors} inset={0} gapAbove={0} gapBelow={0} />
+                  {section.items.map(({ label, item, color }) => (
+                    <LearningCard
                       key={label}
                       label={label}
                       item={item as LearningItem}
-                      Icon={Icon}
-                      badgeColor={section.color}
-                      badgeBg={section.bg}
+                      color={color}
                       colors={colors}
                     />
                   ))}
-                </Card>
-              </View>
-            ))
+                </View>
+              ))}
+              <Text style={[styles.footerNote, { color: colors.textTertiary }]}>
+                לחיצה על פריט פותחת אותו בספריא
+              </Text>
+            </>
           )}
         </ScrollView>
 
@@ -197,60 +170,39 @@ export default function DetailsScreen() {
   );
 }
 
-// ─── LearningRow ───────────────────────────────────────────────────────────────
+// ─── LearningCard ──────────────────────────────────────────────────────────────
+// Figma: one card per item — badge (38, r10, item colour at 12 %) on the
+// right, label + value in the middle, "‹" on the left. The whole card opens
+// the item in Sefaria.
 
-function LearningRow({
+function LearningCard({
   label,
   item,
-  Icon,
-  badgeColor,
-  badgeBg,
+  color,
   colors,
-  isLast = false,
 }: {
   label: string;
   item: LearningItem;
-  Icon: IconComponent;
-  badgeColor: string;
-  badgeBg: string;
+  color: string;
   colors: ThemeColors;
-  isLast?: boolean;
 }) {
   return (
-    <View
-      style={[
-        styles.row,
-        { backgroundColor: colors.surface },
-        !isLast && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.borderSubtle,
-        },
-      ]}
+    <Pressable
+      onPress={() => Linking.openURL(item.url)}
+      android_ripple={{ color: colors.border }}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="link"
+      accessibilityLabel={`${label}: ${item.display}, פתח בספריא`}
     >
-      <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-        <Icon size={18} color={badgeColor} />
+      <View style={[styles.badge, { backgroundColor: withAlpha(color, 0.12) }]}>
+        <BookIcon size={20} color={color} />
       </View>
-
-      <View style={styles.rowContent}>
-        <Text style={[styles.rowLabel, { color: colors.textTertiary }]}>
-          {label}
-        </Text>
-        <Text style={[styles.rowValue, { color: colors.textPrimary }]}>
-          {item.display}
-        </Text>
+      <View style={styles.cardText}>
+        <Text style={[styles.rowLabel, { color: colors.textTertiary }]}>{label}</Text>
+        <Text style={[styles.rowValue, { color: colors.textPrimary }]}>{item.display}</Text>
       </View>
-
-      <Pressable
-        onPress={() => Linking.openURL(item.url)}
-        style={[styles.linkBtn, { backgroundColor: colors.accentLight }]}
-        hitSlop={4}
-        accessibilityRole="button"
-        accessibilityLabel={`פתח ב-ספריא: ${item.display}`}
-      >
-        <ExternalLink size={14} color={colors.accent} />
-        <Text style={[styles.linkText, { color: colors.accent }]}>ספריא</Text>
-      </Pressable>
-    </View>
+      <Text style={[styles.chevron, { color: colors.textTertiary }]}>‹</Text>
+    </Pressable>
   );
 }
 
@@ -258,13 +210,9 @@ function LearningRow({
 
 const styles = StyleSheet.create({
   root:          { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
+  // Figma: content padding 14 / 16, everything 10 apart.
+  scrollContent: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 40, gap: 10 },
 
-  header:      { alignItems: 'center', marginBottom: 20 },
-  hebrewDate:  { ...withFontFamily(typography.displaySmall), letterSpacing: -0.5 },
-  gregDate:    { ...withFontFamily(typography.bodySmall), marginTop: 4 },
-
-  // Figma: footer hint = 11 Regular.
   emptyState: {
     ...withFontFamily(typography.caption, '400'),
     textAlign: 'center',
@@ -272,48 +220,43 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  section: { marginBottom: 12 },
+  section: { gap: 10 },
 
-  row: {
+  card: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 13,
     paddingHorizontal: 14,
     gap: 12,
-    minHeight: 62,
+    borderRadius: radius.card,
+    borderWidth: 1,
   },
   badge: {
     width: 38,
     height: 38,
-    borderRadius: radius.md,
+    borderRadius: radius.item,
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
   },
-  rowContent: {
+  cardText: {
     flex: 1,
-    flexShrink: 1,  // yields space to button rather than compressing text
+    gap: 2,
   },
   rowLabel: {
     ...withFontFamily(typography.caption),
-    marginBottom: 2,
-    textAlign: 'right',  // Hebrew label anchors to right edge
+    textAlign: 'right',
   },
-  // Figma target: learning value = 16 Bold.
   rowValue: {
     ...withFontFamily(typography.emphasis, '700'),
-    textAlign: 'right',  // Hebrew value anchors to right edge
+    textAlign: 'right',
   },
-
-  linkBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,  // reduced: button stays compact
-    paddingVertical: 6,
-    minHeight: 32,
-    borderRadius: radius.md,
-    flexShrink: 0,  // button keeps its natural size; text area yields instead
+  chevron: {
+    ...withFontFamily(typography.glyphSmall),
+    width: 18,
+    textAlign: 'center',
   },
-  linkText: { ...withFontFamily(typography.bodySmall, '600') },
+  footerNote: {
+    ...withFontFamily(typography.caption, '400'),
+    textAlign: 'right',
+  },
 });

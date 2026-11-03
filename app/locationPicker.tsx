@@ -24,14 +24,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  MapPin,
-  Navigation,
-  Search,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-} from 'lucide-react-native';
+import { GpsIcon, PinIcon, SearchIcon } from '../src/components/icons/FigmaIcons';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useLocationStore, type GpsResult } from '../src/providers/LocationProvider';
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
@@ -100,13 +93,13 @@ export default function LocationPickerScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="בחר מיקום" />
+      <ScreenHeader leading="back" title="בחירת מיקום" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* GPS button — label first/right, glyph last/left */}
+        {/* GPS button — Figma: glyph first/right, label to its left */}
         <Pressable
           onPress={handleUseGps}
           disabled={gpsState.phase === 'acquiring'}
@@ -115,14 +108,14 @@ export default function LocationPickerScreen() {
             { backgroundColor: colors.accent },
             gpsState.phase === 'acquiring' && styles.gpsButtonDisabled,
           ]}
-          accessibilityLabel="השתמש במיקום הנוכחי"
+          accessibilityLabel="השתמש במיקום המכשיר"
           accessibilityRole="button"
           accessibilityState={{ disabled: gpsState.phase === 'acquiring' }}
         >
+          <GpsIcon size={19} color={colors.textInverse} />
           <Text style={[styles.gpsButtonText, { color: colors.textInverse }]}>
-            השתמש במיקום הנוכחי
+            השתמש במיקום המכשיר
           </Text>
-          <Navigation size={18} color={colors.textInverse} />
         </Pressable>
 
         {/* Inline GPS status strip — nothing on first render */}
@@ -135,11 +128,11 @@ export default function LocationPickerScreen() {
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
         >
-          <Search size={16} color={colors.textTertiary} />
+          <SearchIcon size={17} color={colors.textTertiary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="חפש עיר..."
+            placeholder="חפש עיר…"
             placeholderTextColor={colors.textTertiary}
             style={[styles.searchInput, { color: colors.textPrimary }]}
             textAlign="right"
@@ -151,8 +144,8 @@ export default function LocationPickerScreen() {
         {/* Israeli cities */}
         {israeli.length > 0 && (
           <>
-            <SectionLabel title="ישראל" colors={colors} />
-            <Card colors={colors}>
+            <SectionLabel title="ישראל" colors={colors} inset={0} gapAbove={0} gapBelow={12} />
+            <Card colors={colors} inset={0} radius={radius.lg}>
               {israeli.map((city) => (
                 <CityRow
                   key={city.hebcalKey}
@@ -169,8 +162,8 @@ export default function LocationPickerScreen() {
         {/* International cities */}
         {international.length > 0 && (
           <>
-            <SectionLabel title="חוץ לארץ" colors={colors} />
-            <Card colors={colors}>
+            <SectionLabel title="חוץ לארץ" colors={colors} inset={0} gapAbove={12} gapBelow={12} />
+            <Card colors={colors} inset={0} radius={radius.lg}>
               {international.map((city) => (
                 <CityRow
                   key={city.hebcalKey}
@@ -202,12 +195,11 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
   if (state.phase === 'acquiring') {
     return (
       <StripRow
-        iconNode={<ActivityIndicator color={colors.accent} />}
+        iconNode={<ActivityIndicator size="small" color={colors.textSecondary} />}
         headline="מאתר מיקום…"
-        detail="ממתין לקליטת GPS"
+        detail="ממתין לקליטת GPS (עד 12 שניות)"
         bg={colors.surface}
-        fg={colors.textPrimary}
-        detailColor={colors.textSecondary}
+        fg={colors.textSecondary}
         border={colors.border}
       />
     );
@@ -218,7 +210,7 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
   if (result.ok) {
     return (
       <StripRow
-        iconNode={<CheckCircle2 size={20} color={colors.success} />}
+        iconNode={<StatusGlyph glyph="✓" color={colors.success} />}
         headline={result.placeName ?? 'המיקום זוהה בהצלחה'}
         detail="המיקום זוהה בהצלחה"
         bg={colors.successBg}
@@ -231,7 +223,7 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
     case 'servicesDisabled':
       return (
         <StripRow
-          iconNode={<AlertTriangle size={20} color={colors.warning} />}
+          iconNode={<StatusGlyph glyph="!" color={colors.warning} />}
           headline="שירותי המיקום כבויים"
           detail="הפעל מיקום בהגדרות המכשיר"
           bg={colors.warningBg}
@@ -241,7 +233,7 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
     case 'permissionBlocked':
       return (
         <StripRow
-          iconNode={<XCircle size={20} color={colors.error} />}
+          iconNode={<StatusGlyph glyph="✕" color={colors.error} />}
           headline="ההרשאה נחסמה"
           detail="יש לאשר גישה למיקום בהגדרות המערכת"
           bg={colors.errorBg}
@@ -251,7 +243,7 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
     case 'permissionDenied':
       return (
         <StripRow
-          iconNode={<XCircle size={20} color={colors.error} />}
+          iconNode={<StatusGlyph glyph="✕" color={colors.error} />}
           headline="לא ניתנה הרשאת מיקום"
           detail="נסה שוב ואשר את הבקשה"
           bg={colors.errorBg}
@@ -261,7 +253,7 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
     case 'timeout':
       return (
         <StripRow
-          iconNode={<XCircle size={20} color={colors.error} />}
+          iconNode={<StatusGlyph glyph="✕" color={colors.error} />}
           headline="לא הצלחנו לאתר מיקום"
           detail="נסה שוב או בחר עיר מהרשימה"
           bg={colors.errorBg}
@@ -272,7 +264,7 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
     default:
       return (
         <StripRow
-          iconNode={<XCircle size={20} color={colors.error} />}
+          iconNode={<StatusGlyph glyph="✕" color={colors.error} />}
           headline="אירעה שגיאה באיתור המיקום"
           detail="נסה שוב או בחר עיר מהרשימה"
           bg={colors.errorBg}
@@ -282,10 +274,9 @@ function GpsStatusStrip({ state, colors }: { state: GpsUiState; colors: ThemeCol
   }
 }
 
-/** Rounded status row: icon/glyph at the LEFT, two-line text block at the
- *  RIGHT (both lines right-aligned) — JSX order [textBlock, iconNode]
- *  inside a `row-reverse` container puts the text block first (→ right)
- *  and the icon last (→ left). */
+/** Rounded status row (Figma): glyph at the far RIGHT, two-line text block
+ *  to its left (both lines right-aligned) — JSX order [iconNode, textBlock]
+ *  inside a `row-reverse` container. Detail line at 80 % opacity. */
 function StripRow({
   iconNode, headline, detail, bg, fg, detailColor, border,
 }: {
@@ -307,6 +298,7 @@ function StripRow({
       accessibilityRole="text"
       accessibilityLabel={`${headline}. ${detail}`}
     >
+      <View style={stripStyles.iconSlot}>{iconNode}</View>
       <View style={stripStyles.textBlock}>
         <Text style={[stripStyles.headline, { color: fg }]} numberOfLines={2}>
           {headline}
@@ -315,9 +307,13 @@ function StripRow({
           {detail}
         </Text>
       </View>
-      <View style={stripStyles.iconSlot}>{iconNode}</View>
     </View>
   );
+}
+
+/** Figma draws the GPS state glyphs as 19 px text (✓ ! ✕). */
+function StatusGlyph({ glyph, color }: { glyph: string; color: string }) {
+  return <Text style={[stripStyles.glyph, { color }]}>{glyph}</Text>;
 }
 
 // ─── CityRow ───────────────────────────────────────────────────────────────────
@@ -341,7 +337,7 @@ function CityRow({
       android_ripple={{ color: colors.border }}
       style={[
         styles.cityRow,
-        { backgroundColor: colors.surface },
+        { backgroundColor: isSelected ? colors.accentLight : colors.surface },
         !isLast && {
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.borderSubtle,
@@ -351,8 +347,8 @@ function CityRow({
       accessibilityLabel={city.nameHe}
       accessibilityState={{ selected: isSelected }}
     >
-      <MapPin
-        size={16}
+      <PinIcon
+        size={18}
         color={isSelected ? colors.accent : colors.textTertiary}
       />
       <Text
@@ -375,46 +371,46 @@ function CityRow({
 
 const styles = StyleSheet.create({
   root:          { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  // Figma: content padding 14 / 16, items 12 apart.
+  scrollContent: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 40 },
 
   gpsButton: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
+    gap: 9,
+    paddingVertical: 15,
     borderRadius: radius.lg,
     marginBottom: 12,
-    minHeight: 50,
+    minHeight: 52,
   },
   gpsButtonDisabled: { opacity: 0.6 },
-  // Figma: primary GPS button = 15 Bold.
   gpsButtonText: { ...withFontFamily(typography.bodyMedium, '700') },
 
+  // Figma: r10, padding 11 / 12, gap 8, 14 Regular text.
   searchContainer: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 16,
+    borderRadius: radius.item,
+    borderWidth: 1,
+    marginBottom: 12,
   },
-  // Figma: search placeholder / input text = 14 Regular.
   searchInput: {
     flex: 1,
     ...withFontFamily(typography.label),
-    paddingVertical: 8,
+    paddingVertical: 11,
   },
 
+  // Figma: padding 13 / 14, gap 11, 48 tall.
   cityRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingVertical: 13,
     paddingHorizontal: 14,
-    gap: 12,
-    minHeight: 50,
+    gap: 11,
+    minHeight: 48,
   },
   cityName: {
     flex: 1,
@@ -422,12 +418,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   cityNameSelected: {
-    ...withFontFamily(typography.bodyMedium, '600'),
+    ...withFontFamily(typography.bodyMedium, '700'),
   },
-  // No exact type-scale step matches the previous hand-picked 18 — nearest
-  // is cardTitle (17), and its baked-in fontWeight (700) already matches.
   checkmark: {
-    ...withFontFamily(typography.cardTitle),
+    ...withFontFamily(typography.glyphSmall),
+    width: 18,
+    textAlign: 'center',
   },
 
   emptyState: {
@@ -438,20 +434,21 @@ const styles = StyleSheet.create({
   },
 });
 
+// Figma GPS state rows: padding 10 / 12, gap 10, headline 13 Bold,
+// detail 10 Regular at 80 %, 20 px glyph slot.
 const stripStyles = StyleSheet.create({
   strip: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     borderRadius: radius.lg,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-    minHeight: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
   },
-  textBlock: { flex: 1 },
-  iconSlot: { width: 24, alignItems: 'center' },
-  // Figma: GPS status headline = 13 Bold; detail line = 10 Regular.
+  textBlock: { flex: 1, gap: 1 },
+  iconSlot: { width: 20, alignItems: 'center' },
   headline: { ...withFontFamily(typography.bodySmall, '700'), textAlign: 'right' },
-  detail:   { ...withFontFamily(typography.micro, '400'), marginTop: 2, textAlign: 'right' },
+  detail:   { ...withFontFamily(typography.micro, '400'), opacity: 0.8, textAlign: 'right' },
+  glyph:    { ...withFontFamily(typography.screenTitle, '400'), textAlign: 'center' },
 });

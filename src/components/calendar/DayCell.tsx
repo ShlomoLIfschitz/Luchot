@@ -56,6 +56,9 @@ export interface DayCellProps {
   // Date display
   primaryLabel: string;   // e.g. "כ״ז" or "14" — large, top-right (RTL reading start)
   secondaryLabel: string; // e.g. "14" or "כ״ז" — small, top-left
+  /** Gregorian grid (Figma): the Gregorian number sits top-LEFT and the
+   *  Hebrew numeral top-right, so the primary label moves to the left. */
+  primaryOnLeft?: boolean;
 
   // State
   isToday: boolean;    // primary label rendered inside a filled circle
@@ -78,6 +81,7 @@ export interface DayCellProps {
 function DayCellInner({
   primaryLabel,
   secondaryLabel,
+  primaryOnLeft = false,
   isToday,
   isSelected,
   isShabbat,
@@ -158,7 +162,7 @@ function DayCellInner({
       {/* ── Top row ─────────────────────────────────────────────────────────── */}
       {/* row-reverse: primary label (first child) lands RIGHT — the RTL
           reading start; secondary label + Friday candle land LEFT. */}
-      <View style={styles.dateRow}>
+      <View style={[styles.dateRow, primaryOnLeft && styles.dateRowLtr]}>
         {isToday ? (
           <View style={[styles.todayCircle, { backgroundColor: colors.today }]}>
             <Text style={[styles.primaryLabel, styles.todayLabel, { color: colors.textInverse }]}>
@@ -196,13 +200,13 @@ function DayCellInner({
                 // Round only the true outer corners of the span.
                 borderRadius: 0,
                 borderTopRightRadius:
-                  tag.segment.isStart ? radius.xs : 0,
+                  tag.segment.isStart ? radius.chip : 0,
                 borderBottomRightRadius:
-                  tag.segment.isStart ? radius.xs : 0,
+                  tag.segment.isStart ? radius.chip : 0,
                 borderTopLeftRadius:
-                  tag.segment.isEnd ? radius.xs : 0,
+                  tag.segment.isEnd ? radius.chip : 0,
                 borderBottomLeftRadius:
-                  tag.segment.isEnd ? radius.xs : 0,
+                  tag.segment.isEnd ? radius.chip : 0,
                 // Fix bar height so blank middle/end bars match the titled start bar.
                 minHeight: SEGMENT_CHIP_HEIGHT,
               }
@@ -238,6 +242,7 @@ export const DayCell = memo(DayCellInner, (prev, next) => {
   return (
     prev.primaryLabel   === next.primaryLabel   &&
     prev.secondaryLabel === next.secondaryLabel &&
+    prev.primaryOnLeft  === next.primaryOnLeft  &&
     prev.isToday        === next.isToday        &&
     prev.isSelected     === next.isSelected     &&
     prev.isShabbat      === next.isShabbat      &&
@@ -265,7 +270,9 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     minHeight: CELL_MIN_HEIGHT, // floor only — grows to fill the parent row's height
-    padding: 5,
+    // Figma: 4 vertical / 3 horizontal.
+    paddingVertical: 4,
+    paddingHorizontal: 3,
     overflow: 'hidden',
   },
   dateRow: {
@@ -273,6 +280,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     height: 24,
+  },
+  // Gregorian grid: primary (first child) lands LEFT, Hebrew numeral right.
+  dateRowLtr: {
+    flexDirection: 'row',
   },
   primaryLabel: {
     ...withFontFamily(typography.cellPrimary),
@@ -313,15 +324,16 @@ const styles = StyleSheet.create({
     height: 17, // was 15 — a couple more px so a typical two-word Hebrew
                 // holiday name (e.g. "ראש השנה") has room before truncating.
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderRadius: radius.xs, // = 4, per DESIGN.md "Tags, small badges"
+    paddingHorizontal: 3,
+    borderRadius: radius.chip, // = 3, the Figma day-cell chip
   },
   tagText: {
     ...withFontFamily(typography.cellTag),
     textAlign: 'right',
   },
+  // Figma: "+N" is 9 Medium, same step as the chip text.
   overflowText: {
-    ...withFontFamily(typography.micro),
+    ...withFontFamily(typography.cellTag),
     textAlign: 'right',
   },
 });

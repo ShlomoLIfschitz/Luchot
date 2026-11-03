@@ -56,6 +56,14 @@ export const typography = {
   cellPrimary:    { fontSize: 15, fontWeight: '600', lineHeight: 20 },
   cellSecondary:  { fontSize: 10, fontWeight: '400', lineHeight: 13 },
   cellTag:        { fontSize: 9,  fontWeight: '500', lineHeight: 12 },
+  // 8 px — week timeline gutter label, event titles and all-day holiday
+  // chips (2026-11-03 parity pass; earlier passes mapped these to 9 px).
+  // lineHeight 12 = the Figma text box height at 8 px.
+  nano:           { fontSize: 8,  fontWeight: '500', lineHeight: 12 },
+  // Text glyphs Figma uses as icons ("‹" chevrons, "✓"): 23 in rows and
+  // headers, 17 in Details / location rows. lineHeight = Figma box height.
+  glyph:          { fontSize: 23, fontWeight: '400', lineHeight: 34 },
+  glyphSmall:     { fontSize: 17, fontWeight: '400', lineHeight: 25 },
 } satisfies Record<string, TypeStyle>;
 
 export type Typography = typeof typography;
