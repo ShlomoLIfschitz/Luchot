@@ -31,6 +31,7 @@ let schemaColorMigrated = false;
 let schemaLocationMigrated = false;
 let schemaV5Migrated = false;
 let schemaV6Migrated = false;
+let schemaV7Migrated = false;
 
 function getDb(): Promise<SQLiteDatabase> {
   if (!dbPromise) {
@@ -231,6 +232,27 @@ async function doCreateSchema(): Promise<void> {
       );
       schemaV6Migrated = true;
     }
+    // v7 migration: add the ics_imports mapping table + its index.
+    // Purely additive — creates a NEW table, never touches the events table or
+    // its data. Maps an imported .ics VEVENT's source key (UID, or
+    // UID + '|' + RECURRENCE-ID for override instances) to the Luchot event id
+    // it was imported as, for duplicate detection on re-import. Both statements
+    // use IF NOT EXISTS, so re-running on subsequent launches is a no-op.
+    if (!schemaV7Migrated) {
+      await txn.executeSqlAsync(
+        `CREATE TABLE IF NOT EXISTS ics_imports (
+          source_key  TEXT PRIMARY KEY,
+          event_id    TEXT NOT NULL,
+          imported_at TEXT NOT NULL
+        )`,
+        [],
+      );
+      await txn.executeSqlAsync(
+        `CREATE INDEX IF NOT EXISTS idx_ics_imports_event ON ics_imports (event_id)`,
+        [],
+      );
+      schemaV7Migrated = true;
+    }
   });
   schemaInitialized = true;
 }
@@ -272,22 +294,9 @@ async function dbFirst<T = any>(sql: string, args: SQLStatementArg[]): Promise<T
   return rows.length > 0 ? rows[0] : null;
 }
 
-// ── StorageService ─────────────────────────────────────────────────────────────
+// ── Event INSERT (shared by saveEvent and the .ics batch import) ───────────────
 
-export class StorageService {
-  // Called explicitly on app startup from _layout.tsx; also safe to skip —
-  // any public method will call ensureSchema() itself on first use.
-  static async init(): Promise<void> {
-    await ensureSchema();
-  }
-
-  // ── Events ────────────────────────────────────────────────
-
-  static async saveEvent(event: CalendarEvent): Promise<void> {
-    await ensureSchema();
-    const ext = event.hebrewExtensions;
-    await dbRun(
-      `INSERT OR REPLACE INTO events (
+const INSERT_EVENT_SQL = `INSERT OR REPLACE INTO events (
         id, summary, description,
         start_date, start_datetime,
         end_date, end_datetime,
@@ -301,39 +310,129 @@ export class StorageService {
         recurrence_calendar, recurrence_id,
         is_exception, exception_date,
         renewal_ask_suppressed, last_renewal_ask
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        event.id,                                        // 1  id
-        event.summary,                                   // 2  summary
-        event.description ?? null,                       // 3  description
-        event.start.date ?? null,                        // 4  start_date
-        event.start.dateTime ?? null,                    // 5  start_datetime
-        event.end.date ?? null,                          // 6  end_date
-        event.end.dateTime ?? null,                      // 7  end_datetime
-        event.status,                                    // 8  status
-        JSON.stringify(event.recurrence ?? []),          // 9  recurrence
-        ext.calendarType,                                // 10 calendar_type
-        ext.hebrewDate?.day ?? null,                     // 11 hebrew_day
-        ext.hebrewDate?.month ?? null,                   // 12 hebrew_month
-        ext.hebrewDate?.year ?? null,                    // 13 hebrew_year
-        ext.hebrewDate?.monthName ?? null,               // 14 hebrew_month_name
-        ext.recurrenceType,                              // 15 recurrence_type
-        ext.category,                                    // 16 category
-        ext.afterSunset ? 1 : 0,                        // 17 after_sunset
-        event.colorId ?? null,                           // 18 color_id
-        event.created,                                   // 19 created
-        event.updated,                                   // 20 updated
-        ext.notificationScheduled ? 1 : 0,              // 21 notification_scheduled
-        event.reminders?.overrides?.[0]?.minutes ?? null, // 22 reminder_minutes
-        event.location ?? null,                          // 23 location
-        ext.recurrenceCalendar ?? null,                  // 24 recurrence_calendar
-        ext.recurrenceId ?? null,                        // 25 recurrence_id
-        ext.isException ? 1 : 0,                        // 26 is_exception
-        ext.exceptionDate ?? null,                       // 27 exception_date
-        ext.renewalAskSuppressed ? 1 : 0,               // 28 renewal_ask_suppressed
-        ext.lastRenewalAsk ?? null,                      // 29 last_renewal_ask
-      ],
-    );
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+
+function eventInsertArgs(event: CalendarEvent): SQLStatementArg[] {
+  const ext = event.hebrewExtensions;
+  return [
+    event.id,                                        // 1  id
+    event.summary,                                   // 2  summary
+    event.description ?? null,                       // 3  description
+    event.start.date ?? null,                        // 4  start_date
+    event.start.dateTime ?? null,                    // 5  start_datetime
+    event.end.date ?? null,                          // 6  end_date
+    event.end.dateTime ?? null,                      // 7  end_datetime
+    event.status,                                    // 8  status
+    JSON.stringify(event.recurrence ?? []),          // 9  recurrence
+    ext.calendarType,                                // 10 calendar_type
+    ext.hebrewDate?.day ?? null,                     // 11 hebrew_day
+    ext.hebrewDate?.month ?? null,                   // 12 hebrew_month
+    ext.hebrewDate?.year ?? null,                    // 13 hebrew_year
+    ext.hebrewDate?.monthName ?? null,               // 14 hebrew_month_name
+    ext.recurrenceType,                              // 15 recurrence_type
+    ext.category,                                    // 16 category
+    ext.afterSunset ? 1 : 0,                        // 17 after_sunset
+    event.colorId ?? null,                           // 18 color_id
+    event.created,                                   // 19 created
+    event.updated,                                   // 20 updated
+    ext.notificationScheduled ? 1 : 0,              // 21 notification_scheduled
+    event.reminders?.overrides?.[0]?.minutes ?? null, // 22 reminder_minutes
+    event.location ?? null,                          // 23 location
+    ext.recurrenceCalendar ?? null,                  // 24 recurrence_calendar
+    ext.recurrenceId ?? null,                        // 25 recurrence_id
+    ext.isException ? 1 : 0,                        // 26 is_exception
+    ext.exceptionDate ?? null,                       // 27 exception_date
+    ext.renewalAskSuppressed ? 1 : 0,               // 28 renewal_ask_suppressed
+    ext.lastRenewalAsk ?? null,                      // 29 last_renewal_ask
+  ];
+}
+
+/** Max bound parameters per IN (...) query (SQLite default limit is 999). */
+const IN_CHUNK = 500;
+
+/** "?,?,?" for n parameters — only placeholders are interpolated, never values. */
+function placeholders(n: number): string {
+  return new Array(n).fill('?').join(',');
+}
+
+// ── StorageService ─────────────────────────────────────────────────────────────
+
+export class StorageService {
+  // Called explicitly on app startup from _layout.tsx; also safe to skip —
+  // any public method will call ensureSchema() itself on first use.
+  static async init(): Promise<void> {
+    await ensureSchema();
+  }
+
+  // ── Events ────────────────────────────────────────────────
+
+  static async saveEvent(event: CalendarEvent): Promise<void> {
+    await ensureSchema();
+    await dbRun(INSERT_EVENT_SQL, eventInsertArgs(event));
+  }
+
+  /**
+   * Batch write for the .ics importer: all events AND their ics_imports mapping
+   * rows commit in ONE transaction on the shared connection (all-or-nothing),
+   * serialized through runExclusive. `sourceKey` is omitted for VEVENTs without
+   * a UID (they are imported but can't be deduplicated later). The mapping uses
+   * INSERT OR REPLACE so re-importing after the event was deleted overwrites it.
+   */
+  static async saveImportedEvents(
+    items: Array<{ event: CalendarEvent; sourceKey?: string }>,
+  ): Promise<void> {
+    if (items.length === 0) return;
+    await ensureSchema();
+    const importedAt = new Date().toISOString();
+    await runExclusive(async () => {
+      await transactionAsync(async (txn) => {
+        for (const { event, sourceKey } of items) {
+          await txn.executeSqlAsync(INSERT_EVENT_SQL, eventInsertArgs(event));
+          if (sourceKey) {
+            await txn.executeSqlAsync(
+              `INSERT OR REPLACE INTO ics_imports (source_key, event_id, imported_at) VALUES (?,?,?)`,
+              [sourceKey, event.id, importedAt],
+            );
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Of the given .ics source keys, those already imported whose mapped event
+   * still exists and is not cancelled (a deleted event doesn't block re-import).
+   * Chunked; every value is bound as a parameter.
+   */
+  static async getImportedEventKeys(sourceKeys: string[]): Promise<Set<string>> {
+    await ensureSchema();
+    const found = new Set<string>();
+    for (let i = 0; i < sourceKeys.length; i += IN_CHUNK) {
+      const chunk = sourceKeys.slice(i, i + IN_CHUNK);
+      const rows = await dbAll<{ source_key: string }>(
+        `SELECT i.source_key AS source_key
+         FROM ics_imports i JOIN events e ON e.id = i.event_id
+         WHERE e.status != 'cancelled' AND i.source_key IN (${placeholders(chunk.length)})`,
+        chunk,
+      );
+      for (const r of rows) found.add(r.source_key);
+    }
+    return found;
+  }
+
+  /** Of the given ids, those present in events with status != 'cancelled'. Chunked + parameterized. */
+  static async getExistingEventIds(ids: string[]): Promise<Set<string>> {
+    await ensureSchema();
+    const found = new Set<string>();
+    for (let i = 0; i < ids.length; i += IN_CHUNK) {
+      const chunk = ids.slice(i, i + IN_CHUNK);
+      const rows = await dbAll<{ id: string }>(
+        `SELECT id FROM events WHERE status != 'cancelled' AND id IN (${placeholders(chunk.length)})`,
+        chunk,
+      );
+      for (const r of rows) found.add(r.id);
+    }
+    return found;
   }
 
   static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {
