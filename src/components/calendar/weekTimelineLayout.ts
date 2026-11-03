@@ -204,6 +204,7 @@ export interface WeekAllDayItem {
   roundStart: boolean; // true = draw the reading-start (RTL: right) cap
   roundEnd: boolean;   // true = draw the reading-end (RTL: left) cap
   onPressDayIdx: number; // which day's date to navigate to on tap
+  external?: boolean; // Google/device-calendar event (live overlay): outlined bar
 }
 
 export interface PositionedAllDayItem extends WeekAllDayItem {
@@ -273,6 +274,7 @@ export function buildWeekAllDayItems(
           roundStart,
           roundEnd,
           onPressDayIdx: i,
+          external: note.external ? true : undefined,
         });
       } else {
         existing.endIdx = i;

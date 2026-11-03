@@ -19,6 +19,8 @@ import { resolveEventColor } from './colorResolver';
  *   3. Omer count — only if no holidays
  *   4. Single-day user events (noteType='note', no segment)
  *   5. Single-day personal (noteType='birthday' | 'yahrzeit' | 'anniversary', no segment)
+ *   6. Google/device-calendar events (live overlay, `external`) — last, after
+ *      Luchot's own events (Figma C1); multi-day ones still lead as spans.
  *
  * Within each group, order is the order received.
  *
@@ -37,13 +39,17 @@ export function buildDayTags(
   // Label rule: only the start day carries the title; middle and end show blank.
   const spanTags: DayCellTag[] = [];
   const normalNoteTags: DayCellTag[] = [];
+  const externalTags: DayCellTag[] = [];
 
   for (const note of userNotes) {
     const category = resolveEventColor(note.noteType, note.colorId);
+    const external = note.external ? true : undefined;
     if (note.segment !== undefined) {
       // Multi-day span: blank label on non-start days so middle/end are bars only.
       const label = note.segment.isStart ? note.summary : '';
-      spanTags.push({ category, label, segment: note.segment });
+      spanTags.push({ category, label, segment: note.segment, external });
+    } else if (external) {
+      externalTags.push({ category, label: note.summary, external });
     } else {
       // Single-day note (or recurring instance): normal chip, no segment.
       normalNoteTags.push({ category, label: note.summary });
@@ -75,5 +81,5 @@ export function buildDayTags(
   }
 
   // ── Assemble: spans first, then holidays, specials, single-day notes ─────────
-  return [...spanTags, ...holidayTags, ...specialTags, ...normalNoteTags];
+  return [...spanTags, ...holidayTags, ...specialTags, ...normalNoteTags, ...externalTags];
 }

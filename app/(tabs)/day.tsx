@@ -44,6 +44,7 @@ import {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
+import { ExternalLink } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { useLocationStore } from '../../src/providers/LocationProvider';
@@ -55,6 +56,7 @@ import { ShabbatCard } from '../../src/components/zmanim/ShabbatCard';
 import { formatZmanTime, type ZmanimResult } from '../../src/services/ZmanimService';
 import { NoteEditor } from '../../src/components/notes/NoteEditor';
 import { NoteList } from '../../src/components/notes/NoteList';
+import { openInCalendarApp } from '../../src/services/DeviceCalendarService';
 import { Card } from '../../src/components/ui/Card';
 import { SectionLabel } from '../../src/components/ui/SectionLabel';
 import {
@@ -164,6 +166,11 @@ export default function DayScreen() {
   }, []);
 
   const openGridNoteEditor = useCallback((note: CalendarNote) => {
+    // Google/device events are edited in the calendar app, never in Luchot.
+    if (note.external) {
+      void openInCalendarApp(note.external.deviceEventId, note.external.instanceStart);
+      return;
+    }
     setGridEditNote(note);
     setEditorVisible(true);
   }, []);
@@ -481,6 +488,35 @@ export default function DayScreen() {
                           const timeStr = endDate && !isNaN(endDate.getTime())
                             ? `${formatHM(startDate)} – ${formatHM(endDate)}`
                             : formatHM(startDate);
+                          if (note.external) {
+                            // Figma C2 `event/google`: outlined block, external-link
+                            // icon, "time · מגוגל · calendar" (39:353).
+                            const meta = `${timeStr} · מגוגל · ${note.external.calendarName}`;
+                            return (
+                              <Pressable
+                                key={note.id}
+                                onPress={() => openGridNoteEditor(note)}
+                                style={[
+                                  styles.hourNote,
+                                  styles.hourNoteExternal,
+                                  { backgroundColor: colors.surface, borderColor: colors.borderStrong },
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${note.summary}, ${meta}`}
+                                accessibilityHint="פותח ביומן גוגל"
+                              >
+                                <View style={styles.hourNoteTitleRow}>
+                                  <Text style={[styles.hourNoteTitle, styles.hourNoteTitleFlex, { color: colors.textPrimary }]}>
+                                    {note.summary}
+                                  </Text>
+                                  <ExternalLink size={13} color={colors.textTertiary} />
+                                </View>
+                                <Text style={[styles.hourNoteTime, { color: colors.textSecondary }]}>
+                                  {meta}
+                                </Text>
+                              </Pressable>
+                            );
+                          }
                           const catKey = resolveNoteCategoryKey(note);
                           const catTokens = CATEGORY_TOKENS[catKey];
                           return (
@@ -839,6 +875,12 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   hourNoteTitle: { ...withFontFamily(typography.bodySmall, '600'), textAlign: 'right' },
+  // Figma C2 `event/google`: surface fill + 1 px borderStrong stroke; the
+  // stroke sits inside the same 7 / 10 padding (content at 8 / 11).
+  hourNoteExternal: { borderWidth: 1 },
+  // RTL: row-reverse, natural order [title, icon] — title right, icon left, gap 6.
+  hourNoteTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  hourNoteTitleFlex: { flex: 1 },
   hourNoteTime: { ...withFontFamily(typography.caption, '400'), textAlign: 'right' },
   // Quiet empty-state hint (grid stays visible below it on the events tab;
   // shown alone on the learning tab when there is nothing to learn) shown

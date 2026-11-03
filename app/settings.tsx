@@ -42,6 +42,7 @@ import { findNearestCity } from '../src/utils/locationLookup';
 import { Card } from '../src/components/ui/Card';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
 import { ImportEntryRow } from '../src/components/import/ImportEntryRow';
+import { SyncSettingsSection } from '../src/components/sync/SyncSettingsSection';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
@@ -503,6 +504,9 @@ export default function SettingsScreen() {
             />
           )}
         </Card>
+
+        {/* ── יומן גוגל (device calendar sync, Figma B1–B6) ── */}
+        <SyncSettingsSection colors={colors} />
 
         {/* ── ייבוא ── */}
         <SectionLabel title="ייבוא" colors={colors} />
