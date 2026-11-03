@@ -49,7 +49,7 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
     >
       {/* icon — JSX-first = rightmost (row-reverse), the reading start */}
       <Icon
-        size={22}
+        size={21}
         color={active ? colors.accent : colors.textSecondary}
       />
       {/* label — JSX-last = flex:1, fills toward the left */}
@@ -72,15 +72,16 @@ export function DrawerItem({ Icon, label, onPress, active = false }: DrawerItemP
 }
 
 const styles = StyleSheet.create({
+  // Figma: r10, padding 13 / 14, gap 12, rows 2 apart, 21 px icon.
   row: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
     minHeight: 48,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: radius.md,
-    marginVertical: 2,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: radius.item,
+    marginVertical: 1,
   },
   label: {
     flex: 1,
