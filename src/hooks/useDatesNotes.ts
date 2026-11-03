@@ -20,7 +20,8 @@ import { StorageService } from '../services/StorageService';
 import { expandRecurringNotes } from '../utils/expandRecurringNotes';
 import { formatDateKey } from '../utils/dateUtils';
 import type { CalendarNote } from './useNotes';
-import { eventToCalendarNote } from './useNotes';
+import { eventToCalendarNote, overlayToCalendarNote, useOverlayKey } from './useNotes';
+import { getOverlayEvents } from '../services/DeviceCalendarService';
 
 /**
  * Batch-loads all CalendarNotes whose effective date falls within
@@ -45,13 +46,15 @@ export function useDatesNotes(
   // render even when they represent the same date.
   const startKey = formatDateKey(rangeStart);
   const endKey   = formatDateKey(rangeEnd);
+  const overlayKey = useOverlayKey();
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        const [rangeEvents, recurringEvents, exceptionEvents] = await Promise.all([
+        const overlayEnd = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate(), 23, 59, 59, 999);
+        const [rangeEvents, recurringEvents, exceptionEvents, overlay] = await Promise.all([
           StorageService.getNotesInRange(rangeStart, rangeEnd),
           StorageService.getAllRecurringNotes(),
           // Fetch exception/tombstone rows for the overlay.
@@ -60,12 +63,18 @@ export function useDatesNotes(
           // standalone notes through the other two queries.
           // Existing installs have zero exception rows → overlay is a no-op.
           StorageService.getExceptions(),
+          // Live device-calendar overlay (Phase 3; empty while sync is off).
+          // Already expanded by the device, so it joins the direct notes below.
+          getOverlayEvents(rangeStart, overlayEnd),
         ]);
 
         if (cancelled) return;
 
         // Map raw CalendarEvents to CalendarNotes
-        const rangeNotes     = rangeEvents.map(eventToCalendarNote);
+        const rangeNotes     = [
+          ...rangeEvents.map(eventToCalendarNote),
+          ...overlay.map(overlayToCalendarNote),
+        ];
         const recurringNotes = recurringEvents.map(eventToCalendarNote);
         const exceptionNotes = exceptionEvents.map(eventToCalendarNote);
 
@@ -163,7 +172,7 @@ export function useDatesNotes(
     load();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startKey, endKey, refreshKey]);
+  }, [startKey, endKey, refreshKey, overlayKey]);
 
   return byDate;
 }

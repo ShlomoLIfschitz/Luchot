@@ -23,7 +23,9 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.USE_EXACT_ALARM"
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
       ],
       "intentFilters": [
         {
@@ -60,7 +62,13 @@
           ]
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Luchot reads and writes your device calendars only when you turn on Google Calendar sync in Settings."
+        }
+      ]
     ],
     "extra": {
       "router": {
