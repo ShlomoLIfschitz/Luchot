@@ -187,6 +187,12 @@ Font loading is folded into the existing `settingsReady` gate in `app/_layout.ts
 | `cell.secondary` | 11 | 400 | 14 | Day cell secondary number/letter |
 | `cell.tag` | 10 | 500 | 13 | Tag text inside day cell |
 
+The table above is the Foundations page. The code scale in
+`src/constants/typography.ts` follows the screen frames where they differ
+(e.g. cell.primary 15/600, cell.tag 9/500) and adds `label` 14, `subtitle` 12,
+`emphasis` 16, `sheetTitle` 18, `screenTitle` 19, `cardTitle` 17, `micro` 10
+and `nano` 8 (week timeline, added 2026-11-03).
+
 ---
 
 ### Spacing
@@ -217,14 +223,23 @@ const spacing = {
 
 ```typescript
 const radius = {
-  xs:  4,    // Tags, small badges
-  sm:  6,    // Day cells
-  md:  8,    // Buttons, input fields
-  lg:  12,   // Cards, sheets
-  xl:  16,   // Modals
+  chip:  3,  // Month-grid day-cell chips (screen frames)
+  xs:    4,  // Tags, small badges
+  event: 5,  // Week timeline event blocks (screen frames)
+  sm:    6,  // Day cells
+  md:    8,  // Buttons, input fields
+  item: 10,  // Drawer items, search field, Details badges (screen frames)
+  lg:   12,  // Location-picker cards, editor fields, buttons
+  card: 14,  // Cards (screen frames)
+  xl:   16,  // Modals
+  sheet: 20, // Bottom-sheet top corners (screen frames)
   full: 999, // Pills, circular buttons
 };
 ```
+
+The Foundations page lists 4/6/8/12/16/999. The approved screen frames also
+draw 3, 5, 10, 14 and 20; those are the named steps above (2026-11-03 parity
+pass). `src/constants/radius.ts` is the source of truth.
 
 ---
 
