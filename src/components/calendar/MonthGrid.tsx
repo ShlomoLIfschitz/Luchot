@@ -26,14 +26,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, ScrollView, StatusBar, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, LayoutChangeEvent } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import BottomSheet from '@gorhom/bottom-sheet';
-import { Menu, CalendarCheck } from 'lucide-react-native';
 import { useCalendarStore } from '../../providers/CalendarProvider';
 import { useSettingsStore } from '../../providers/SettingsProvider';
-import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { typography, withFontFamily } from '../../constants/typography';
 import { DayCell } from './DayCell';
@@ -48,6 +46,8 @@ import { useDatesNotes } from '../../hooks/useDatesNotes';
 import { dateService } from '../../services/DateService';
 import { formatDateKey } from '../../utils/dateUtils';
 import { swipeDirection } from '../../constants/layout';
+import { ScreenHeader } from '../common/ScreenHeader';
+import { Fab } from '../ui/Fab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -66,8 +66,9 @@ interface MonthGridProps {
 
 const DAY_NAMES_HE_SUN_FIRST = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
 const DAY_NAMES_HE_MON_FIRST = ['ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳', 'א׳'];
-const DAY_NAMES_EN_SUN_FIRST = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DAY_NAMES_EN_MON_FIRST = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Figma Gregorian frame: single Latin letters, no Shabbat emphasis.
+const DAY_NAMES_EN_SUN_FIRST = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAY_NAMES_EN_MON_FIRST = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 // ── Gregorian month names (Hebrew-language labels) ─────────────────────────────
 // Defined locally rather than via toLocaleDateString('he-IL', …) — Hermes on
@@ -111,7 +112,6 @@ function formatHebrewRange(start: HebrewDateInfo, end: HebrewDateInfo): string {
 export function MonthGrid({ mode }: MonthGridProps) {
   const colors = useThemeColors();
   const router = useRouter();
-  const openDrawer = useDrawerStore((s) => s.open);
   const {
     monthData,
     hebrewMonthData,
@@ -378,7 +378,13 @@ export function MonthGrid({ mode }: MonthGridProps) {
     >
       {week.map((day, dIdx) => {
         if (!day) {
-          return <View key={`e-${wIdx}-${dIdx}`} style={styles.emptyCell} />;
+          // Figma: other-month cells keep the surface fill and the top hairline.
+          return (
+            <View
+              key={`e-${wIdx}-${dIdx}`}
+              style={[styles.emptyCell, { backgroundColor: colors.surface, borderTopColor: colors.borderSubtle }]}
+            />
+          );
         }
 
         const { primary, secondary } = getLabels(day);
@@ -394,6 +400,7 @@ export function MonthGrid({ mode }: MonthGridProps) {
             <DayCell
               primaryLabel={primary}
               secondaryLabel={secondary}
+              primaryOnLeft={!isHebrew}
               isToday={isToday}
               isSelected={isSelected}
               isShabbat={day.hebrewDate.isShabbat}
@@ -411,61 +418,37 @@ export function MonthGrid({ mode }: MonthGridProps) {
 
   return (
     <GestureDetector gesture={swipeGesture}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
 
-        {/* Merged header — hamburger (left) + tappable two-line title (center)
-            + jump-to-today (right). Replaces the old stacked ScreenHeader +
-            arrows-header pair; index.tsx/gregorian.tsx no longer render
-            ScreenHeader at all so there is exactly one header row. */}
-        <View
-          style={[
-            styles.header,
-            { borderBottomColor: colors.border, paddingTop: (StatusBar.currentHeight ?? 0) + 8 },
-          ]}
-        >
-          <Pressable
-            onPress={openDrawer}
-            hitSlop={12}
-            style={styles.iconButton}
-            accessibilityRole="button"
-            accessibilityLabel="פתח תפריט"
-          >
-            <Menu size={24} color={colors.textPrimary} />
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              if (mode === 'hebrew') setHebrewPickerVisible(true);
-              else setPickerVisible(true);
-            }}
-            style={styles.titleBlock}
-            accessibilityRole="button"
-            accessibilityLabel={`${primaryTitle}, ${secondaryTitle}, לבחירת חודש`}
-          >
-            <Text style={[styles.monthTitle, { color: colors.textPrimary }]}>
-              {primaryTitle}
-            </Text>
-            <Text style={[styles.monthSubtitle, { color: colors.textSecondary }]}>
-              {secondaryTitle}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleJumpToToday}
-            hitSlop={12}
-            style={styles.iconButton}
-            accessibilityRole="button"
-            accessibilityLabel="עבור להיום"
-          >
-            <CalendarCheck size={24} color={colors.accent} />
-          </Pressable>
-        </View>
+        {/* Header — hamburger (left) + tappable two-line title (centre) +
+            jump-to-today target (right), per the Figma month frames. */}
+        <ScreenHeader
+          variant="month"
+          title={primaryTitle}
+          subtitle={secondaryTitle}
+          onTitlePress={() => {
+            if (mode === 'hebrew') setHebrewPickerVisible(true);
+            else setPickerVisible(true);
+          }}
+          titleAccessibilityLabel={`${primaryTitle}, ${secondaryTitle}, לבחירת חודש`}
+          onJumpToToday={handleJumpToToday}
+        />
 
         {/* Day Name Headers — direction driven by mode; always pinned above grid.
             Shabbat column is bold + tinted (Task 2c). */}
-        <View style={[styles.dayNames, { flexDirection: isRtl ? 'row-reverse' : 'row' }]}>
+        <View
+          style={[
+            styles.dayNames,
+            {
+              flexDirection: isRtl ? 'row-reverse' : 'row',
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
           {dayNames.map((name, i) => {
-            const isShabbatCol = i === shabbatIndex;
+            // Shabbat emphasis is a Hebrew-calendar header only (Figma).
+            const isShabbatCol = isHebrew && i === shabbatIndex;
             return (
               <Text
                 key={i}
@@ -501,6 +484,14 @@ export function MonthGrid({ mode }: MonthGridProps) {
             <View style={styles.gridStatic}>{gridRows}</View>
           )}
         </View>
+
+        {/* Quick-add FAB — new note on the selected day */}
+        <Fab
+          onPress={() => {
+            setActionSheetDate(null);
+            setNoteEditorVisible(true);
+          }}
+        />
 
         {/* Month/Year Picker — Gregorian mode only */}
         <MonthYearPicker
@@ -572,32 +563,12 @@ const MAX_ROW_HEIGHT = 132;
 const DEFAULT_ROW_HEIGHT = 110;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 8 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  iconButton: {
-    padding: 6, // combined with hitSlop(12) clears the 48dp touch-target floor
-  },
-  titleBlock: { flex: 1, alignItems: 'center' },
-  monthTitle: {
-    ...withFontFamily(typography.screenTitle),
-    textAlign: 'center',
-  },
-  monthSubtitle: {
-    ...withFontFamily(typography.subtitle),
-    marginTop: 1,
-    textAlign: 'center',
-  },
+  // Figma: the grid runs edge to edge (390 wide), no side padding.
+  container: { flex: 1 },
 
   // Day name header row — flexDirection set inline based on mode
-  dayNames: { paddingTop: 8, paddingBottom: 8 },
+  // Figma: surface fill, 1 px bottom border, padding 6 / 8.
+  dayNames: { paddingTop: 6, paddingBottom: 8, borderBottomWidth: 1 },
   dayName: {
     flex: 1,
     textAlign: 'center',
@@ -630,7 +601,7 @@ const styles = StyleSheet.create({
   // alignItems: 'stretch' (default on weekRow) makes cellWrapper fill the
   // row's explicit height so DayCell's flex:1 inside it expands correctly.
   cellWrapper: { flex: 1 },
-  emptyCell:   { flex: 1 }, // height comes from weekRow's explicit height
+  emptyCell:   { flex: 1, borderTopWidth: 1 }, // height comes from weekRow's explicit height
 
   // ScrollView wrapper for months whose computed rows exceed the measured
   // area. flex: 1 bounds it within gridArea so it can actually scroll

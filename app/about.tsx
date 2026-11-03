@@ -122,7 +122,7 @@ export default function AboutScreen() {
         </Card>
 
         {/* Credits */}
-        <SectionLabel title="קרדיטים" colors={colors} />
+        <SectionLabel title="קרדיטים" colors={colors} inset={20} gapAbove={24} />
         <Card colors={colors}>
           {CREDITS.map((credit) => (
             <CreditRow key={credit.name} credit={credit} colors={colors} />
