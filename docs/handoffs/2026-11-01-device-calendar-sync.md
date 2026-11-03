@@ -16,6 +16,7 @@ Let users opt in to syncing Luchot with their Google Calendar (import and export
 - Google Play: new apps and updates must target "Android 16 (API level 36) or higher" (in effect since August 31, 2026).
 - VISION.md: "Not an account-required app — ever. Even if sync is added later, it will be optional"
 - VISION.md: "Not permission-hungry — only location (for zmanim) and notifications (for reminders)" — calendar permission is a deliberate exception, requested only when the user turns sync on.
+- Shlomo (2026-11-03, approving the Phase 2–3 Figma frames): "אני מאשר את כל המסכים , הייתי רוצה שתשמור על רמת הפיקסלים בעיצוב" — the implementation must match the frames pixel for pixel; any deviation is listed in the PR (global CLAUDE.md, "Deviations").
 
 ## 4. Acceptance criteria
 Phase 1 — Expo SDK upgrade (prerequisite for Play)
@@ -40,6 +41,18 @@ Phase 3 — Device calendar sync
 - [ ] Denied / permanently blocked permission handled with a clear state — verified by: device test
 - [ ] `security-auditor` pass on the new permission and data path — verified by: its report
 - [ ] Gate — verified by: `npm run typecheck; if ($?) { npx expo-doctor }` and `npx expo export --platform android`
+
+Figma frames for Phases 2–3 (designed 2026-11-03, **approved by Shlomo 2026-11-03**, all screens; build them pixel for pixel).
+File "Luchot — Design System & Screens", page `05 · Sync & Import (Phase 2–3)`. Base URL:
+`https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=`
+- [ ] Page (everything below) — [36-5](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=36-5)
+- [ ] Phase 2 · .ics import, Light — [37-2](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=37-2) · Dark — [40-68](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=40-68)
+  - A1 preview (file, count, date range, duplicates skipped, list preview, "ייבא 37 אירועים" / "ביטול") `37-3` · A2 parsing `37-97` · A3 empty file `37-120` · A4 everything already imported `37-146` · A5 invalid file `37-170` · A6 success `37-199`
+- [ ] Phase 3 · sync settings inside Settings, Light — [38-2](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=38-2) · Dark — [40-293](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=40-293)
+  - B1 sync off (default) + import entry `38-3` · B2 system permission dialog `38-66` · B3 sync on: calendars to show (multi) + calendar to write to (single) + "holidays are never written" (full scroll) `38-142` · B4 permission denied `38-254` · B5 permanently blocked → open system settings `38-328` · B6 no Google calendar on the device `38-405`
+- [ ] Phase 3 · Google events vs Luchot events, Light — [39-2](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=39-2) · Dark — [39-369](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=39-369)
+  - C1 month cell (outlined chip) `39-3` · C2 day list (outlined block + external-link icon + calendar name) `39-223` · C3 legend `40-2`
+- [ ] Tablet 768 (A1, B3; light + dark) — [40-785](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=40-785)
 
 ## 5. Out of scope
 - Google Calendar API, OAuth, any network client.
