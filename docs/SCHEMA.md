@@ -35,6 +35,8 @@ without architect approval.
 |         | renewal_ask_suppressed, last_renewal_ask; remap legacy recurrence_type values  |
 | v6      | Backfill end_date = start_date where null; add index idx_events_daterange      |
 |         | (start_date, end_date) for range-overlap queries                               |
+| v7      | Additive only; does not touch the events table. Creates the new `ics_imports`  |
+|         | mapping table + index idx_ics_imports_event (see below).                       |
 
 ### Column definitions (physical order)
 
@@ -104,6 +106,31 @@ When a single occurrence of a recurring event is overridden or deleted:
 `renewal_ask_suppressed` and `last_renewal_ask` together implement a once-per-year renewal
 prompt rate-limit. Logic not yet built (schema-only as of v5); see DECISIONS.md
 "NotificationRecord schema includes renewal and recurrence fields".
+
+---
+
+## Table: ics_imports
+
+Added in v7 (additive — a new table; the events table is untouched).
+
+Maps an imported `.ics` VEVENT to the Luchot `events` row it was imported as, so a later
+re-import of the same file (or a file sharing events) can detect and skip duplicates. It is a
+**separate table** rather than columns on `events` because `EventSchema.ts` (and therefore the
+`events` table shape) is a locked, Google-Calendar-compatible decision — provenance of an import
+does not belong in that shape. A mapping whose `event_id` no longer exists in `events` (deleted,
+or status 'cancelled') does not block re-import; the importer overwrites the row with
+`INSERT OR REPLACE`.
+
+| Column      | Type | Constraints  | Notes                                                                                   |
+|-------------|------|--------------|-----------------------------------------------------------------------------------------|
+| source_key  | TEXT | PRIMARY KEY  | The VEVENT's UID, or `UID + '|' + RECURRENCE-ID` value for an override instance.         |
+| event_id    | TEXT | NOT NULL     | The `events.id` the VEVENT was imported as. No FK (events is Google-compatible, no FKs). |
+| imported_at | TEXT | NOT NULL     | ISO 8601 timestamp of the import.                                                       |
+
+| Index name            | Columns  | Added | Purpose                                                           |
+|-----------------------|----------|-------|-------------------------------------------------------------------|
+| (PRIMARY KEY)         | source_key | v7  | Duplicate lookup by source key on re-import.                      |
+| idx_ics_imports_event | event_id | v7    | Reverse lookup: find the import mapping(s) for a given event id.  |
 
 ---
 
