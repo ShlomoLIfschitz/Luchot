@@ -29,7 +29,7 @@ import {
   defaultSelection,
   type DeviceCalendarInfo,
 } from '../../services/DeviceCalendarService';
-import { resyncAll } from '../../services/DeviceSyncService';
+import { pushExisting } from '../../services/DeviceSyncService';
 import { SectionLabel } from '../ui/SectionLabel';
 import { radius } from '../../constants/radius';
 import { typography, withFontFamily } from '../../constants/typography';
@@ -79,7 +79,8 @@ export function SyncSettingsSection({ colors }: { colors: ThemeColors }) {
     setPermIssue(null);
     applyDefaults(await loadCalendars());
     setSyncEnabled(true);
-    void resyncAll();
+    // Existing events that have not passed yet go to Google too (Shlomo, 2026-11-03).
+    void pushExisting();
   }, [applyDefaults, loadCalendars, setSyncEnabled]);
 
   const onToggle = useCallback((v: boolean) => {

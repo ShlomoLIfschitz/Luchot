@@ -480,6 +480,13 @@ export class StorageService {
     return (row?.n ?? 0) > 0;
   }
 
+  /** Ids of every event that came from an .ics import (one query, for batch filtering). */
+  static async getImportedEventIds(): Promise<Set<string>> {
+    await ensureSchema();
+    const rows = await dbAll<{ event_id: string }>(`SELECT event_id FROM ics_imports`, []);
+    return new Set(rows.map((r) => r.event_id));
+  }
+
   // ── Device calendar sync map (v8) ─────────────────────────
 
   static async getSyncMappings(luchotId: string): Promise<DeviceSyncMapping[]> {

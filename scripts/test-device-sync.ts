@@ -22,6 +22,7 @@ import {
   isSyncableMaster,
   deviceOccurrenceToParsed,
   HEBREW_SYNC_YEARS,
+  isUpcoming,
 } from '../src/services/DeviceSyncPlan.ts';
 import { toCalendarEvent } from '../src/services/IcsParser.ts';
 
@@ -330,4 +331,27 @@ test('device occurrence goes through the Phase 2 mapping (toCalendarEvent) uncha
 
 test('invalid device dates are dropped', () => {
   assert.equal(deviceOccurrenceToParsed({ title: 'x', startDate: 'nope' }), null);
+});
+
+// ── turning sync on: which existing events are pushed ────────────────────────
+test('isUpcoming: one-off events from today on are pushed, past ones are not', () => {
+  const today = '2026-11-03';
+  assert.equal(isUpcoming(ev({ start: { date: '2026-11-03' }, end: { date: '2026-11-03' } }), today), true);
+  assert.equal(isUpcoming(ev({ start: { date: '2026-12-01' }, end: { date: '2026-12-01' } }), today), true);
+  assert.equal(isUpcoming(ev({ start: { date: '2026-11-02' }, end: { date: '2026-11-02' } }), today), false);
+  // timed event earlier today still counts as today
+  assert.equal(isUpcoming(ev({
+    start: { date: '2026-11-03', dateTime: '2026-11-03T05:00:00.000Z' },
+    end: { date: '2026-11-03', dateTime: '2026-11-03T06:00:00.000Z' },
+  }), today), true);
+});
+
+test('isUpcoming: a multi-day event still running is pushed', () => {
+  assert.equal(isUpcoming(ev({ start: { date: '2026-11-01' }, end: { date: '2026-11-05' } }), '2026-11-03'), true);
+});
+
+test('isUpcoming: every recurring series is pushed, even if it started in the past', () => {
+  const old = '2010-01-01';
+  assert.equal(isUpcoming(hebrewYearly(15, 9, old), '2026-11-03'), true);
+  assert.equal(isUpcoming(ev({ start: { date: old }, end: { date: old }, hebrewExtensions: { recurrenceType: 'weekly' } }), '2026-11-03'), true);
 });

@@ -97,6 +97,19 @@ export function isSyncableMaster(e: CalendarEvent): boolean {
   return !!e.start.date;
 }
 
+/**
+ * Whether an existing event is written when sync is turned on: every
+ * recurring series (Luchot series never end, so they always have occurrences
+ * ahead), and one-off events whose last day is today or later.
+ */
+export function isUpcoming(e: CalendarEvent, todayKey: string): boolean {
+  if (e.hebrewExtensions.recurrenceType !== 'none') return true;
+  const start = e.start.date;
+  if (!start) return false;
+  const last = e.end.date && e.end.date > start ? e.end.date : start;
+  return last >= todayKey;
+}
+
 /** The calendar a recurring series follows (mirrors expandRecurringNotes). */
 export function seriesCalendar(e: CalendarEvent): 'hebrew' | 'gregorian' | null {
   const ext = e.hebrewExtensions;

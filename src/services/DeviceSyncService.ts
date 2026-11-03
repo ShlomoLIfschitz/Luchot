@@ -17,6 +17,9 @@ import { useSettingsStore } from '../providers/SettingsProvider';
 import { getPermissionState } from './DeviceCalendarService';
 import {
   planDeviceEvents,
+  isSyncableMaster,
+  isUpcoming,
+  localDateKey,
   diffPlan,
   payloadHash,
   occurrenceStart,
@@ -149,6 +152,32 @@ export function syncEvent(id: string): Promise<void> {
   return serialized(() => syncNow(id)).catch(() => {
     // A failed device write must never break the Luchot save that triggered it.
   });
+}
+
+/**
+ * Turning sync on: writes every existing personal event that has not passed
+ * yet (one-off events ending today or later, and every recurring series),
+ * plus re-syncs what was written before. Events already on the device with
+ * unchanged content are skipped by the hash compare, so turning sync off and
+ * on again writes nothing twice. Runs in the background; never throws.
+ */
+export async function pushExisting(): Promise<void> {
+  try {
+    if (!(await writeCalendarId())) return;
+    const today = localDateKey(new Date());
+    const [events, imported, synced] = await Promise.all([
+      StorageService.getAllEvents(),
+      StorageService.getImportedEventIds(),
+      StorageService.getSyncedLuchotIds(),
+    ]);
+    const ids = new Set(synced);
+    for (const e of events) {
+      if (isSyncableMaster(e) && isUpcoming(e, today) && !imported.has(e.id)) ids.add(e.id);
+    }
+    for (const id of ids) await syncEvent(id);
+  } catch {
+    // A failed read must not break turning sync on; the launch pass retries.
+  }
 }
 
 /**
