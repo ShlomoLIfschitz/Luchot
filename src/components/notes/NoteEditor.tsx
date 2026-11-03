@@ -109,7 +109,7 @@ function ColorPickerRow({ noteType, colorId, onChange, colors }: ColorPickerRowP
   const effectiveKey: ColorTokenKey = (colorId as ColorTokenKey) ?? DEFAULT_COLOR_FOR_TYPE[noteType];
   return (
     <View style={cpStyles.row}>
-      <Text style={[cpStyles.label, { color: colors.textTertiary }]}>צבע</Text>
+      <Text style={[cpStyles.label, { color: colors.accent }]}>צבע</Text>
       <View style={cpStyles.circles}>
         {COLOR_OPTIONS.map((key) => {
           const hexColor = (colors as Record<string, string>)[key] ?? colors.textTertiary;
@@ -141,18 +141,18 @@ function ColorPickerRow({ noteType, colorId, onChange, colors }: ColorPickerRowP
 const CIRCLE_SIZE = 34;
 
 const cpStyles = StyleSheet.create({
+  // Figma: "צבע" section label above the swatch row, 13 apart; swatches 12 apart.
   row: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 13,
+    gap: 13,
   },
   label: {
     ...withFontFamily(typography.captionBold),
+    textAlign: 'right',
   },
   circles: {
     flexDirection: 'row-reverse',
-    gap: 6,
+    gap: 12,
     flex: 1,
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
@@ -664,9 +664,9 @@ export function NoteEditor({
                           style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
                           onPress={() => enterEdit(null)}
                         >
-                          <Clock size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>שעה</Text>
-                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                          <Clock size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>שעה</Text>
+                          <Text style={[s.fieldValue, { color: colors.textSecondary }]}>
                             {formatHM(new Date(note.startDateTime), use24hTime)}
                             {note.endDateTime ? ` — ${formatHM(new Date(note.endDateTime), use24hTime)}` : ''}
                           </Text>
@@ -679,9 +679,9 @@ export function NoteEditor({
                           style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
                           onPress={() => enterEdit(null)}
                         >
-                          {(() => { const TypeIcon = TYPE_ICON[noteType]; return <TypeIcon size={18} color={colors.textTertiary} />; })()}
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>סוג</Text>
-                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                          {(() => { const TypeIcon = TYPE_ICON[noteType]; return <TypeIcon size={19} color={colors.accent} />; })()}
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>סוג</Text>
+                          <Text style={[s.fieldValue, { color: colors.textSecondary }]}>
                             {noteTypeInfo.label}
                           </Text>
                         </Pressable>
@@ -693,9 +693,9 @@ export function NoteEditor({
                           style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
                           onPress={() => enterEdit('location')}
                         >
-                          <MapPin size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>מיקום</Text>
-                          <Text style={[s.fieldValue, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
+                          <MapPin size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>מיקום</Text>
+                          <Text style={[s.fieldValue, { color: colors.textSecondary, flex: 1 }]} numberOfLines={1}>
                             {location}
                           </Text>
                         </Pressable>
@@ -710,9 +710,9 @@ export function NoteEditor({
                           style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
                           onPress={() => enterEdit(null)}
                         >
-                          <CalendarDays size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>עוגן תאריך</Text>
-                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                          <CalendarDays size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>עוגן תאריך</Text>
+                          <Text style={[s.fieldValue, { color: colors.textSecondary }]}>
                             {recurrenceCalendar === 'hebrew' ? `עברי — ${hebDateLabel}` : `לועזי — ${gregDateLabel}`}
                           </Text>
                         </Pressable>
@@ -730,9 +730,9 @@ export function NoteEditor({
                             style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}
                             onPress={() => enterEdit(null)}
                           >
-                            <CalendarDays size={18} color={colors.textTertiary} />
-                            <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>עד תאריך</Text>
-                            <Text style={[s.fieldValue, { color: colors.textPrimary }]}>{endLabel}</Text>
+                            <CalendarDays size={19} color={colors.accent} />
+                            <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>עד תאריך</Text>
+                            <Text style={[s.fieldValue, { color: colors.textSecondary }]}>{endLabel}</Text>
                           </Pressable>
                         );
                       })()}
@@ -743,9 +743,9 @@ export function NoteEditor({
                           style={[s.fieldRow, s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}
                           onPress={() => enterEdit(null)}
                         >
-                          <Bell size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>תזכורת</Text>
-                          <Text style={[s.fieldValue, { color: colors.textPrimary }]}>
+                          <Bell size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary }]}>תזכורת</Text>
+                          <Text style={[s.fieldValue, { color: colors.textSecondary }]}>
                             {note.reminderMinutes === 0
                               ? 'בזמן האירוע'
                               : note.reminderMinutes < 60
@@ -836,7 +836,6 @@ export function NoteEditor({
                     <View style={s.typeRow}>
                       {NOTE_TYPES.map(({ type, label }) => {
                         const active = noteType === type;
-                        const Icon = TYPE_ICON[type];
                         return (
                           <Pressable
                             key={type}
@@ -849,7 +848,6 @@ export function NoteEditor({
                               { backgroundColor: active ? colors.accent : colors.surfaceMuted },
                             ]}
                           >
-                            <Icon size={18} color={active ? colors.textInverse : colors.textSecondary} />
                             {/* Figma target: 13 Bold (active) / 13 Medium (inactive) — exact
                                 match via typography.bodySmall (13/400 default) with weight
                                 overridden per active state. */}
@@ -957,14 +955,15 @@ export function NoteEditor({
                     <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
                       {/* All-day toggle — [icon, label(flex:1,right), Switch] */}
                       <View style={[s.fieldRow, !(allDay && recurrenceType === 'none') && s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}>
-                        <Sun size={18} color={colors.textTertiary} />
-                        <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>
+                        <Sun size={19} color={colors.accent} />
+                        <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>
                           כל היום
                         </Text>
                         <Switch
                           value={allDay}
                           onValueChange={setAllDay}
-                          trackColor={{ false: colors.border, true: colors.accent }}
+                          trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                          thumbColor={colors.switchThumb}
                           accessibilityLabel="כל היום"
                         />
                       </View>
@@ -972,14 +971,15 @@ export function NoteEditor({
                       {/* Slice B: Multi-day toggle (only for all-day non-recurring) */}
                       {allDay && recurrenceType === 'none' && (
                         <View style={[s.fieldRow, !multiDay && s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}>
-                          <CalendarRange size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>
+                          <CalendarRange size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>
                             מרובה ימים
                           </Text>
                           <Switch
                             value={multiDay}
                             onValueChange={setMultiDay}
-                            trackColor={{ false: colors.border, true: colors.accent }}
+                            trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                            thumbColor={colors.switchThumb}
                             accessibilityLabel="מרובה ימים"
                           />
                         </View>
@@ -995,8 +995,8 @@ export function NoteEditor({
                         const endLabel = `${toHebrewNumeral(eh.day)} ${eh.monthName} ${toHebrewYear(ehYear)}`;
                         return (
                           <View style={[s.fieldRow, s.fieldRowLast]}>
-                            <CalendarDays size={18} color={colors.textTertiary} />
-                            <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>עד תאריך</Text>
+                            <CalendarDays size={19} color={colors.accent} />
+                            <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>עד תאריך</Text>
                             <Pressable
                               onPress={() => setEndPickerVisible(true)}
                               style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
@@ -1017,8 +1017,8 @@ export function NoteEditor({
                       <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
                         {/* Start time row */}
                         <View style={[s.fieldRow, { borderBottomColor: colors.borderSubtle }]}>
-                          <Clock size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>משעה</Text>
+                          <Clock size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>משעה</Text>
                           <Pressable
                             onPress={openStartPicker}
                             style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
@@ -1033,8 +1033,8 @@ export function NoteEditor({
 
                         {/* End time row */}
                         <View style={[s.fieldRow, s.fieldRowLast]}>
-                          <Clock size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>עד שעה</Text>
+                          <Clock size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>עד שעה</Text>
                           {endTime !== null ? (
                             <View style={s.endTimeGroup}>
                               <Pressable
@@ -1075,22 +1075,23 @@ export function NoteEditor({
                     {/* ── Reminder field-group card ────────────────────────────── */}
                     <View style={[s.fieldGroup, { backgroundColor: colors.background, borderColor: colors.border }]}>
                       <View style={[s.fieldRow, !(allDay && reminderEnabled) && s.fieldRowLast, { borderBottomColor: colors.borderSubtle }]}>
-                        <Bell size={18} color={colors.textTertiary} />
-                        <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>
+                        <Bell size={19} color={colors.accent} />
+                        <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>
                           תזכּר אותי
                         </Text>
                         <Switch
                           value={reminderEnabled}
                           onValueChange={handleReminderToggle}
-                          trackColor={{ false: colors.border, true: colors.accent }}
+                          trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                          thumbColor={colors.switchThumb}
                         />
                       </View>
 
                       {/* Inline reminder time chip — shown only for all-day events with reminder on */}
                       {allDay && reminderEnabled && (
                         <View style={[s.fieldRow, s.fieldRowLast]}>
-                          <Clock size={18} color={colors.textTertiary} />
-                          <Text style={[s.fieldLabel, { color: colors.textSecondary, flex: 1 }]}>שעת תזכורת</Text>
+                          <Clock size={19} color={colors.accent} />
+                          <Text style={[s.fieldLabel, { color: colors.textPrimary, flex: 1 }]}>שעת תזכורת</Text>
                           <Pressable
                             onPress={openReminderTimePicker}
                             style={[s.timeChip, { backgroundColor: colors.surfaceElevated }]}
@@ -1159,7 +1160,7 @@ export function NoteEditor({
                     )}
 
                     {/* Footer — row-reverse, [Save, Cancel] so Save (primary) sits on the RIGHT */}
-                    <View style={s.actions}>
+                    <View style={[s.actions, { borderTopColor: colors.border }]}>
                       <Pressable
                         onPress={handleSave}
                         style={[s.btn, { backgroundColor: colors.accent }]}
@@ -1189,40 +1190,42 @@ export function NoteEditor({
 
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, paddingBottom: 36, maxHeight: '85%' },
-  handle: { width: 38, height: 4, borderRadius: radius.full, alignSelf: 'center', marginBottom: 16 },
-  headerRow: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
+  // Figma: top radius 20, 18 side padding, handle 10 from the top and 6
+  // above the header, header padding 6 / 14, 13 between body items.
+  sheet: { borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, paddingHorizontal: 18, paddingTop: 10, maxHeight: '85%' },
+  handle: { width: 38, height: 4, borderRadius: radius.full, alignSelf: 'center', marginBottom: 6 },
+  headerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 14 },
   // Figma target: 18 Bold — exact match via typography.sheetTitle.
   title: { flex: 1, textAlign: 'right', ...withFontFamily(typography.sheetTitle) },
-  // Nearest token: typography.displaySmall (20/600/26) — exact fontSize AND
-  // fontWeight match, no delta.
-  closeBtn: { ...withFontFamily(typography.displaySmall) },
+  // Figma: the close "✕" is a 17 px glyph in a 22 px slot.
+  closeBtn: { ...withFontFamily(typography.glyphSmall) },
   // Visual size stays modest; the Pressable itself is padded to reach the 48dp target.
   closeBtnHit: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   input: {
     // Figma target: 16 Medium — exact match via typography.emphasis.
-    borderWidth: 1, borderRadius: radius.md, padding: 12,
-    minHeight: 52, textAlignVertical: 'top', marginBottom: 16,
+    borderWidth: 1, borderRadius: radius.lg, padding: 14,
+    minHeight: 52, textAlignVertical: 'top', marginBottom: 13,
     ...withFontFamily(typography.emphasis),
   },
   sectionLabel: {
-    textAlign: 'right', marginBottom: 8,
+    textAlign: 'right', marginBottom: 13,
     ...withFontFamily(typography.captionBold),
   },
   // Chip rows (type / recurrence / anchor / lead-time): row-reverse + flexWrap so the
   // FIRST option lands at the right. Active = accent fill + inverse bold; inactive =
   // surfaceMuted + textSecondary. Fully rounded pills.
-  typeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  typeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 13 },
+  // Figma: text-only pills, padding 8 / 14.
   typeChip: {
-    flexDirection: 'row-reverse', alignItems: 'center', gap: 6,
-    borderRadius: radius.full, paddingVertical: 9, paddingHorizontal: 14,
+    flexDirection: 'row-reverse', alignItems: 'center',
+    borderRadius: radius.full, paddingVertical: 8, paddingHorizontal: 14,
   },
   // typeLabel removed — font now applied inline per active state (see JSX; Figma: 13 Bold/Medium).
   recurrenceRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 16,
+    gap: 8,
+    marginBottom: 13,
   },
   recurrenceChip: {
     borderRadius: radius.full,
@@ -1231,13 +1234,18 @@ const s = StyleSheet.create({
   },
   // recurrenceChipLabel removed — font now applied inline per active state (Figma: 13 Bold/Medium).
   // Calendar anchor chips (shown only for yearly)
-  anchorRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  anchorRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 13 },
   anchorChip: { borderRadius: radius.full, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' },
   // anchorLabel removed — font now applied inline per active state (Figma: 13 Bold/Medium);
   // textAlign: 'center' preserved inline alongside it.
   // Footer — row-reverse, [Save, Cancel] JSX order puts Save on the RIGHT.
-  actions: { flexDirection: 'row-reverse', gap: 10, marginTop: 4 },
-  btn: { flex: 1, minHeight: 48, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  // Figma footer: full-width top border, padding 14 / 28, buttons 50 tall.
+  actions: {
+    flexDirection: 'row-reverse', gap: 10,
+    marginHorizontal: -18, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 28,
+    borderTopWidth: 1,
+  },
+  btn: { flex: 1, minHeight: 50, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   // Figma target: 15 Bold — exact match via typography.bodyMedium (15/400
   // default) with weight overridden to 700.
   btnText: { ...withFontFamily(typography.bodyMedium, '700') },
@@ -1247,7 +1255,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 13,
   },
   fieldRow: {
     flexDirection: 'row-reverse',
@@ -1328,6 +1336,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 24,
     paddingTop: 16,
+    paddingBottom: 36, // view mode keeps its old bottom space (no Figma frame)
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   toolbarBtn: {

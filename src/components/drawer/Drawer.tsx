@@ -29,27 +29,27 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import {
-  ArrowLeftRight,
-  CalendarArrowUp,
-  Calendar,
-  BookOpenText,
-  Sun,
-  CalendarRange,
-  Clock,
-  Library,
-  MapPin,
-  Settings as SettingsIcon,
-  Info,
-} from 'lucide-react-native';
+  BookIcon,
+  CalendarDayIcon,
+  CalendarIcon,
+  ClockIcon,
+  DayPageIcon,
+  GearIcon,
+  InfoIcon,
+  PinIcon,
+  ShareIcon,
+  WeekIcon,
+} from '../icons/FigmaIcons';
+import { hebrewFullDate, gregFullDate } from '../../utils/hebrewLabels';
+import { ArrowLeftRight } from 'lucide-react-native';
 import { useDrawerStore } from '../../providers/DrawerProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { overlay } from '../../constants/overlay';
 import { typography, withFontFamily } from '../../constants/typography';
 import { elevation } from '../../constants/elevation';
-import { dateService, toHebrewNumeral, toHebrewYear } from '../../services/DateService';
 import { DrawerItem } from './DrawerItem';
 import { ExportModal } from '../export/ExportModal';
 
@@ -171,14 +171,14 @@ export function Drawer() {
     setTimeout(() => router.push(path as any), 100);
   };
 
+  // Figma header: "כ״ח בתשרי תשפ״ו" / "20 באוקטובר 2025".
   const today = new Date();
-  const gregLabel = today.toLocaleDateString('he-IL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-  const heToday = dateService.getDayData(today).hebrewDate;
-  const hebLabel = `${toHebrewNumeral(heToday.day)} ${heToday.monthName} ${toHebrewYear(heToday.year ?? today.getFullYear() + 3760)}`;
+  const hebLabel = hebrewFullDate(today);
+  const gregLabel = gregFullDate(today);
+
+  // The current screen's item is highlighted (Figma: accentLight + Bold).
+  const pathname = usePathname();
+  const isActive = (path: string) => pathname === path;
 
   return (
     <>
@@ -214,7 +214,7 @@ export function Drawer() {
           <View
             style={[
               styles.header,
-              { backgroundColor: colors.accent, paddingTop: insets.top + 16 },
+              { backgroundColor: colors.accent, paddingTop: insets.top + 11 },
             ]}
           >
             <Text style={[styles.appName, { color: colors.textInverse }]}>לוחות</Text>
@@ -230,49 +230,56 @@ export function Drawer() {
               Richer drawer contents (Week, Details, About, Tour) arrive in 3.7b–3.7c. */}
           <View style={styles.items}>
             <DrawerItem
-              Icon={BookOpenText}
+              Icon={CalendarIcon}
               label="לוח עברי"
+              active={isActive('/')}
               onPress={() => navigateTo('/(tabs)/')}
             />
             <DrawerItem
-              Icon={Calendar}
+              Icon={CalendarDayIcon}
               label="לוח לועזי"
+              active={isActive('/gregorian')}
               onPress={() => navigateTo('/(tabs)/gregorian')}
             />
             <DrawerItem
-              Icon={Sun}
+              Icon={DayPageIcon}
               label="יום"
+              active={isActive('/day')}
               onPress={() => navigateTo('/(tabs)/day')}
             />
-            {/* NEW in 3.7b-3 */}
             <DrawerItem
-              Icon={CalendarRange}
-              label="שבוע"
+              Icon={WeekIcon}
+              label="תצוגת שבוע"
+              active={isActive('/week')}
               onPress={() => navigateTo('/week')}
             />
             <DrawerItem
-              Icon={Clock}
+              Icon={ClockIcon}
               label="זמנים"
+              active={isActive('/zmanim')}
               onPress={() => navigateTo('/(tabs)/zmanim')}
             />
             <DrawerItem
-              Icon={Library}
-              label="פרטי לימוד"
+              Icon={BookIcon}
+              label="לימוד יומי"
+              active={isActive('/details')}
               onPress={() => navigateTo('/details')}
             />
             <DrawerItem
               Icon={ArrowLeftRight}
               label="ממיר תאריכים"
+              active={isActive('/converter')}
               onPress={() => navigateTo('/converter')}
             />
             <DrawerItem
-              Icon={MapPin}
+              Icon={PinIcon}
               label="מיקום"
+              active={isActive('/locationPicker')}
               onPress={() => navigateTo('/locationPicker')}
             />
             <DrawerItem
-              Icon={CalendarArrowUp}
-              label="ייצוא יומן"
+              Icon={ShareIcon}
+              label="ייצוא ליומן"
               onPress={() => {
                 closeDrawer();
                 setTimeout(() => setExportModalVisible(true), 150);
@@ -283,14 +290,15 @@ export function Drawer() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             <DrawerItem
-              Icon={SettingsIcon}
+              Icon={GearIcon}
               label="הגדרות"
+              active={isActive('/settings')}
               onPress={() => navigateTo('/settings')}
             />
-            {/* NEW in 3.7c — final item */}
             <DrawerItem
-              Icon={Info}
+              Icon={InfoIcon}
               label="אודות"
+              active={isActive('/about')}
               onPress={() => navigateTo('/about')}
             />
           </View>
@@ -300,7 +308,7 @@ export function Drawer() {
             <Text
               style={[
                 styles.version,
-                { color: colors.textTertiary, paddingBottom: insets.bottom + 12 },
+                { color: colors.textTertiary, paddingBottom: Math.max(insets.bottom, 28) },
               ]}
             >
               {`גרסה ${APP_VERSION}`}
@@ -334,8 +342,9 @@ const styles = StyleSheet.create({
     // biases the iOS shadow to emanate from the right.
     shadowOffset: { width: 4, height: 0 },
   },
+  // Figma: padding 18 sides / 20 bottom, lines 4 apart.
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingBottom: 20,
   },
   appName: {
@@ -353,24 +362,24 @@ const styles = StyleSheet.create({
     // Figma target: 11 Regular — exact match via typography.caption (11/500
     // default) with weight overridden to 400.
     textAlign: 'right',
-    marginTop: 2,
+    marginTop: 4,
     ...withFontFamily(typography.caption, '400'),
   },
   items: {
     paddingHorizontal: 10,
-    paddingTop: 8,
+    paddingTop: 10,
   },
   divider: {
-    height: StyleSheet.hairlineWidth,
+    height: 1,
     marginVertical: 8,
-    marginHorizontal: 10,
+    marginHorizontal: 14,
   },
   version: {
     // Figma target: 11 Regular — exact match via typography.caption (11/500
     // default) with weight overridden to 400.
     marginTop: 'auto',
     textAlign: 'right',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 8,
     ...withFontFamily(typography.caption, '400'),
   },

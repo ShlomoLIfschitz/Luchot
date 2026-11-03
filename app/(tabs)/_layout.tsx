@@ -16,7 +16,12 @@ import { useCallback } from 'react';
 import { Tabs, useFocusEffect, useRouter, useSegments } from 'expo-router';
 import { Alert, BackHandler, View, Text, StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BookOpenText, Calendar, Sun, Clock, type LucideIcon } from 'lucide-react-native';
+import {
+  CalendarIcon,
+  CalendarDayIcon,
+  ClockIcon,
+  DayPageIcon,
+} from '../../src/components/icons/FigmaIcons';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { radius } from '../../src/constants/radius';
@@ -30,17 +35,21 @@ function asColorString(color: ColorValue): string | undefined {
   return typeof color === 'string' ? color : undefined;
 }
 
+type TabGlyph = typeof CalendarIcon;
+
+/** Figma tab icons are 22 px inside a 58×28 pill. */
+const TAB_ICON_SIZE = 22;
+
 /** Icon wrapped in a pill that lights up with `colors.accentLight` when the tab is active. */
-function TabIcon({ Icon, color, size, focused, colors }: {
-  Icon: LucideIcon;
+function TabIcon({ Icon, color, focused, colors }: {
+  Icon: TabGlyph;
   color: ColorValue;
-  size: number;
   focused: boolean;
   colors: ThemeColors;
 }) {
   return (
     <View style={[styles.iconPill, focused && { backgroundColor: colors.accentLight }]}>
-      <Icon color={asColorString(color)} size={size} />
+      <Icon color={asColorString(color) ?? colors.textTertiary} size={TAB_ICON_SIZE} />
     </View>
   );
 }
@@ -95,11 +104,12 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopWidth: 1,
           borderTopColor: colors.border,
-          height: 56 + insets.bottom,
-          paddingTop: 6,
-          paddingBottom: insets.bottom + 4,
+          // Figma: 8 top, 47 content (28 pill + 3 + 16 label), 18 bottom.
+          height: 8 + 47 + Math.max(insets.bottom, 18),
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 18),
         },
       }}
     >
@@ -111,8 +121,8 @@ export default function TabLayout() {
         name="zmanim"
         options={{
           title: 'זמנים',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={Clock} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={ClockIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -123,8 +133,8 @@ export default function TabLayout() {
         name="day"
         options={{
           title: 'יום',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={Sun} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={DayPageIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -135,8 +145,8 @@ export default function TabLayout() {
         name="gregorian"
         options={{
           title: 'לועזי',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={Calendar} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={CalendarDayIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -147,8 +157,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'עברי',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={BookOpenText} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={CalendarIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -166,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   label: {
-    marginTop: 2,
+    marginTop: 3,
     textAlign: 'center',
     ...withFontFamily(typography.caption),
   },

@@ -37,7 +37,7 @@ export const TODAY_CIRCLE_SIZE = 28;
 /** Minimum height of the pinned all-day row (grows if a day stacks 2+ items). */
 export const ALLDAY_ROW_MIN_HEIGHT = 42;
 /** Height of a single all-day / span chip. */
-export const ALLDAY_CHIP_HEIGHT = 18;
+export const ALLDAY_CHIP_HEIGHT = 17; // Figma multi-day bar
 /** Vertical gap between stacked all-day chip lanes. */
 export const ALLDAY_CHIP_GAP = 3;
 /** Vertical padding (top+bottom, applied once each) inside the all-day row. */
