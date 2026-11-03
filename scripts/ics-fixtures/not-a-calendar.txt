@@ -1,0 +1,4 @@
+Shopping list
+- milk
+- eggs
+This is not an iCalendar file.
