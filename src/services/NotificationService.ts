@@ -86,6 +86,13 @@ function checkErevYomTovRishon(date: Date, il: boolean): boolean {
   return tomorrowIsChag && !todayIsChag;
 }
 
+// Android channel settings are immutable once created, so the custom sound needs
+// its own channel; the old 'default' channel stays for notifications that were
+// scheduled before it existed. The sound file is bundled by the expo-notifications
+// plugin (app.json → plugins → sounds).
+const REMINDER_CHANNEL_ID = 'reminders';
+const REMINDER_SOUND = 'luchot_reminder.wav';
+
 export class NotificationService {
   static async init(): Promise<void> {
     Notifications.setNotificationHandler({
@@ -101,6 +108,13 @@ export class NotificationService {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Luchot',
         importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#4A90D9',
+      });
+      await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
+        name: 'תזכורות',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: REMINDER_SOUND,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#4A90D9',
       });
@@ -137,13 +151,14 @@ export class NotificationService {
         title: params.title,
         body: params.body,
         data: params.data ? { ...params.data } : undefined,
+        sound: REMINDER_SOUND,
       },
       // channelId: without it Android posts to expo's fallback channel (default
-      // importance) instead of our HIGH-importance 'default' channel from init().
+      // importance, default sound) instead of ours from init().
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: params.triggerDate,
-        channelId: 'default',
+        channelId: REMINDER_CHANNEL_ID,
       },
     });
   }
