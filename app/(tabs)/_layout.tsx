@@ -12,8 +12,9 @@
 // keeps עברי as the tab that loads by default when entering the group.
 // (expo-router 58 dropped the `initialRouteName` prop on <Tabs>.)
 
-import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, type ColorValue } from 'react-native';
+import { useCallback } from 'react';
+import { Tabs, useFocusEffect, useRouter, useSegments } from 'expo-router';
+import { Alert, BackHandler, View, Text, StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CalendarIcon,
@@ -22,6 +23,7 @@ import {
   DayPageIcon,
 } from '../../src/components/icons/FigmaIcons';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
+import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { radius } from '../../src/constants/radius';
 import { typography, withFontFamily } from '../../src/constants/typography';
 import type { ThemeColors } from '../../src/hooks/useThemeColors';
@@ -64,6 +66,35 @@ function TabLabel({ children, color, focused }: { children: string; color: Color
 export default function TabLayout() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const segments: string[] = useSegments();
+  const defaultCalendarType = useSettingsStore((s) => s.defaultCalendarType);
+
+  // Android back inside the tabs. The tab router's default ('firstRoute')
+  // returns to the first DECLARED tab, which is זמנים because the tabs are
+  // declared in reverse for RTL. Instead: any other tab goes back to the
+  // month view chosen in Settings, and back on that view asks before exiting.
+  // Registered only while the tab group is focused, so stack screens pushed
+  // on top (settings, converter…) keep normal back; the open drawer's own
+  // listener is newer and runs first.
+  const homeTab = defaultCalendarType === 'gregorian' ? 'gregorian' : 'index';
+  const currentTab = segments[1] ?? 'index';
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (currentTab !== homeTab) {
+          router.navigate(homeTab === 'gregorian' ? '/(tabs)/gregorian' : '/(tabs)');
+          return true;
+        }
+        Alert.alert('יציאה מהאפליקציה', 'האם אתה בטוח שברצונך לצאת?', [
+          { text: 'ביטול', style: 'cancel' },
+          { text: 'יציאה', style: 'destructive', onPress: () => BackHandler.exitApp() },
+        ]);
+        return true;
+      });
+      return () => sub.remove();
+    }, [currentTab, homeTab, router]),
+  );
 
   return (
     <Tabs

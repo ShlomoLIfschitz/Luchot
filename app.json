@@ -18,7 +18,7 @@
       "package": "app.luchot",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1E4BA2"
+        "backgroundColor": "#3D5A80"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -42,7 +42,14 @@
           "locationWhenInUsePermission": "Luchot uses your location to calculate zmanim (halachic times)."
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/luchot_reminder.wav"
+          ]
+        }
+      ],
       "expo-font"
     ],
     "extra": {
