@@ -306,8 +306,8 @@ export default function SettingsScreen() {
   const colors = useThemeColors();
   const {
     hebrewOnTop, diaspora, use24hTime,
-    darkMode, zmanimMethod, firstDayOfWeek,
-    toggleHebrewOnTop,
+    darkMode, zmanimMethod, firstDayOfWeek, defaultCalendarType,
+    toggleHebrewOnTop, setDefaultCalendarType,
     setDarkMode, setZmanimMethod, setFirstDayOfWeek, setUse24hTime,
     setDiaspora: setSettingsDiaspora,
     omerRemindersEnabled, omerReminderTime,
@@ -397,6 +397,13 @@ export default function SettingsScreen() {
         {/* ── לוח שנה ── */}
         <SectionLabel title="לוח שנה" colors={colors} />
         <Card colors={colors}>
+          <SettingRow
+            Icon={CalendarDays}
+            label="לוח ראשי"
+            colors={colors}
+            onPress={() => setDefaultCalendarType(defaultCalendarType === 'hebrew' ? 'gregorian' : 'hebrew')}
+            right={<ChevronValue value={defaultCalendarType === 'hebrew' ? 'עברי' : 'לועזי'} colors={colors} />}
+          />
           <SettingRow
             Icon={CalendarDays}
             label="יום ראשון בשבוע"

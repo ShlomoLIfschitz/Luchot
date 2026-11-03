@@ -16,6 +16,7 @@ import {
   Text,
   StyleSheet,
   Pressable,
+  BackHandler,
   useWindowDimensions,
 } from 'react-native';
 import type { ViewProps } from 'react-native';
@@ -96,6 +97,18 @@ export function Drawer() {
       backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION });
     }
   }, [isOpen, drawerWidth, translateX, backdropOpacity]);
+
+  // Android back closes the open drawer, like a tap on the backdrop, instead
+  // of navigating the screen underneath. Subscribed only while open: the
+  // newest listener runs first, so it precedes navigation's own handler.
+  useEffect(() => {
+    if (!isOpen) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeDrawer();
+      return true;
+    });
+    return () => sub.remove();
+  }, [isOpen, closeDrawer]);
 
   const animatedDrawerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
