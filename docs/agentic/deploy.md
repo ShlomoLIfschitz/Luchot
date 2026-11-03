@@ -13,7 +13,7 @@ Merges: run `gh pr checks <n>`; when every check passed, Claude merges and says 
 | Question | Answer |
 |---|---|
 | Host | EAS (Expo Application Services). No web host, no backend. |
-| What deploys production | Nothing on merge. Releases are manual: JS-only changes ship as an OTA update, `eas update --branch preview --message "..."` (or `--branch production` for release); native changes (new native packages, `app.json` changes, new permissions, a `runtimeVersion` move) need a full `eas build --profile preview` (or `production`). Only Shlomo uses the `preview` APK, so a `preview` OTA is not a production deploy. |
+| What deploys production | Nothing on merge. Releases are manual: JS-only changes ship as an OTA update, `eas update --branch preview --environment preview --platform android --message "..."` (or `--branch production --environment production` for release; without `--platform android` the export also builds web and fails, and `--non-interactive` requires `--environment`); native changes (new native packages, `app.json` changes, new permissions, a `runtimeVersion` move) need a full `eas build --profile preview` (or `production`). Only Shlomo uses the `preview` APK, so a `preview` OTA is not a production deploy. |
 | Does it run before or after CI? | Manual, after the PR is merged with CI green. Before any `eas build`, run `npx expo export --platform android` locally (see `docs/agentic/integration-checks.md`). |
 | Previews | The `preview` channel / profile (internal APK distribution). |
 | DB migrations on deploy | None on a server. SQLite upgrade logic runs on app launch on the device (see `docs/agentic/local-first.md`). |
@@ -33,7 +33,7 @@ Once the app is on Google Play, the `production` channel is real users, and thei
 2. Upgrade-scenario check on a device with existing data (`docs/agentic/local-first.md`): the migration applies cleanly and no data is lost. Mandatory for every production release, not only schema changes.
 3. A full build: `eas build --profile production` (Android App Bundle, `autoIncrement`).
 4. `eas submit --profile production` to the Play Console track.
-5. Later JS-only fixes: `eas update --branch production --message "..."`, only for builds that share the current `runtimeVersion`.
+5. Later JS-only fixes: `eas update --branch production --environment production --platform android --message "..."`, only for builds that share the current `runtimeVersion`.
 
 **`runtimeVersion`:** the policy is `fingerprint` (it was `sdkVersion` until 2026-11-02). The runtime version is a hash of the native project, so a new native dependency, an `app.json` change or a native config change produces a new runtime version and an OTA no longer reaches older builds — the crash-on-launch trap of `sdkVersion` is closed. After any of those, the next production release is still a full build (step 3); run `npx expo-updates fingerprint:generate` to see whether the runtime version moved.
 
