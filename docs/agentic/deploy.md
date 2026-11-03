@@ -37,7 +37,7 @@ Once the app is on Google Play, the `production` channel is real users, and thei
 
 **`runtimeVersion`:** the policy is `fingerprint` (it was `sdkVersion` until 2026-11-02). The runtime version is a hash of the native project, so a new native dependency, an `app.json` change or a native config change produces a new runtime version and an OTA no longer reaches older builds — the crash-on-launch trap of `sdkVersion` is closed. After any of those, the next production release is still a full build (step 3); run `npx expo-updates fingerprint:generate` to see whether the runtime version moved.
 
-**Store requirements (Shlomo's, outside the code):** a privacy policy URL and the Play Console Data safety form. Inference, not verified against the current Play policy text: both are needed because the app requests location and sends rounded coordinates to Nominatim (`src/utils/reverseGeocode.ts`).
+**Store requirements (Shlomo's, outside the code):** a privacy policy URL, the Play Console Data safety form, and the exact-alarm declaration (App content → Sensitive app permissions: `USE_EXACT_ALARM`, use case "calendar app" — event, Omer and candle-lighting reminders must fire on time). Inference, not verified against the current Play policy text: both are needed because the app requests location and sends rounded coordinates to Nominatim (`src/utils/reverseGeocode.ts`).
 
 ## Open gaps
 

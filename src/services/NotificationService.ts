@@ -138,7 +138,13 @@ export class NotificationService {
         body: params.body,
         data: params.data ? { ...params.data } : undefined,
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: params.triggerDate },
+      // channelId: without it Android posts to expo's fallback channel (default
+      // importance) instead of our HIGH-importance 'default' channel from init().
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: params.triggerDate,
+        channelId: 'default',
+      },
     });
   }
 
