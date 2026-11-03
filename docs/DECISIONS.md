@@ -1014,3 +1014,35 @@
   - Play's Data Safety form must list purchase history (handled by Google Play).
   - UI is a new flow: Figma frames E1–E4 (section "תמיכה בפרויקט") need Shlomo's
     approval before any code.
+
+## Device calendar sync: how Luchot events are written (Phase 3)
+- Date: 2026-11-03
+- Context: Phase 3 of the 2026-11-01 sync decision. Luchot events are written to
+  the one Google calendar the user picks; the shape of the device events had to
+  be chosen without changing `EventSchema.ts` (locked).
+- Choice:
+  - A new additive table `device_sync_map` (schema v8: luchot_id, occ_key,
+    device_event_id, calendar_id, payload_hash) maps every Luchot event to the
+    device events it was written as. The pure planner `DeviceSyncPlan.ts`
+    computes the wanted device events; `DeviceSyncService.ts` applies the diff.
+  - One-off events → one device event. Gregorian series (daily / weekly /
+    monthly / yearly) → one device event with a recurrence rule; tombstoned and
+    overridden dates are written as cancelled occurrences, and each override as
+    its own event. Hebrew-date series (yearly / monthly) → one device event per
+    occurrence, today → today + 10 years; the window is extended on every launch.
+    Past occurrences are kept while the series exists.
+  - Not written: hebcal holidays (never stored), events imported from an .ics
+    file (they already live in the calendar they came from), reminders/alarms
+    (Luchot schedules its own notifications; writing alarms would notify twice).
+  - Google events are read live (`getOverlayEvents`) through the Phase 2 mapping
+    (`IcsParser.toCalendarEvent`), never stored; events Luchot wrote itself are
+    filtered out of the overlay by `device_sync_map`.
+  - Turning sync off stops every read and write; the mapping table stays, so
+    turning it back on continues where it left off.
+- Alternatives considered: one recurring device event for Hebrew-date series -
+  impossible (RRULE has no Hebrew calendar); expanding Gregorian series too -
+  rejected: a daily event would be 3,650 device events; storing the device id in
+  `events` - rejected: `EventSchema.ts` is locked.
+- Implications: native dependency `expo-calendar` + READ/WRITE_CALENDAR: full EAS
+  build. Existing events are written only when created, edited or deleted after
+  sync is turned on (open question for Shlomo, see the PR).
