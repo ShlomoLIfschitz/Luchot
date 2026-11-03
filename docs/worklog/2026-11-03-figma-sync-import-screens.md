@@ -14,9 +14,9 @@
 - Google's own "Holidays in Israel" calendar is unchecked by default, with a hint that Luchot already shows holidays.
 - Card radius 14 follows the existing Figma screens (DESIGN.md says `lg` 12).
 ### Open issues / blocked
-- Waiting for Shlomo's approval of the frames. No UI code before it (global CLAUDE.md, "UI changes: Figma first").
-- Undecided, for Shlomo:
-  1. Google event colour: neutral outline (designed) or the calendar's own colour from the device (data colour, not a token)?
+- Approved 2026-11-03: Shlomo: "אני מאשר את כל המסכים , הייתי רוצה שתשמור על רמת הפיקסלים בעיצוב". The implementation matches the frames pixel for pixel.
+- Approving the screens settles question 1 (neutral outline, as drawn). Questions 2–5 are not visible in the frames and stay open, for Shlomo:
+  1. (Settled by the approval: neutral outline.) Google event colour: neutral outline (designed) or the calendar's own colour from the device (data colour, not a token)?
   2. Tapping a Google event: open it in the Google Calendar app (proposed) or a read-only detail sheet in Luchot?
   3. .ics import while sync is on: imported events become personal events and are auto-written to Google. If the file came from Google, that duplicates them there. Warn, don't write imported events, or write anyway?
   4. Turning sync off: events Luchot already wrote to Google stay there (assumed) or are removed?

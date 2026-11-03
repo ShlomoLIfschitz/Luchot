@@ -16,6 +16,7 @@ Let users opt in to syncing Luchot with their Google Calendar (import and export
 - Google Play: new apps and updates must target "Android 16 (API level 36) or higher" (in effect since August 31, 2026).
 - VISION.md: "Not an account-required app — ever. Even if sync is added later, it will be optional"
 - VISION.md: "Not permission-hungry — only location (for zmanim) and notifications (for reminders)" — calendar permission is a deliberate exception, requested only when the user turns sync on.
+- Shlomo (2026-11-03, approving the Phase 2–3 Figma frames): "אני מאשר את כל המסכים , הייתי רוצה שתשמור על רמת הפיקסלים בעיצוב" — the implementation must match the frames pixel for pixel; any deviation is listed in the PR (global CLAUDE.md, "Deviations").
 
 ## 4. Acceptance criteria
 Phase 1 — Expo SDK upgrade (prerequisite for Play)
@@ -41,7 +42,7 @@ Phase 3 — Device calendar sync
 - [ ] `security-auditor` pass on the new permission and data path — verified by: its report
 - [ ] Gate — verified by: `npm run typecheck; if ($?) { npx expo-doctor }` and `npx expo export --platform android`
 
-Figma frames for Phases 2–3 (designed 2026-11-03, **waiting for Shlomo's approval: no UI code before it**).
+Figma frames for Phases 2–3 (designed 2026-11-03, **approved by Shlomo 2026-11-03**, all screens; build them pixel for pixel).
 File "Luchot — Design System & Screens", page `05 · Sync & Import (Phase 2–3)`. Base URL:
 `https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=`
 - [ ] Page (everything below) — [36-5](https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/Luchot-%E2%80%94-Design-System---Screens?node-id=36-5)
