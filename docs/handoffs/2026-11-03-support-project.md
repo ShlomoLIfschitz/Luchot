@@ -18,7 +18,7 @@ Let users who want to support Luchot leave a one-time tip through Google Play Bi
 - Memory: "הייתי רוצה שתשמור על רמת הפיקסלים בעיצוב" — build pixel for pixel from the frames.
 
 ## 4. Acceptance criteria
-- [ ] Shlomo approved frames E1–E4 (light, dark, tablet) — verified by: his approval quoted in the PR.
+- [x] Shlomo approved frames E1–E4 (light, dark, tablet), the copy and the amounts 10/25/50 ₪ on 2026-11-03: "מאשר" — verified by: quoted in the PR.
 - [ ] Drawer shows "תמיכה בפרויקט" with the heart icon, matching E1 — verified by: screenshot at 375 next to E1.
 - [ ] Amount screen matches E2; prices are read from Play (localized), not hard-coded — verified by: screenshot + code review.
 - [ ] A completed purchase shows E3 and the product is consumed (can tip again) — verified by: Play test purchase with a license tester on a device.
