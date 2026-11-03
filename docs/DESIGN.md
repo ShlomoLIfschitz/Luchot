@@ -80,6 +80,7 @@ const lightColors = {
   successBg:         '#E8F5E9',  // GPS "located" state
   warningBg:         '#FCEFE0',  // GPS "services disabled" state
   errorBg:           '#FDEAEA',  // GPS "blocked / failed" state
+  switchThumb:       '#FFFFFF',  // switch thumb (Figma: white light / textPrimary dark)
 };
 ```
 
@@ -145,6 +146,7 @@ const darkColors = {
   successBg:         '#1B2E1D',
   warningBg:         '#2E2218',
   errorBg:           '#2E1822',
+  switchThumb:       '#F0F0EC',
 };
 ```
 
