@@ -21,15 +21,13 @@ import {
 } from 'react-native';
 import { useTimePicker } from '../src/hooks/useTimePicker';
 import { useRouter } from 'expo-router';
+import { Moon } from 'lucide-react-native';
 import {
-  Moon,
-  Globe,
-  CalendarDays,
-  Clock,
-  MapPin,
-  Bell,
-  Flame,
-} from 'lucide-react-native';
+  BellIcon,
+  CalendarIcon,
+  PinIcon,
+  RowClockIcon,
+} from '../src/components/icons/FigmaIcons';
 import { useNotificationPermission } from '../src/hooks/useNotificationPermission';
 import { NotificationService } from '../src/services/NotificationService';
 import { useThemeColors } from '../src/hooks/useThemeColors';
@@ -156,7 +154,7 @@ function SettingRow({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
     >
-      {Icon && <Icon size={20} color={colors.textSecondary} />}
+      {Icon && <Icon size={20} color={colors.accent} />}
       <Text style={[rowStyles.label, { color: colors.textPrimary }]}>{label}</Text>
       <View style={rowStyles.right}>{right}</View>
     </Pressable>
@@ -169,8 +167,8 @@ function SettingRow({
 function ChevronValue({ value, colors }: { value: string; colors: ThemeColors }) {
   return (
     <>
-      <Text style={[styles.valueText, { color: colors.textSecondary }]}>{value}</Text>
-      <Text style={[styles.chevron, { color: colors.textTertiary }]}>›</Text>
+      <Text style={[styles.valueText, { color: colors.textTertiary }]}>{value}</Text>
+      <Text style={[styles.chevron, { color: colors.textTertiary }]}>‹</Text>
     </>
   );
 }
@@ -201,8 +199,8 @@ function ToggleRow({
         <Switch
           value={value}
           onValueChange={onValueChange}
-          trackColor={{ false: colors.border, true: colors.accent }}
-          thumbColor={colors.surface}
+          trackColor={{ false: colors.borderStrong, true: colors.accent }}
+          thumbColor={colors.switchThumb}
         />
       }
     />
@@ -225,7 +223,7 @@ function InfoRow({
       label={label}
       colors={colors}
       isLast={isLast}
-      right={<Text style={[styles.valueText, { color: colors.textSecondary }]}>{value}</Text>}
+      right={<Text style={[styles.valueText, { color: colors.textTertiary }]}>{value}</Text>}
     />
   );
 }
@@ -293,12 +291,13 @@ function ChipsRow({
 }
 
 const rowStyles = StyleSheet.create({
+  // Figma: padding 13 / 14, gap 10, 48 tall (switch rows grow to 54).
   row: {
     flexDirection: 'row-reverse', alignItems: 'center',
-    paddingVertical: 12, paddingHorizontal: 16, gap: 14, minHeight: 54,
+    paddingVertical: 13, paddingHorizontal: 14, gap: 10, minHeight: 48,
   },
   label: { flex: 1, ...withFontFamily(typography.bodyMedium), textAlign: 'right' },
-  right: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  right: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -307,8 +306,8 @@ export default function SettingsScreen() {
   const colors = useThemeColors();
   const {
     hebrewOnTop, diaspora, use24hTime,
-    darkMode, zmanimMethod, firstDayOfWeek,
-    toggleHebrewOnTop,
+    darkMode, zmanimMethod, firstDayOfWeek, defaultCalendarType,
+    toggleHebrewOnTop, setDefaultCalendarType,
     setDarkMode, setZmanimMethod, setFirstDayOfWeek, setUse24hTime,
     setDiaspora: setSettingsDiaspora,
     omerRemindersEnabled, omerReminderTime,
@@ -347,8 +346,8 @@ export default function SettingsScreen() {
   }, [placeName, latitude, longitude]);
 
   const themeLabel =
-    darkMode === 'system' ? 'לפי המכשיר' : darkMode === 'dark' ? 'כהה' : 'בהיר';
-  const zmanimLabel = zmanimMethod === 'MGA' ? 'מג״א' : 'גר״א';
+    darkMode === 'system' ? 'לפי המערכת' : darkMode === 'dark' ? 'כהה' : 'בהיר';
+  const zmanimLabel = zmanimMethod === 'MGA' ? 'מגן אברהם' : 'הגר״א';
 
   const notificationLabel =
     permission.status === null ? '...' :
@@ -373,7 +372,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="הגדרות" />
+      <ScreenHeader leading="back" title="הגדרות" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* ── מראה ── */}
@@ -387,7 +386,6 @@ export default function SettingsScreen() {
             right={<ChevronValue value={themeLabel} colors={colors} />}
           />
           <ToggleRow
-            Icon={Clock}
             label="שעון 24 שעות"
             value={use24hTime}
             onValueChange={setUse24hTime}
@@ -399,15 +397,21 @@ export default function SettingsScreen() {
         <SectionLabel title="לוח שנה" colors={colors} />
         <Card colors={colors}>
           <SettingRow
-            Icon={CalendarDays}
-            label="יום ראשון בשבוע"
+            Icon={CalendarIcon}
+            label="לוח ראשי"
+            colors={colors}
+            onPress={() => setDefaultCalendarType(defaultCalendarType === 'hebrew' ? 'gregorian' : 'hebrew')}
+            right={<ChevronValue value={defaultCalendarType === 'hebrew' ? 'עברי' : 'לועזי'} colors={colors} />}
+          />
+          <SettingRow
+            Icon={CalendarIcon}
+            label="תחילת שבוע"
             colors={colors}
             onPress={() => setFirstDayOfWeek(firstDayOfWeek === 0 ? 1 : 0)}
             right={<ChevronValue value={firstDayOfWeek === 0 ? 'ראשון' : 'שני'} colors={colors} />}
           />
           <ToggleRow
-            Icon={Globe}
-            label="תפוצות (חגים)"
+            label="חו״ל (יום טוב שני)"
             value={diaspora}
             onValueChange={(v) => {
               setSettingsDiaspora(v);
@@ -416,7 +420,7 @@ export default function SettingsScreen() {
             colors={colors}
           />
           <ToggleRow
-            Icon={CalendarDays}
+            Icon={CalendarIcon}
             label="עברית למעלה"
             value={hebrewOnTop}
             onValueChange={toggleHebrewOnTop}
@@ -428,14 +432,14 @@ export default function SettingsScreen() {
         <SectionLabel title="מיקום וזמנים" colors={colors} />
         <Card colors={colors}>
           <SettingRow
-            Icon={MapPin}
+            Icon={PinIcon}
             label="המיקום שלי"
             colors={colors}
             onPress={() => router.push('/locationPicker' as any)}
             right={<ChevronValue value={currentLocationLabel} colors={colors} />}
           />
           <SettingRow
-            Icon={Clock}
+            Icon={RowClockIcon}
             label="שיטת חישוב"
             colors={colors}
             onPress={() => setZmanimPicker(true)}
@@ -451,7 +455,7 @@ export default function SettingsScreen() {
         <SectionLabel title="התראות" colors={colors} />
         <Card colors={colors}>
           <SettingRow
-            Icon={Bell}
+            Icon={BellIcon}
             label="הרשאת התראות"
             colors={colors}
             onPress={() => { void permission.request(); }}
@@ -463,8 +467,8 @@ export default function SettingsScreen() {
             colors={colors}
           />
           <ToggleRow
-            Icon={Flame}
-            label="התראות הדלקת נרות"
+            Icon={BellIcon}
+            label="הדלקת נרות"
             value={candleLightingRemindersEnabled}
             onValueChange={handleCandleLightingToggle}
             colors={colors}
@@ -480,8 +484,8 @@ export default function SettingsScreen() {
             />
           )}
           <ToggleRow
-            Icon={Bell}
-            label="תזכורת ספירת העומר"
+            Icon={BellIcon}
+            label="ספירת העומר"
             value={omerRemindersEnabled}
             onValueChange={setOmerRemindersEnabled}
             colors={colors}
@@ -513,7 +517,7 @@ export default function SettingsScreen() {
         visible={themePicker}
         title="ערכת צבעים"
         options={[
-          { label: 'לפי המכשיר', value: 'system' },
+          { label: 'לפי המערכת', value: 'system' },
           { label: 'בהיר',       value: 'light' },
           { label: 'כהה',        value: 'dark' },
         ]}
@@ -526,8 +530,8 @@ export default function SettingsScreen() {
         visible={zmanimPicker}
         title="שיטת חישוב זמנים"
         options={[
-          { label: 'גר״א', value: 'GRA' },
-          { label: 'מג״א', value: 'MGA' },
+          { label: 'הגר״א',     value: 'GRA' },
+          { label: 'מגן אברהם', value: 'MGA' },
         ]}
         selected={zmanimMethod}
         onSelect={(v) => setZmanimMethod(v as 'GRA' | 'MGA')}
@@ -541,7 +545,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   root:      { flex: 1 },
-  content:   { paddingBottom: 48 },
+  // Figma: content top 14 = 6 here + the first label's 8.
+  content:   { paddingTop: 6, paddingBottom: 48 },
   card: {
     marginHorizontal: 16,
     borderRadius: radius.lg,
@@ -553,13 +558,14 @@ const styles = StyleSheet.create({
   // No exact type-scale step matches the previous hand-picked 22 — nearest
   // step is displaySmall (20); delta of -2 noted, matches the row's Icon
   // size (20) so the chevron reads consistently with the leading glyph.
-  chevron:   { ...withFontFamily(typography.displaySmall) },
+  // Figma: "‹" 23 Regular in a 20 px slot at the far left.
+  chevron:   { ...withFontFamily(typography.glyph), width: 20, textAlign: 'center' },
   // Figma: explanatory note under a card = 11 Regular.
   note: {
     ...withFontFamily(typography.caption, '400'),
     textAlign: 'right',
-    paddingHorizontal: 20,
-    paddingTop: 6,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
 });
 

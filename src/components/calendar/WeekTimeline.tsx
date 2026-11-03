@@ -199,7 +199,7 @@ export function WeekTimeline({ weekStart }: WeekTimelineProps) {
 
   return (
     <GestureDetector gesture={swipeGesture}>
-      <View style={styles.root} onLayout={onContainerLayout}>
+      <View style={[styles.root, { backgroundColor: colors.surface }]} onLayout={onContainerLayout}>
         {/* ── Day-columns header (pinned) ──────────────────────────────────────
             Single geometry path: every cell is absolutely positioned via the
             SAME columnLeft(i, containerWidth) used by the all-day row and the
@@ -535,11 +535,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingRight: 4,
   },
-  // Figma: all-day gutter label = 8 Medium. No 8px step exists (and none
-  // will be added — see 8px-problem note at file top); using the smallest
-  // existing step, cellTag (9/500), as a deliberate 1px deviation.
+  // Figma: all-day gutter label = 8 Medium (typography.nano).
   gutterLabel: {
-    ...withFontFamily(typography.cellTag),
+    ...withFontFamily(typography.nano),
   },
 
   // Day-columns header — full-width relative coordinate space; cells are
@@ -547,7 +545,7 @@ const styles = StyleSheet.create({
   // row and hourly grid use. No flexDirection here — see Bug 1 fix notes.
   dayHeaderRow: {
     height: DAY_HEADER_HEIGHT,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     position: 'relative',
   },
   dayHeaderCell: {
@@ -585,12 +583,14 @@ const styles = StyleSheet.create({
   // NOT [gutter, body] flex siblings — see Bug 2 fix notes above.
   allDayRow: {
     position: 'relative',
+    borderBottomWidth: 1,
   },
+  // Figma multi-day bar: 17 tall, r4, text inset 5.
   allDayBar: {
     position: 'absolute',
     height: ALLDAY_CHIP_HEIGHT,
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
   },
   allDayLabel: {
     ...withFontFamily(typography.cellTag),
@@ -615,7 +615,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     paddingRight: 4,
     writingDirection: 'ltr',
-    ...withFontFamily(typography.micro),
+    // Figma: hour labels 9 Regular.
+    ...withFontFamily(typography.cellTag, '400'),
   },
   verticalSeparator: {
     position: 'absolute',
@@ -629,15 +630,12 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
 
-  // Figma: timed event block corner = r5. No 5px step exists; radius.sm (6)
-  // is a 1px deviation, same rationale as the cellTag font-size deviations
-  // below — a 1px corner-radius difference on a ~small event block is not
-  // visually perceptible, so this doesn't warrant a new single-use token.
+  // Figma: event block r5, text inset 3, 3 px stripe on the right edge.
   timedBlock: {
     position: 'absolute',
-    borderRadius: radius.sm,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    borderRadius: radius.event,
+    padding: 3,
+    paddingRight: 5, // clears the 3 px stripe (Figma text box ends 5 from the edge)
     overflow: 'hidden',
   },
   timedStripe: {
@@ -645,15 +643,13 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: 2.5,
-    borderTopRightRadius: radius.sm,
-    borderBottomRightRadius: radius.sm,
+    width: 3,
+    borderTopRightRadius: radius.event,
+    borderBottomRightRadius: radius.event,
   },
-  // Figma: timed event title = 8 SemiBold. No 8px step exists (deliberate
-  // 1px deviation, same rationale as gutterLabel above) — using cellTag
-  // (9px) with a SemiBold ('600') weight override.
+  // Figma: timed event title = 8 SemiBold (typography.nano).
   timedTitle: {
-    ...withFontFamily(typography.cellTag, '600'),
+    ...withFontFamily(typography.nano, '600'),
     textAlign: 'right',
   },
 
@@ -662,13 +658,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   nowLine: {
-    height: 1.5,
+    height: 2,
     width: '100%',
   },
   nowDot: {
     position: 'absolute',
     right: -NOW_DOT_SIZE / 2,
-    top: -(NOW_DOT_SIZE - 1.5) / 2,
+    top: -(NOW_DOT_SIZE - 2) / 2,
     width: NOW_DOT_SIZE,
     height: NOW_DOT_SIZE,
     borderRadius: radius.full,

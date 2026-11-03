@@ -5,11 +5,9 @@
 // + WeekTimeline (day-columns header, all-day/span row, hourly grid).
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Menu, CalendarDays, Plus } from 'lucide-react-native';
 import { useCalendarStore } from '../src/providers/CalendarProvider';
-import { useDrawerStore } from '../src/providers/DrawerProvider';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { WeekTimeline } from '../src/components/calendar/WeekTimeline';
 import { useSettingsStore } from '../src/providers/SettingsProvider';
@@ -22,12 +20,12 @@ import {
 } from '../src/services/DateService';
 import { GREG_MONTHS_HE, formatGregDayMonth } from '../src/components/calendar/weekTimelineLayout';
 import { radius } from '../src/constants/radius';
-import { elevation } from '../src/constants/elevation';
+import { ScreenHeader } from '../src/components/common/ScreenHeader';
+import { Fab } from '../src/components/ui/Fab';
 import { typography, withFontFamily } from '../src/constants/typography';
 import type { FirstDayOfWeek } from '../src/providers/SettingsProvider';
 import { useDatePicker } from '../src/hooks/useDatePicker';
 
-const FAB_SIZE = 56;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,7 +48,6 @@ function getWeekStart(anchor: Date, firstDayOfWeek: FirstDayOfWeek): Date {
 export default function WeekScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const openDrawer = useDrawerStore((s) => s.open);
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
@@ -127,51 +124,17 @@ export default function WeekScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* ── Header: hamburger / title / jump-to-today ─────────────────────── */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-            paddingTop: (StatusBar.currentHeight ?? 0) + 8,
-          },
-        ]}
-      >
-        <Pressable
-          onPress={openDrawer}
-          hitSlop={12}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="פתח תפריט"
-        >
-          <Menu size={24} color={colors.textPrimary} />
-        </Pressable>
-
-        <Pressable
-          onPress={openPicker}
-          style={styles.titleBlock}
-          accessibilityRole="button"
-          accessibilityLabel="בחר תאריך"
-        >
-          <Text style={[styles.primaryRange, { color: colors.textPrimary }]}>
-            {primaryRange}
-          </Text>
-          <Text style={[styles.secondaryRange, { color: colors.textSecondary }]}>
-            {secondaryRange}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={jumpToToday}
-          hitSlop={12}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="קפוץ להיום"
-        >
-          <CalendarDays size={22} color={colors.textPrimary} />
-        </Pressable>
-      </View>
+      {/* Header — Figma week frame: 17 Bold range, 11 Medium sub-line */}
+      <ScreenHeader
+        variant="week"
+        compactTitle
+        title={primaryRange}
+        subtitle={secondaryRange}
+        subtitleSize="caption"
+        onTitlePress={openPicker}
+        titleAccessibilityLabel="בחר תאריך"
+        onJumpToToday={jumpToToday}
+      />
 
       {/* Parasha banner — only on weeks that have a parasha */}
       {parasha && (
@@ -195,18 +158,7 @@ export default function WeekScreen() {
       {/* Quick-add FAB — bottom-end (= bottom-LEFT in RTL). This screen has no
           bottom tab bar (it's a top-level Stack route, not under (tabs)), so
           the offset is anchored to the safe-area bottom inset instead. */}
-      <Pressable
-        onPress={() => setNoteEditorVisible(true)}
-        style={[
-          styles.fab,
-          elevation.lg,
-          { backgroundColor: colors.accent, bottom: insets.bottom + 20 },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel="הוסף אירוע"
-      >
-        <Plus size={26} color={colors.textInverse} />
-      </Pressable>
+      <Fab onPress={() => setNoteEditorVisible(true)} bottom={insets.bottom + 16} />
 
       {/* NoteEditor — opened by the quick-add FAB, creates a note on selectedDate */}
       <NoteEditor
@@ -229,26 +181,6 @@ export default function WeekScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  iconButton: {
-    width: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleBlock: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  // Figma: week-range title = 17 Bold; Gregorian sub-line = 11 Medium.
-  primaryRange:   { ...withFontFamily(typography.cardTitle), textAlign: 'center' },
-  secondaryRange: { ...withFontFamily(typography.caption), marginTop: 2, textAlign: 'center' },
-
   parashaBanner: {
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -270,13 +202,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  fab: {
-    position: 'absolute',
-    left: 20, // bottom-end in RTL = bottom-left
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

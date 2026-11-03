@@ -12,11 +12,18 @@
 // keeps עברי as the tab that loads by default when entering the group.
 // (expo-router 58 dropped the `initialRouteName` prop on <Tabs>.)
 
-import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, type ColorValue } from 'react-native';
+import { useCallback } from 'react';
+import { Tabs, useFocusEffect, useRouter, useSegments } from 'expo-router';
+import { Alert, BackHandler, View, Text, StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BookOpenText, Calendar, Sun, Clock, type LucideIcon } from 'lucide-react-native';
+import {
+  CalendarIcon,
+  CalendarDayIcon,
+  ClockIcon,
+  DayPageIcon,
+} from '../../src/components/icons/FigmaIcons';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
+import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { radius } from '../../src/constants/radius';
 import { typography, withFontFamily } from '../../src/constants/typography';
 import type { ThemeColors } from '../../src/hooks/useThemeColors';
@@ -28,17 +35,21 @@ function asColorString(color: ColorValue): string | undefined {
   return typeof color === 'string' ? color : undefined;
 }
 
+type TabGlyph = typeof CalendarIcon;
+
+/** Figma tab icons are 22 px inside a 58×28 pill. */
+const TAB_ICON_SIZE = 22;
+
 /** Icon wrapped in a pill that lights up with `colors.accentLight` when the tab is active. */
-function TabIcon({ Icon, color, size, focused, colors }: {
-  Icon: LucideIcon;
+function TabIcon({ Icon, color, focused, colors }: {
+  Icon: TabGlyph;
   color: ColorValue;
-  size: number;
   focused: boolean;
   colors: ThemeColors;
 }) {
   return (
     <View style={[styles.iconPill, focused && { backgroundColor: colors.accentLight }]}>
-      <Icon color={asColorString(color)} size={size} />
+      <Icon color={asColorString(color) ?? colors.textTertiary} size={TAB_ICON_SIZE} />
     </View>
   );
 }
@@ -55,6 +66,35 @@ function TabLabel({ children, color, focused }: { children: string; color: Color
 export default function TabLayout() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const segments: string[] = useSegments();
+  const defaultCalendarType = useSettingsStore((s) => s.defaultCalendarType);
+
+  // Android back inside the tabs. The tab router's default ('firstRoute')
+  // returns to the first DECLARED tab, which is זמנים because the tabs are
+  // declared in reverse for RTL. Instead: any other tab goes back to the
+  // month view chosen in Settings, and back on that view asks before exiting.
+  // Registered only while the tab group is focused, so stack screens pushed
+  // on top (settings, converter…) keep normal back; the open drawer's own
+  // listener is newer and runs first.
+  const homeTab = defaultCalendarType === 'gregorian' ? 'gregorian' : 'index';
+  const currentTab = segments[1] ?? 'index';
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (currentTab !== homeTab) {
+          router.navigate(homeTab === 'gregorian' ? '/(tabs)/gregorian' : '/(tabs)');
+          return true;
+        }
+        Alert.alert('יציאה מהאפליקציה', 'האם אתה בטוח שברצונך לצאת?', [
+          { text: 'ביטול', style: 'cancel' },
+          { text: 'יציאה', style: 'destructive', onPress: () => BackHandler.exitApp() },
+        ]);
+        return true;
+      });
+      return () => sub.remove();
+    }, [currentTab, homeTab, router]),
+  );
 
   return (
     <Tabs
@@ -64,11 +104,12 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopWidth: 1,
           borderTopColor: colors.border,
-          height: 56 + insets.bottom,
-          paddingTop: 6,
-          paddingBottom: insets.bottom + 4,
+          // Figma: 8 top, 47 content (28 pill + 3 + 16 label), 18 bottom.
+          height: 8 + 47 + Math.max(insets.bottom, 18),
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 18),
         },
       }}
     >
@@ -80,8 +121,8 @@ export default function TabLayout() {
         name="zmanim"
         options={{
           title: 'זמנים',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={Clock} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={ClockIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -92,8 +133,8 @@ export default function TabLayout() {
         name="day"
         options={{
           title: 'יום',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={Sun} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={DayPageIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -104,8 +145,8 @@ export default function TabLayout() {
         name="gregorian"
         options={{
           title: 'לועזי',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={Calendar} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={CalendarDayIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -116,8 +157,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'עברי',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon Icon={BookOpenText} color={color} size={size} focused={focused} colors={colors} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon Icon={CalendarIcon} color={color} focused={focused} colors={colors} />
           ),
           tabBarLabel: ({ color, focused, children }) => (
             <TabLabel color={color} focused={focused}>{children}</TabLabel>
@@ -135,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   label: {
-    marginTop: 2,
+    marginTop: 3,
     textAlign: 'center',
     ...withFontFamily(typography.caption),
   },

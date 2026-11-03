@@ -1,119 +1,164 @@
 // src/components/common/ScreenHeader.tsx
-// Universal screen header.
-// Phase 3.7a-1: hamburger button + optional title + right spacer.
-// Phase 3.7c: optional `date` prop. When passed, renders a compact bilingual
-// date display (Hebrew + Gregorian) in place of the title. Line order
-// is controlled by the hebrewOnTop setting from SettingsProvider.
+// Universal screen header — the one header every screen uses, built to the
+// approved Figma frames (2026-11-03 parity pass):
+//   [leading icon] ——— [title block, centred] ——— [jump-to-today | spacer]
+// - Background `surface`, no bottom border (the border belongs to whatever
+//   sits under the header: the weekday row, the week day-columns, …).
+// - Leading: hamburger (tab screens) or a "‹" back glyph (stack screens).
+// - Title block: a title plus an optional tertiary subtitle, above or below.
+// - Trailing: the target icon (jump to today) when `onJumpToToday` is given,
+//   otherwise an empty 24 px slot that keeps the title centred.
+//
+// The row is direction-neutral (symmetric 3 slots), so plain 'row' is
+// correct here: the hamburger sits on the LEFT, where the drawer opens.
 //
 // Padding note: uses StatusBar.currentHeight for Android status-bar clearance.
-// iOS: currentHeight is null → falls back to 0. Safe area handling via
-// SafeAreaProvider at the root covers iOS notches separately.
+// iOS: currentHeight is null → falls back to 0.
 
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, StatusBar } from 'react-native';
-import { Menu, ChevronDown } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useDrawerStore } from '../../providers/DrawerProvider';
-import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { typography, withFontFamily } from '../../constants/typography';
-import {
-  dateService,
-  toHebrewNumeral,
-  toHebrewYear,
-} from '../../services/DateService';
+import { MenuIcon, TargetIcon } from '../icons/FigmaIcons';
+
+/** Figma header paddings differ slightly per screen family. */
+type HeaderVariant = 'month' | 'default' | 'week';
+
+const VARIANT_PADDING: Record<HeaderVariant, { top: number; bottom: number }> = {
+  month:   { top: 6, bottom: 12 },
+  default: { top: 4, bottom: 12 },
+  week:    { top: 4, bottom: 10 },
+};
 
 interface ScreenHeaderProps {
-  title?: string;
-  date?: Date;  // When provided, replaces title with compact bilingual date
-  /** When provided alongside `date`, wraps the date area in a Pressable
-   *  and shows a ChevronDown hint — tapping opens the date picker. */
-  onDatePress?: () => void;
+  title: string;
+  subtitle?: string;
+  /** Subtitle renders above the title (Day, Zmanim) instead of below it. */
+  subtitleAbove?: boolean;
+  /** Type step of the subtitle line; Figma uses 11, 12 or 13 Medium. */
+  subtitleSize?: 'caption' | 'subtitle' | 'bodySmall';
+  /** Week header: 17 Bold title instead of 19 Bold. */
+  compactTitle?: boolean;
+  leading?: 'menu' | 'back';
+  variant?: HeaderVariant;
+  /** Makes the title block tappable (opens a date / month picker). */
+  onTitlePress?: () => void;
+  titleAccessibilityLabel?: string;
+  /** Shows the target icon on the right; tapping it jumps to today. */
+  onJumpToToday?: () => void;
 }
 
-export function ScreenHeader({ title, date, onDatePress }: ScreenHeaderProps) {
+export function ScreenHeader({
+  title,
+  subtitle,
+  subtitleAbove = false,
+  subtitleSize = 'subtitle',
+  compactTitle = false,
+  leading = 'menu',
+  variant = 'default',
+  onTitlePress,
+  titleAccessibilityLabel,
+  onJumpToToday,
+}: ScreenHeaderProps) {
   const colors = useThemeColors();
+  const router = useRouter();
   const openDrawer = useDrawerStore((s) => s.open);
-  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
+  const pad = VARIANT_PADDING[variant];
 
-  // Build bilingual date strings when date prop is present.
-  // dateService.getDayData is cached per month — cheap on repeated renders.
-  let primaryLine: string | undefined;
-  let secondaryLine: string | undefined;
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
 
-  if (date) {
-    const dayData = dateService.getDayData(date);
-    const hebrew = `${toHebrewNumeral(dayData.hebrewDate.day)} ${dayData.hebrewDate.monthName} ${toHebrewYear(dayData.hebrewDate.year)}`;
-    const greg = date.toLocaleDateString('he-IL', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-    primaryLine   = hebrewOnTop ? hebrew : greg;
-    secondaryLine = hebrewOnTop ? greg   : hebrew;
-  }
+  const subtitleNode = subtitle ? (
+    <Text
+      style={[
+        withFontFamily(typography[subtitleSize], '500'),
+        styles.centered,
+        { color: colors.textTertiary },
+      ]}
+    >
+      {subtitle}
+    </Text>
+  ) : null;
+
+  const titleBlock = (
+    <>
+      {subtitleAbove && subtitleNode}
+      <Text
+        style={[
+          compactTitle ? styles.titleCompact : styles.title,
+          { color: colors.textPrimary },
+        ]}
+        numberOfLines={1}
+      >
+        {title}
+      </Text>
+      {!subtitleAbove && subtitleNode}
+    </>
+  );
 
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: colors.background,
-          borderBottomColor: colors.border,
-          paddingTop: (StatusBar.currentHeight ?? 0) + 8,
+          backgroundColor: colors.surface,
+          paddingTop: (StatusBar.currentHeight ?? 0) + pad.top,
+          paddingBottom: pad.bottom,
         },
       ]}
     >
-      <Pressable
-        onPress={openDrawer}
-        hitSlop={12}
-        style={styles.menuButton}
-        accessibilityLabel="פתח תפריט"
-      >
-        <Menu size={24} color={colors.textPrimary} />
-      </Pressable>
+      {leading === 'menu' ? (
+        <Pressable
+          onPress={openDrawer}
+          hitSlop={12}
+          style={styles.iconSlot}
+          accessibilityRole="button"
+          accessibilityLabel="פתח תפריט"
+        >
+          <MenuIcon size={24} color={colors.textPrimary} />
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={goBack}
+          hitSlop={12}
+          style={styles.iconSlot}
+          accessibilityRole="button"
+          accessibilityLabel="חזרה"
+        >
+          <Text style={[styles.backGlyph, { color: colors.textPrimary }]}>‹</Text>
+        </Pressable>
+      )}
 
-      <View style={styles.centerContent}>
-        {date ? (
-          // Bilingual date display — compact two-line stack.
-          // When onDatePress is provided, wrap in a Pressable with a ChevronDown
-          // affordance so the user knows the date is tappable.
-          onDatePress ? (
-            <Pressable
-              onPress={onDatePress}
-              hitSlop={8}
-              style={styles.datePressable}
-              accessibilityLabel="בחר תאריך"
-              accessibilityRole="button"
-            >
-              <Text style={[styles.dateLineLarge, { color: colors.textPrimary }]}>
-                {primaryLine}
-              </Text>
-              <Text style={[styles.dateLineSmall, { color: colors.textSecondary }]}>
-                {secondaryLine}
-              </Text>
-              <ChevronDown size={12} color={colors.textTertiary} style={styles.chevron} />
-            </Pressable>
-          ) : (
-            <>
-              <Text style={[styles.dateLineLarge, { color: colors.textPrimary }]}>
-                {primaryLine}
-              </Text>
-              <Text style={[styles.dateLineSmall, { color: colors.textSecondary }]}>
-                {secondaryLine}
-              </Text>
-            </>
-          )
-        ) : title ? (
-          // Plain title fallback (screens that don't pass a date)
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            {title}
-          </Text>
-        ) : null}
-      </View>
+      {onTitlePress ? (
+        <Pressable
+          onPress={onTitlePress}
+          style={styles.titleBlock}
+          accessibilityRole="button"
+          accessibilityLabel={titleAccessibilityLabel ?? title}
+        >
+          {titleBlock}
+        </Pressable>
+      ) : (
+        <View style={styles.titleBlock}>{titleBlock}</View>
+      )}
 
-      {/* Right-side spacer keeps content visually centred.
-          Reserved for a "today" shortcut button in a future phase. */}
-      <View style={styles.rightSpacer} />
+      {onJumpToToday ? (
+        <Pressable
+          onPress={onJumpToToday}
+          hitSlop={12}
+          style={styles.iconSlot}
+          accessibilityRole="button"
+          accessibilityLabel="עבור להיום"
+        >
+          <TargetIcon size={24} color={colors.accent} />
+        </Pressable>
+      ) : (
+        <View style={styles.iconSlot} />
+      )}
     </View>
   );
 }
@@ -122,40 +167,32 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
   },
-  menuButton: {
-    padding: 4,
+  // 24×24 like the Figma icon frames; hitSlop(12) brings the touch target to 48.
+  iconSlot: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  centerContent: {
+  titleBlock: {
     flex: 1,
     alignItems: 'center',
+    gap: 1,
   },
   title: {
-    // Figma target: 19 Bold — exact match via typography.screenTitle.
     ...withFontFamily(typography.screenTitle),
     textAlign: 'center',
   },
-  dateLineLarge: {
-    // Figma target: 19 Bold — exact match via typography.screenTitle.
-    ...withFontFamily(typography.screenTitle),
-    letterSpacing: -0.2,
+  titleCompact: {
+    ...withFontFamily(typography.cardTitle),
     textAlign: 'center',
   },
-  dateLineSmall: {
-    // Figma target: 13 Regular — exact match via typography.bodySmall.
-    ...withFontFamily(typography.bodySmall),
-    marginTop: 1,
+  centered: { textAlign: 'center' },
+  backGlyph: {
+    ...withFontFamily(typography.glyph),
     textAlign: 'center',
   },
-  rightSpacer: {
-    width: 32, // matches menuButton footprint (24px icon + 2×4px padding) for centred content
-  },
-
-  // Phase 4.4 — tappable date area (only rendered when onDatePress is provided)
-  // minHeight 48 + hitSlop(8) below satisfies the 48dp touch-target floor.
-  datePressable: { alignItems: 'center', justifyContent: 'center', minHeight: 48 },
-  chevron: { marginTop: 2 },
 });

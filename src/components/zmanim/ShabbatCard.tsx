@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Flame } from 'lucide-react-native';
+import { CandleFlameIcon } from '../icons/FigmaIcons';
 import { formatZmanTime, type ShabbatRow } from '../../services/ZmanimService';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useShabbatTable } from '../../hooks/useShabbatTable';
@@ -51,12 +51,13 @@ export function ShabbatCard({
       {day === 5 ? (
         /* ── Friday branch — 4-city + user-row table ───────────────────── */
         <View>
-          {/* Card header row — row-reverse: title first/right, candle icon last/left */}
+          {/* Card header row — row-reverse: candle icon first (far right),
+              title next to it filling toward the left (Figma). */}
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardHeaderTitle, { color: colors.tagShabbat }]}>
+            <CandleFlameIcon size={20} bodyColor={colors.borderStrong} flameColor={colors.candle} />
+            <Text style={[styles.cardHeaderTitle, { color: colors.textPrimary }]}>
               כניסת שבת
             </Text>
-            <Flame size={18} color={colors.candle} />
           </View>
 
           {/* Column header row */}
@@ -82,12 +83,13 @@ export function ShabbatCard({
 
             return (
               <React.Fragment key={row.isUserRow ? 'user' : row.nameHe}>
-                {showDivider && (
-                  <View
-                    style={[styles.divider, { backgroundColor: colors.border }]}
-                  />
-                )}
-                <View style={styles.tableRow}>
+                {/* The user's own row is set off by a top hairline (Figma). */}
+                <View
+                  style={[
+                    styles.tableRow,
+                    showDivider && { borderTopWidth: 1, borderTopColor: colors.borderSubtle },
+                  ]}
+                >
                   {/* (a) City name — flex: 1, rightmost */}
                   <Text
                     style={[
@@ -98,7 +100,9 @@ export function ShabbatCard({
                       },
                     ]}
                   >
-                    {row.nameHe}
+                    {row.isUserRow && row.nameHe !== 'המיקום שלי'
+                      ? `${row.nameHe}  ·  המיקום שלי`
+                      : row.nameHe}
                   </Text>
                   {/* (b) Candle lighting — fixed ~74, center. 13 SemiBold on
                       regular rows (heavier than the plain city-name/havdalah
@@ -115,13 +119,13 @@ export function ShabbatCard({
                   >
                     {formatZmanTime(row.candleLighting, use24h)}
                   </Text>
-                  {/* (c) Havdalah — fixed ~66, center */}
+                  {/* (c) Havdalah — fixed ~66, center; secondary text on regular rows */}
                   <Text
                     style={[
                       styles.timeCell,
                       styles.havdalahCell,
                       {
-                        color: row.isUserRow ? colors.accent : colors.textPrimary,
+                        color: row.isUserRow ? colors.accent : colors.textSecondary,
                         ...withFontFamily(typography.bodySmall, row.isUserRow ? '700' : '400'),
                       },
                     ]}
@@ -168,11 +172,12 @@ export function ShabbatCard({
 
 const styles = StyleSheet.create({
   // ── Card shell ──────────────────────────────────────────────────────────
+  // Figma: r14, 1 px border, padding 14, 12 above the next item.
   card: {
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
   },
   // Saturday-branch title (unchanged content/position — kept centered above the rows).
   title: {
@@ -185,11 +190,13 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 10,
   },
   cardHeaderTitle: {
+    flex: 1,
     ...withFontFamily(typography.bodyMedium, '700'),
+    textAlign: 'right',
   },
 
   // ── Saturday branch (row/label/value — kept exactly as before) ──────────
@@ -213,13 +220,14 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginBottom: 4,
   },
   // Data row: RTL, columns align with header.
+  // Figma: rows 29 tall (padding 5), 10 apart.
   tableRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginVertical: 3,
+    paddingVertical: 5,
+    marginTop: 10,
   },
   // (a) City-name cell — flex: 1, rightmost in the row-reverse layout.
   nameCell: {
@@ -244,10 +252,5 @@ const styles = StyleSheet.create({
   columnHeaderLabel: {
     ...withFontFamily(typography.micro),
     textAlign: 'center',
-  },
-  // Divider between the 4 fixed-city rows and the user row.
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 8,
   },
 });

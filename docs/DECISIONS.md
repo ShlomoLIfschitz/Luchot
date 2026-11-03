@@ -989,3 +989,28 @@
   and secondary sources; current Play policy text not verified) and requires a
   declaration in Play Console (Shlomo's). `app.json` change: full EAS build.
   Not yet verified on a device.
+
+## "Support the project": one-time tips through Google Play Billing, no ads
+- Date: 2026-11-03
+- Context: Shlomo asked whether a bottom banner ad would be acceptable. Ads were
+  rejected again: VISION.md says the app "**לא** מציגה פרסומות — לעולם", an ad SDK
+  adds constant network traffic and the advertising ID (tracking), and the content
+  of the ads cannot be fully controlled. Shlomo accepted the alternative: "קיבלתי את
+  החלופה של "תמיכה בפרויקט"", and chose Google Play Billing over an external link.
+- Choice: a "תמיכה בפרויקט" item in the drawer opens a screen with three one-time
+  consumable in-app products (10 ₪ / 25 ₪ / 50 ₪ in the Figma frames; the real
+  prices come from Play in the user's local currency). A tip unlocks nothing:
+  every feature stays free for everyone.
+- Alternatives considered: banner ads (above) - rejected; an external link
+  (Buy Me a Coffee / PayBox / Bit) - rejected: Play's Payments policy exempts from
+  Play Billing only "tax exempt donations", so a tip to the developer risks
+  rejection or suspension; a paid "pro" tier - not requested.
+- Implications:
+  - No network call from Luchot's own code: the purchase runs inside the Play
+    Store app. The offline-first rule and the single Nominatim exception stand.
+  - A new native dependency (IAP library) and the BILLING permission: full EAS build.
+  - Shlomo's steps: a Play Console payments profile (merchant account) and the
+    three in-app products. Google keeps a service fee on each purchase.
+  - Play's Data Safety form must list purchase history (handled by Google Play).
+  - UI is a new flow: Figma frames E1–E4 (section "תמיכה בפרויקט") need Shlomo's
+    approval before any code.

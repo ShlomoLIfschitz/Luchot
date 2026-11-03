@@ -119,6 +119,24 @@ export function toHebrewYear(year: number): string {
   return letters.slice(0, -1) + '״' + letters.slice(-1);
 }
 
+/** Day of month in gematria with geresh / gershayim, e.g. 5 → "ה׳", 19 → "י״ט" */
+export function toHebrewDay(n: number): string {
+  const letters = toHebrewNumeral(n);
+  if (letters.length <= 1) return letters + '׳';
+  return letters.slice(0, -1) + '״' + letters.slice(-1);
+}
+
+/**
+ * Hebrew year with its millennium letter, e.g. 4960 → "ד׳תתק״ס".
+ * Unless `always`, the 5000s are written without it (5708 → "תש״ח"),
+ * which is how dates are usually written today.
+ */
+export function toHebrewYearFull(year: number, always: boolean): string {
+  const thousands = Math.floor(year / 1000);
+  const prefix = always || thousands !== 5 ? GEM_UNITS[thousands] + '׳' : '';
+  return year % 1000 === 0 ? prefix : prefix + toHebrewYear(year);
+}
+
 // ── Daily Learning Helper ─────────────────────────────────
 // Looks up a named learning schedule for a given Hebrew date and returns
 // a LearningItem (display text + Sefaria URL), or undefined if no event
@@ -399,6 +417,25 @@ export class DateService {
       isShabbat: tomorrow.getDay() === 6,
       isRoshChodesh: hdate.getDate() === 1 || hdate.getDate() === 30,
     };
+  }
+
+  /**
+   * Convert a Gregorian date (any year 1–9999) to a Hebrew date. With
+   * afterSunset the next Hebrew day is returned, since the Hebrew day
+   * begins at sunset.
+   *
+   * Builds the Date with setFullYear: the (y, m, d) constructor maps years
+   * 0–99 to 1900–1999. Before 1582 the result is on the proleptic Gregorian
+   * calendar (both JS Date and @hebcal's R.D. arithmetic), not the Julian one.
+   */
+  gregorianToHebrew(
+    year: number, month: number, day: number, afterSunset: boolean,
+  ): { day: number; month: number; year: number } {
+    const date = new Date(2000, 0, 1, 12);
+    date.setFullYear(year, month - 1, day);
+    let hd = new HDate(date);
+    if (afterSunset) hd = hd.next();
+    return { day: hd.getDate(), month: hd.getMonth(), year: hd.getFullYear() };
   }
 
 }

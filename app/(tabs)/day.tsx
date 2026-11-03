@@ -44,7 +44,6 @@ import {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { BookOpenText } from 'lucide-react-native';
 import { useCalendarStore } from '../../src/providers/CalendarProvider';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
 import { useLocationStore } from '../../src/providers/LocationProvider';
@@ -68,16 +67,25 @@ import { typography, withFontFamily } from '../../src/constants/typography';
 import { findNearestCity } from '../../src/utils/locationLookup';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { useDatePicker } from '../../src/hooks/useDatePicker';
+import { Fab } from '../../src/components/ui/Fab';
+import { ParashaBookIcon } from '../../src/components/icons/FigmaIcons';
+import { elevation } from '../../src/constants/elevation';
+import {
+  weekdayNameHe,
+  hebrewFullDate,
+  gregFullDate,
+} from '../../src/utils/hebrewLabels';
 import { swipeDirection } from '../../src/constants/layout';
 
 // Hourly grid layout constant — row height, used by the row style.
-const HOUR_ROW_HEIGHT = 40;
+// Figma: an empty hour row is 34 tall (padding 8 + 18 + 8).
+const HOUR_ROW_HEIGHT = 34;
 // Default hourly-grid window when the day has no timed events at all —
 // "roughly 07:00–22:00", a sensible daytime band with no wall of empty rows.
 const DEFAULT_TIMELINE_START_HOUR = 7;
 const DEFAULT_TIMELINE_END_HOUR = 22;
 // Vertical padding above the first item in the ScrollView's content.
-const CONTENT_TOP_PADDING = 16;
+const CONTENT_TOP_PADDING = 14;
 
 // Hourly-grid event block color: mirrors NoteList's colorId/noteType → tag
 // token mapping (that helper is local/unexported to NoteList.tsx, which is
@@ -101,6 +109,7 @@ export default function DayScreen() {
   const selectedDate = useCalendarStore((s) => s.selectedDate);
   const setSelectedDate = useCalendarStore((s) => s.setSelectedDate);
   const use24hTime = useSettingsStore((s) => s.use24hTime);
+  const hebrewOnTop = useSettingsStore((s) => s.hebrewOnTop);
   const { latitude: locationLat, longitude: locationLng, placeName: locationPlaceName } = useLocationStore();
 
   // Derive DayData for the selected date — month is cached, so cheap.
@@ -278,7 +287,18 @@ export default function DayScreen() {
         {/* ScreenHeader already renders the compact bilingual date (Hebrew +
             Gregorian) and is the tappable date-picker affordance — no
             separate date hero needed below it. */}
-        <ScreenHeader date={selectedDate} onDatePress={openPicker} />
+        {/* Figma: weekday above the date (19 Bold); the other calendar's
+            date is the first line of the content. hebrewOnTop picks which
+            calendar is the header date. */}
+        <ScreenHeader
+          title={hebrewOnTop ? hebrewFullDate(selectedDate) : gregFullDate(selectedDate)}
+          subtitle={weekdayNameHe(selectedDate)}
+          subtitleAbove
+          subtitleSize="bodySmall"
+          onTitlePress={openPicker}
+          titleAccessibilityLabel="בחר תאריך"
+          onJumpToToday={() => setSelectedDate(new Date())}
+        />
 
         <ScrollView
           style={styles.scroll}
@@ -301,6 +321,10 @@ export default function DayScreen() {
               nothing special collapses cleanly with no empty cards or stray
               gaps. */}
           <View>
+            <Text style={[styles.secondaryDate, { color: colors.textTertiary }]}>
+              {hebrewOnTop ? gregFullDate(selectedDate) : hebrewFullDate(selectedDate)}
+            </Text>
+
             {isHoliday && primaryHoliday && (
               <View style={[styles.infoBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
                 <Text style={[styles.infoBannerText, { color: colors.tagHoliday }]}>
@@ -368,48 +392,46 @@ export default function DayScreen() {
               column/stretch default, stacking the two tabs full-width
               instead of side by side. The fix is to give
               stickyHeaderIndices={[1]} a plain OUTER View (tabBarOuter,
-              chrome only: background + bottom border), and keep the actual
-              row (tabBarRow, flexDirection row-reverse) as an inner child
+              chrome only: background + bottom padding), and keep the actual
+              row (segTrack, flexDirection row-reverse) as an inner child
               one level down, where RN's hoisting can't reach it.
 
               The outer View must carry the opaque background (matching the
-              screen root) and the bottom border, because that style is what
+              screen root), because that style is what
               ends up on the wrapper Animated.View — the element that
               actually paints while the bar is docked at the top. If the
               background were only on the inner row, content scrolling
               underneath would show through around/behind it while docked. */}
-          <View style={[styles.tabBarOuter, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-            <View style={styles.tabBarRow}>
-              {/* RTL: 'אירועים' first in JSX → renders on the right */}
-              <Pressable
-                onPress={() => setActiveTab('events')}
-                style={[styles.tabItem, activeTab === 'events' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-                accessibilityRole="tab"
-                accessibilityLabel="אירועים"
-              >
-                <Text style={[
-                  styles.tabText,
-                  activeTab === 'events' && styles.tabTextActive,
-                  { color: activeTab === 'events' ? colors.textPrimary : colors.textTertiary },
-                ]}>
-                  אירועים
-                </Text>
-              </Pressable>
-              {/* 'לימוד' second in JSX → renders on the left */}
-              <Pressable
-                onPress={() => setActiveTab('learning')}
-                style={[styles.tabItem, activeTab === 'learning' && { borderBottomWidth: 2, borderBottomColor: colors.accent }]}
-                accessibilityRole="tab"
-                accessibilityLabel="לימוד"
-              >
-                <Text style={[
-                  styles.tabText,
-                  activeTab === 'learning' && styles.tabTextActive,
-                  { color: activeTab === 'learning' ? colors.textPrimary : colors.textTertiary },
-                ]}>
-                  לימוד
-                </Text>
-              </Pressable>
+          <View style={[styles.tabBarOuter, { backgroundColor: colors.background }]}>
+            {/* Figma: pill segmented control (track surfaceMuted, active
+                segment surface + sm shadow). RTL: 'אירועים' first in JSX →
+                renders on the right. Segments are 33 tall like the frame;
+                hitSlop keeps the touch target at 48. */}
+            <View style={[styles.segTrack, { backgroundColor: colors.surfaceMuted }]}>
+              {(['events', 'learning'] as const).map((tab) => {
+                const active = activeTab === tab;
+                const label = tab === 'events' ? 'אירועים' : 'לימוד';
+                return (
+                  <Pressable
+                    key={tab}
+                    onPress={() => setActiveTab(tab)}
+                    hitSlop={{ top: 8, bottom: 8 }}
+                    style={[styles.segItem, active && [styles.segItemActive, { backgroundColor: colors.surface }]]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={label}
+                  >
+                    <Text
+                      style={[
+                        active ? styles.segTextActive : styles.segText,
+                        { color: active ? colors.textPrimary : colors.textTertiary },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
 
@@ -425,29 +447,20 @@ export default function DayScreen() {
                 hideAddButton
                 onlyAllDay
               />
-              <Pressable
-                onPress={openNoteEditor}
-                style={[styles.addEventBtn, { backgroundColor: colors.accentLight }]}
-                accessibilityRole="button"
-                accessibilityLabel="הוסף אירוע"
-              >
-                <Text style={[styles.addEventBtnText, { color: colors.accent }]}>+ הוסף אירוע</Text>
-              </Pressable>
 
               {/* Hourly schedule — C2: moved from torah tab to events tab.
                   Timed notes bucketed by getHours() of startDateTime.
                   Renders only the computed timelineHours window (see
                   timelineHourRange above) — no auto-scroll needed. */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-                  לוח שעות
-                </Text>
-
                 {!hasTimedEvents && (
                   <Text style={[styles.timelineEmptyHint, { color: colors.textTertiary }]}>
                     אין אירועים ליום זה
                   </Text>
                 )}
+
+                {/* Figma: the hours sit inside a card (surface, border, r14). */}
+                <View style={[styles.scheduleCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
 
                 {timelineHours.map((hour) => {
                   const hourLabel = hour.toString().padStart(2, '0') + ':00';
@@ -463,7 +476,11 @@ export default function DayScreen() {
                       <View style={styles.hourContent}>
                         {hourNotes.map((note) => {
                           const startDate = new Date(note.startDateTime!);
-                          const timeStr = formatHM(startDate);
+                          const endDate = note.endDateTime ? new Date(note.endDateTime) : null;
+                          // Figma: "09:00 – 10:00" when the event has an end time.
+                          const timeStr = endDate && !isNaN(endDate.getTime())
+                            ? `${formatHM(startDate)} – ${formatHM(endDate)}`
+                            : formatHM(startDate);
                           const catKey = resolveNoteCategoryKey(note);
                           const catTokens = CATEGORY_TOKENS[catKey];
                           return (
@@ -487,13 +504,13 @@ export default function DayScreen() {
                           );
                         })}
                       </View>
-                      <View style={[styles.hourDivider, { backgroundColor: colors.borderSubtle }]} />
                       <Text style={[styles.hourLabel, { color: colors.textTertiary }]}>
                         {hourLabel}
                       </Text>
                     </View>
                   );
                 })}
+                </View>
               </View>
             </>
           ) : (
@@ -505,7 +522,7 @@ export default function DayScreen() {
             // Rambam, and a single Tanach/Nach row (see tanachItem above).
             <View style={styles.section}>
               {hasLearningItems ? (
-                <Card colors={colors}>
+                <Card colors={colors} inset={0}>
                   {dayData.dafYomi && (
                     <DetailRow
                       label="דף יומי"
@@ -544,6 +561,9 @@ export default function DayScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* Quick-add FAB (Figma) — replaces the inline "+ הוסף אירוע" button */}
+        <Fab onPress={openNoteEditor} />
 
         {/* Note Editor — Modal-based, controlled via visible prop.
             Serves both the "add new event" button and the hourly grid taps.
@@ -592,7 +612,7 @@ function ParashaCard({
         <Text style={[styles.parashaCaption, { color: colors.tagShabbat }]}>{label}</Text>
         <Text style={[styles.parashaName, { color: colors.tagShabbat }]}>{name}</Text>
       </View>
-      <BookOpenText size={22} color={colors.tagShabbat} />
+      <ParashaBookIcon size={26} color={colors.tagShabbat} />
     </View>
   );
 }
@@ -625,8 +645,8 @@ function KeyZmanimCard({
 
   return (
     <View style={styles.keyZmanimWrap}>
-      <SectionLabel title="זמני היום" colors={colors} />
-      <Card colors={colors}>
+      <SectionLabel title="זמני היום" colors={colors} inset={0} gapAbove={0} />
+      <Card colors={colors} inset={0}>
         {rows.map(([label, time]) => (
           <KeyZmanRow key={label} label={label} time={time} use24h={use24h} colors={colors} />
         ))}
@@ -730,29 +750,26 @@ function DetailRow({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: CONTENT_TOP_PADDING, paddingBottom: 100 },
+  // Figma: content padding 14 / 16, items 12 apart.
+  scrollContent: { paddingHorizontal: 16, paddingTop: CONTENT_TOP_PADDING, paddingBottom: 100 },
+
+  // First content line: the other calendar's date (13 Regular, tertiary).
+  secondaryDate: { ...withFontFamily(typography.bodySmall), textAlign: 'right', marginBottom: 12 },
 
   // Highlights-strip banner — shared visual language for the holiday banner,
   // Omer count and Rosh Chodesh; only colors differ per use.
   infoBanner: {
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     borderWidth: 1,
-    marginBottom: 16,
+    marginBottom: 12,
     alignItems: 'center',
   },
   infoBannerText: { ...withFontFamily(typography.cardTitle), textAlign: 'center' },
 
   // Sections
-  section: { marginVertical: 12 },
-  sectionTitle: {
-    ...withFontFamily(typography.caption, '600'),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    textAlign: 'right',
-  },
+  section: { marginBottom: 12 },
 
   // Detail rows (learning tab) — card row: bottom hairline suppressed on
   // the last visible row via the `isLast` prop Card auto-injects.
@@ -790,34 +807,39 @@ const styles = StyleSheet.create({
   // Hourly schedule — explicit row-reverse (locked RTL convention): first
   // JSX child (event content) lands right, last child (hourLabel) lands
   // left as the fixed time gutter. Rows separated by a top hairline.
+  // Figma: each hour row has a 1 px top line, padding 8 / 12, gap 10;
+  // the 38-wide hour label sits on the left.
+  scheduleCard: {
+    borderRadius: radius.card,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
   hourRow: {
     flexDirection: 'row-reverse',
     alignItems: 'flex-start',
     minHeight: HOUR_ROW_HEIGHT,
-    paddingVertical: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 10,
+    borderTopWidth: 1,
   },
   hourLabel: {
     width: 38,
     ...withFontFamily(typography.caption),
-    paddingTop: 4,
     textAlign: 'left',
-  },
-  hourDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: 10,
   },
   hourContent: { flex: 1, gap: 6 },
   // Filled, rounded event block — background/foreground colors come from the
   // note's resolved category token (CATEGORY_TOKENS), applied inline.
+  // Figma: r8, padding 7 / 10, title 13 SemiBold, time 11 Regular, 1 apart.
   hourNote: {
-    paddingVertical: 8,
+    paddingVertical: 7,
     paddingHorizontal: 10,
     borderRadius: radius.md,
+    gap: 1,
   },
-  hourNoteTitle: { ...withFontFamily(typography.caption), textAlign: 'right' },
-  hourNoteTime: { ...withFontFamily(typography.caption, '400'), textAlign: 'right', marginTop: 2, opacity: 0.75 },
+  hourNoteTitle: { ...withFontFamily(typography.bodySmall, '600'), textAlign: 'right' },
+  hourNoteTime: { ...withFontFamily(typography.caption, '400'), textAlign: 'right' },
   // Quiet empty-state hint (grid stays visible below it on the events tab;
   // shown alone on the learning tab when there is nothing to learn) shown
   // when there is nothing to show.
@@ -829,12 +851,15 @@ const styles = StyleSheet.create({
 
   // Parasha card (every day: upcoming Shabbat's reading, or the current
   // Shabbat's reading on Shabbat itself)
+  // Figma: r14, padding 13 / 14, gap 12, 26 px book icon on the left.
   parashaCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    borderRadius: radius.lg,
-    padding: 14,
-    marginBottom: 16,
+    gap: 12,
+    borderRadius: radius.card,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    marginBottom: 12,
   },
   parashaTextBlock: { flex: 1, gap: 2 },
   parashaCaption: { ...withFontFamily(typography.caption), textAlign: 'right' },
@@ -842,7 +867,7 @@ const styles = StyleSheet.create({
 
   // Key zmanim card (highlights strip, every day) — Card + SectionLabel
   // language shared with ZmanimList's full-list version.
-  keyZmanimWrap: { marginBottom: 16 },
+  keyZmanimWrap: { marginBottom: 12 },
   keyZmanRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -873,37 +898,29 @@ const styles = StyleSheet.create({
   // safe from that hoisting) — see the long comment at the JSX call site
   // for why this split exists. Do not merge them back into one View.
   tabBarOuter: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: 4,
+    paddingBottom: 12,
   },
-  // Each tab is an even flex:1 share of the row so the active-tab underline
-  // spans only its own half, never the full row.
-  tabBarRow: {
+  // Figma segmented control: track r999 padding 3; segments 33 tall
+  // (padding 7) — hitSlop on each keeps the touch target at 48.
+  segTrack: {
     flexDirection: 'row-reverse',
+    borderRadius: radius.full,
+    padding: 3,
   },
-  tabItem: {
+  segItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    minHeight: 48,
+    paddingVertical: 7,
+    borderRadius: radius.full,
   },
-  tabText: {
+  segItemActive: {
+    ...elevation.sm,
+  },
+  segText: {
     ...withFontFamily(typography.bodySmall, '500'),
   },
-  tabTextActive: {
+  segTextActive: {
     ...withFontFamily(typography.bodySmall, '700'),
-  },
-
-  // Inline add-event button (events tab)
-  addEventBtn: {
-    height: 48,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 12,
-  },
-  addEventBtnText: {
-    ...withFontFamily(typography.bodyMedium, '600'),
   },
 });
