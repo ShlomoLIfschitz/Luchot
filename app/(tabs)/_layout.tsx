@@ -12,14 +12,13 @@
 // keeps עברי as the tab that loads by default when entering the group.
 // (expo-router 58 dropped the `initialRouteName` prop on <Tabs>.)
 
-import { useEffect } from 'react';
-import { Tabs, useRouter, useSegments } from 'expo-router';
+import { useCallback } from 'react';
+import { Tabs, useFocusEffect, useRouter, useSegments } from 'expo-router';
 import { Alert, BackHandler, View, Text, StyleSheet, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookOpenText, Calendar, Sun, Clock, type LucideIcon } from 'lucide-react-native';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useSettingsStore } from '../../src/providers/SettingsProvider';
-import { setTabBackHandler } from '../../src/utils/tabBackHandler';
 import { radius } from '../../src/constants/radius';
 import { typography, withFontFamily } from '../../src/constants/typography';
 import type { ThemeColors } from '../../src/hooks/useThemeColors';
@@ -63,32 +62,33 @@ export default function TabLayout() {
   const defaultCalendarType = useSettingsStore((s) => s.defaultCalendarType);
 
   // Android back inside the tabs. The tab router's default ('firstRoute')
-  // returned to the first DECLARED tab, זמנים, because the tabs are declared
-  // in reverse for RTL. With backBehavior="none" below, navigation leaves
-  // tab switches alone and this runs as the last-resort handler (see
-  // src/utils/tabBackHandler.ts for why it can't be a plain listener): any
-  // other tab goes to the month view chosen in Settings, and back on that
-  // view asks before exiting. Stack screens on top still pop normally.
+  // returns to the first DECLARED tab, which is זמנים because the tabs are
+  // declared in reverse for RTL. Instead: any other tab goes back to the
+  // month view chosen in Settings, and back on that view asks before exiting.
+  // Registered only while the tab group is focused, so stack screens pushed
+  // on top (settings, converter…) keep normal back; the open drawer's own
+  // listener is newer and runs first.
   const homeTab = defaultCalendarType === 'gregorian' ? 'gregorian' : 'index';
   const currentTab = segments[1] ?? 'index';
-  useEffect(() => {
-    setTabBackHandler(() => {
-      if (currentTab !== homeTab) {
-        router.navigate(homeTab === 'gregorian' ? '/(tabs)/gregorian' : '/(tabs)');
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (currentTab !== homeTab) {
+          router.navigate(homeTab === 'gregorian' ? '/(tabs)/gregorian' : '/(tabs)');
+          return true;
+        }
+        Alert.alert('יציאה מהאפליקציה', 'האם אתה בטוח שברצונך לצאת?', [
+          { text: 'ביטול', style: 'cancel' },
+          { text: 'יציאה', style: 'destructive', onPress: () => BackHandler.exitApp() },
+        ]);
         return true;
-      }
-      Alert.alert('יציאה מהאפליקציה', 'האם אתה בטוח שברצונך לצאת?', [
-        { text: 'ביטול', style: 'cancel' },
-        { text: 'יציאה', style: 'destructive', onPress: () => BackHandler.exitApp() },
-      ]);
-      return true;
-    });
-    return () => setTabBackHandler(null);
-  }, [currentTab, homeTab, router]);
+      });
+      return () => sub.remove();
+    }, [currentTab, homeTab, router]),
+  );
 
   return (
     <Tabs
-      backBehavior="none"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
