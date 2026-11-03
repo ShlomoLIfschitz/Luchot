@@ -20,6 +20,8 @@ import { Drawer } from '../src/components/drawer/Drawer';
 import { NotificationService } from '../src/services/NotificationService';
 import { isIsraelCoords } from '../src/utils/isIsraelCoords';
 import { useOtaUpdates } from '../src/hooks/useOtaUpdates';
+// Side effect: subscribes the last-resort back handler before any screen mounts.
+import '../src/utils/tabBackHandler';
 import * as Updates from 'expo-updates';
 
 if (I18nManager.isRTL) {
