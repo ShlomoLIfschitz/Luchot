@@ -1,7 +1,8 @@
 // app/about.tsx
 // Phase 3.7c — About screen. Standalone, accessible from the drawer.
 // Shows app metadata: version (from expo-constants), description,
-// credits with Sefaria/hebcal/kosher-zmanim/Lucide links.
+// the app's own licence and source link (GPL-3.0-or-later, DECISIONS.md
+// 2026-11-04), and credits with their licences.
 
 import React from 'react';
 import {
@@ -26,19 +27,40 @@ import type { ThemeColors } from '../src/hooks/useThemeColors';
 interface CreditItem {
   name: string;
   description: string;
+  /** SPDX id, shown after the description. Omitted for linked services. */
+  license?: string;
   url?: string;
 }
 
+const SOURCE_URL = 'https://github.com/ShlomoLIfschitz/Luchot';
+
+const SOURCE: CreditItem = {
+  name: 'קוד המקור',
+  description: 'לוחות היא תוכנה חופשית. מותר להפיץ ולשנות אותה לפי תנאי הרישיון',
+  license: 'GPL-3.0-or-later',
+  url: SOURCE_URL,
+};
+
+// Licences as declared in each package.json (checked 2026-11-04).
 const CREDITS: CreditItem[] = [
   {
     name: '@hebcal/core ו-@hebcal/learning',
     description: 'חישובי לוח עברי, חגים, פרשת השבוע, ולוחות לימוד יומי',
+    license: 'GPL-2.0-or-later · BSD-2-Clause',
     url: 'https://github.com/hebcal',
   },
   {
     name: 'kosher-zmanim',
     description: 'חישובי זמנים הלכתיים מדויקים',
+    license: 'LGPL-3.0',
     url: 'https://github.com/BehindTheMath/KosherZmanim',
+  },
+  {
+    // ODbL requires this attribution wherever Nominatim results are shown.
+    name: 'OpenStreetMap',
+    description: 'שמות מקומות לפי מיקום (Nominatim). © OpenStreetMap contributors',
+    license: 'ODbL',
+    url: 'https://www.openstreetmap.org/copyright',
   },
   {
     name: 'Sefaria',
@@ -48,6 +70,7 @@ const CREDITS: CreditItem[] = [
   {
     name: 'Lucide Icons',
     description: 'אייקונים נקיים ועקביים',
+    license: 'ISC',
     url: 'https://lucide.dev',
   },
 ];
@@ -121,11 +144,22 @@ export default function AboutScreen() {
           </Text>
         </Card>
 
+        {/* Licence and source — GPL requires the source to be reachable. */}
+        <SectionLabel title="רישיון" colors={colors} inset={20} gapAbove={24} />
+        <Card colors={colors}>
+          <CreditRow credit={SOURCE} colors={colors} isLast />
+        </Card>
+
         {/* Credits */}
         <SectionLabel title="קרדיטים" colors={colors} inset={20} gapAbove={24} />
         <Card colors={colors}>
-          {CREDITS.map((credit) => (
-            <CreditRow key={credit.name} credit={credit} colors={colors} />
+          {CREDITS.map((credit, i) => (
+            <CreditRow
+              key={credit.name}
+              credit={credit}
+              colors={colors}
+              isLast={i === CREDITS.length - 1}
+            />
           ))}
         </Card>
       </ScrollView>
@@ -165,6 +199,11 @@ function CreditRow({
         <Text style={[styles.creditDescription, { color: colors.textSecondary }]}>
           {credit.description}
         </Text>
+        {credit.license && (
+          <Text style={[styles.creditLicense, { color: colors.textTertiary }]}>
+            {credit.license}
+          </Text>
+        )}
       </View>
       {credit.url && (
         <Text style={[styles.creditLink, { color: colors.accent }]}>
@@ -217,6 +256,11 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   creditDescription: {
+    ...withFontFamily(typography.caption),
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  creditLicense: {
     ...withFontFamily(typography.caption),
     marginTop: 2,
     textAlign: 'right',
