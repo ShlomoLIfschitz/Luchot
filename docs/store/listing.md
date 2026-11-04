@@ -43,3 +43,14 @@ The Google Calendar sync line depends on PR #22 shipping in the same release.
 
 לוחות היא תוכנה חופשית ברישיון GPL-3.0. קוד המקור פתוח ב-GitHub.
 ```
+
+## Graphics (uploaded to the store listing draft, 2026-11-04)
+
+- **App icon 512×512:** `assets/icon.png` resized, no design change.
+- **Feature graphic 1024×500:** Figma `06 · App Icon` → "Play · Feature graphic 1024×500",
+  https://www.figma.com/design/yFaCDCb17k2BVTGLzwj64a/?node-id=71-2. Built from the approved icon
+  layers (Concept A, 2026-11-03), Heebo, `text/textInverse`. Approved by Shlomo 2026-11-04: "מאשר, העלה".
+- **Phone screenshots (4, 1080×2110):** Shlomo's device screenshots of build 17 (month, day with Rosh
+  Chodesh, zmanim, date converter), status bar and navigation bar cropped so the long side stays within
+  2× the short side, as Play requires. The Google sync screen was left out: it shows personal Gmail
+  addresses.
