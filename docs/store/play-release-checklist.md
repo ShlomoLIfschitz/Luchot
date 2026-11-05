@@ -38,18 +38,18 @@ Saved in Play Console on 2026-11-05 (draft, goes out with the first release):
 - [x] Target audience: 13-15, 16-17, 18+. Under 13 would bring the Families policy.
 - [x] Content rating (IARC, Shlomo approved the IARC terms 2026-11-05): category "all other app types"; every question answered No (no rating-relevant content, no user-to-user sharing, no online content shown in-app, no age-restricted goods, no location sharing, no digital purchases, no rewards, not a browser, not primarily news/education). Result: ESRB Everyone, PEGI 3, USK 0, IARC 3+. Contact email `shlomo.apps.dev@gmail.com`. **Redo the questionnaire when tips (Play Billing) ship**: "digital purchases" becomes Yes.
 - [ ] **Exact alarm declaration:** `USE_EXACT_ALARM` is declared (DECISIONS.md 2026-11-03). Play restricts it to apps whose core function is alarms or **calendar** *(inference: Luchot qualifies as a calendar app)*. Not offered in App content yet; expected after the first AAB upload.
-- [ ] Data safety form: draft below. Waits for PR #22 (calendar permission).
+- [x] Data safety form (saved 2026-11-05, Shlomo approved the answers): collects or shares data: Yes; encrypted in transit: Yes; no account creation, no sign-in with external accounts; deletion request: No. Data types and answers in the table below. Approximate location does not show on the store page, because Play hides ephemerally processed data.
 - [x] Store settings (2026-11-05): app, category **Productivity**; store contact email `shlomo.apps.dev@gmail.com`, website `https://pricelog.fyi/en/`, no phone.
 
-### Data safety draft *(inference, verify against the form's own definitions)*
-| Data | Leaves the device? | Declare |
+### Data safety answers (as saved)
+| Data | Leaves the device? | Declared |
 |---|---|---|
-| Events, notes, reminders, settings | No | Not collected |
-| Approximate location (rounded ~110 m to Nominatim, on user action) | Yes, to a third party | Collected, processed ephemerally, optional, purpose "App functionality"; decide on "shared" with the form's definitions |
-| Precise location | No (only rounded coords leave) | Not collected *(check: the form may treat the GPS read itself as collection only if transmitted)* |
-| Expo update check (app/OS version, random install ID) | Yes, to Expo | Check whether "Device or other IDs" applies |
+| Events, notes, reminders, settings, device calendar | No | Not collected |
+| Approximate location (rounded ~110 m to Nominatim, on user action) | Yes | Collected, not shared (user-initiated transfer), processed ephemerally, optional, purpose "App functionality" |
+| Precise location | No (only rounded coords leave) | Not collected |
+| Device or other IDs (Expo update check sends a random install ID) | Yes, to Expo | Collected, not shared, not ephemeral, required, purpose "App functionality" |
 | Encryption in transit | Nominatim and Expo use HTTPS | Yes |
-| Deletion | Uninstall removes everything | No account, so no deletion request flow |
+| Deletion | Uninstall removes everything on the device | No deletion request flow (no account) |
 
 ## 6. Tips via Play Billing (PR #18 decision, `feat/support-project`) — NOT in the first release
 Shlomo, 2026-11-03: "בלי, בעדכון מאוחר". The first Play release ships without the tips screen, so the account stays non-monetizing. When tips ship in a later update:
