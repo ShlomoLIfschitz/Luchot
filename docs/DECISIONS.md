@@ -1039,10 +1039,13 @@
     filtered out of the overlay by `device_sync_map`.
   - Turning sync off stops every read and write; the mapping table stays, so
     turning it back on continues where it left off.
+    Events Luchot already wrote stay in Google (Shlomo, 2026-11-05: "תשאיר ככה");
+    nothing is deleted from the device calendar when sync is turned off.
 - Alternatives considered: one recurring device event for Hebrew-date series -
   impossible (RRULE has no Hebrew calendar); expanding Gregorian series too -
   rejected: a daily event would be 3,650 device events; storing the device id in
   `events` - rejected: `EventSchema.ts` is locked.
 - Implications: native dependency `expo-calendar` + READ/WRITE_CALENDAR: full EAS
-  build. Existing events are written only when created, edited or deleted after
-  sync is turned on (open question for Shlomo, see the PR).
+  build. Turning sync on writes every existing upcoming event (one-off events
+  whose last day is today or later, and every series); past one-off events are
+  not written.
