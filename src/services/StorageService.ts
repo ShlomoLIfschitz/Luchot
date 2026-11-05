@@ -32,6 +32,7 @@ let schemaLocationMigrated = false;
 let schemaV5Migrated = false;
 let schemaV6Migrated = false;
 let schemaV7Migrated = false;
+let schemaV8Migrated = false;
 
 function getDb(): Promise<SQLiteDatabase> {
   if (!dbPromise) {
@@ -253,6 +254,33 @@ async function doCreateSchema(): Promise<void> {
       );
       schemaV7Migrated = true;
     }
+    // v8 migration: add the device_sync_map table + its index (Phase 3, device
+    // calendar sync). Purely additive — creates a NEW table, never touches the
+    // events table or its data. Maps a Luchot event id (+ an occurrence key: ''
+    // for the event itself, 'YYYY-MM-DD' for one occurrence of a Hebrew-date
+    // series, 'x:YYYY-MM-DD' for an overridden occurrence) to the device
+    // calendar event it was written as. payload_hash is the content last
+    // written, so unchanged events are not rewritten. Both statements use
+    // IF NOT EXISTS, so re-running on subsequent launches is a no-op.
+    if (!schemaV8Migrated) {
+      await txn.executeSqlAsync(
+        `CREATE TABLE IF NOT EXISTS device_sync_map (
+          luchot_id       TEXT NOT NULL,
+          occ_key         TEXT NOT NULL,
+          device_event_id TEXT NOT NULL,
+          calendar_id     TEXT NOT NULL,
+          payload_hash    TEXT NOT NULL,
+          synced_at       TEXT NOT NULL,
+          PRIMARY KEY (luchot_id, occ_key)
+        )`,
+        [],
+      );
+      await txn.executeSqlAsync(
+        `CREATE INDEX IF NOT EXISTS idx_device_sync_map_device ON device_sync_map (device_event_id)`,
+        [],
+      );
+      schemaV8Migrated = true;
+    }
   });
   schemaInitialized = true;
 }
@@ -355,6 +383,13 @@ function placeholders(n: number): string {
   return new Array(n).fill('?').join(',');
 }
 
+export interface DeviceSyncMapping {
+  occKey: string;
+  deviceEventId: string;
+  calendarId: string;
+  payloadHash: string;
+}
+
 // ── StorageService ─────────────────────────────────────────────────────────────
 
 export class StorageService {
@@ -433,6 +468,90 @@ export class StorageService {
       for (const r of rows) found.add(r.id);
     }
     return found;
+  }
+
+  /** True when the event came from an .ics import (it already lives in another calendar). */
+  static async isImportedEvent(id: string): Promise<boolean> {
+    await ensureSchema();
+    const row = await dbFirst<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ics_imports WHERE event_id = ?`,
+      [id],
+    );
+    return (row?.n ?? 0) > 0;
+  }
+
+  /** Ids of every event that came from an .ics import (one query, for batch filtering). */
+  static async getImportedEventIds(): Promise<Set<string>> {
+    await ensureSchema();
+    const rows = await dbAll<{ event_id: string }>(`SELECT event_id FROM ics_imports`, []);
+    return new Set(rows.map((r) => r.event_id));
+  }
+
+  // ── Device calendar sync map (v8) ─────────────────────────
+
+  static async getSyncMappings(luchotId: string): Promise<DeviceSyncMapping[]> {
+    await ensureSchema();
+    const rows = await dbAll<{
+      occ_key: string; device_event_id: string; calendar_id: string; payload_hash: string;
+    }>(
+      `SELECT occ_key, device_event_id, calendar_id, payload_hash
+       FROM device_sync_map WHERE luchot_id = ?`,
+      [luchotId],
+    );
+    return rows.map((r) => ({
+      occKey: r.occ_key,
+      deviceEventId: r.device_event_id,
+      calendarId: r.calendar_id,
+      payloadHash: r.payload_hash,
+    }));
+  }
+
+  static async upsertSyncMapping(luchotId: string, m: DeviceSyncMapping): Promise<void> {
+    await ensureSchema();
+    await dbRun(
+      `INSERT OR REPLACE INTO device_sync_map
+         (luchot_id, occ_key, device_event_id, calendar_id, payload_hash, synced_at)
+       VALUES (?,?,?,?,?,?)`,
+      [luchotId, m.occKey, m.deviceEventId, m.calendarId, m.payloadHash, new Date().toISOString()],
+    );
+  }
+
+  static async deleteSyncMapping(luchotId: string, occKey: string): Promise<void> {
+    await ensureSchema();
+    await dbRun(
+      `DELETE FROM device_sync_map WHERE luchot_id = ? AND occ_key = ?`,
+      [luchotId, occKey],
+    );
+  }
+
+  /** Luchot ids that have at least one device event (for the launch re-sync). */
+  static async getSyncedLuchotIds(): Promise<string[]> {
+    await ensureSchema();
+    const rows = await dbAll<{ luchot_id: string }>(
+      `SELECT DISTINCT luchot_id FROM device_sync_map`,
+      [],
+    );
+    return rows.map((r) => r.luchot_id);
+  }
+
+  /** Device event ids Luchot wrote itself, so the live overlay never shows them twice. */
+  static async getSyncedDeviceEventIds(): Promise<Set<string>> {
+    await ensureSchema();
+    const rows = await dbAll<{ device_event_id: string }>(
+      `SELECT device_event_id FROM device_sync_map`,
+      [],
+    );
+    return new Set(rows.map((r) => r.device_event_id));
+  }
+
+  /** Exception/tombstone rows of one recurring master. */
+  static async getExceptionsForMaster(masterId: string): Promise<CalendarEvent[]> {
+    await ensureSchema();
+    const rows = await dbAll(
+      `SELECT * FROM events WHERE is_exception = 1 AND recurrence_id = ?`,
+      [masterId],
+    );
+    return StorageService.mapRows(rows);
   }
 
   static async getEventsForGregorianDate(date: Date): Promise<CalendarEvent[]> {

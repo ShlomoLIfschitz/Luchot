@@ -7,6 +7,9 @@ import { generateUUID, formatDateKey } from '../utils/dateUtils';
 import type { HebrewDateInfo } from '../services/DateService';
 import { expandRecurringNotes } from '../utils/expandRecurringNotes';
 import { useCalendarStore } from '../providers/CalendarProvider';
+import { useSettingsStore } from '../providers/SettingsProvider';
+import { getOverlayEvents, type OverlayEvent } from '../services/DeviceCalendarService';
+import { syncEvent } from '../services/DeviceSyncService';
 
 export type NoteType = 'note' | 'birthday' | 'yahrzeit' | 'anniversary';
 
@@ -42,6 +45,28 @@ export interface CalendarNote {
   status?: 'confirmed' | 'tentative' | 'cancelled';
   recurrenceId?: string;   // for exception rows: the master series id; for override slots: the override's real UUID
   exceptionDate?: string;  // ISO "YYYY-MM-DD" of the overridden occurrence
+  // Device calendar overlay (Phase 3): set ONLY on events read live from a
+  // device/Google calendar. They are never stored in SQLite and are edited in
+  // the calendar app, never in Luchot (views open them there instead).
+  external?: { calendarName: string; deviceEventId: string; instanceStart: string };
+}
+
+/** Overlay event → CalendarNote, through the same mapping as Luchot's own rows. */
+export function overlayToCalendarNote(o: OverlayEvent): CalendarNote {
+  return {
+    ...eventToCalendarNote(o.event),
+    external: { calendarName: o.calendarName, deviceEventId: o.deviceEventId, instanceStart: o.instanceStart },
+  };
+}
+
+/**
+ * Key that changes whenever the live overlay must be read again (sync turned
+ * on/off, another calendar chosen). Views add it to their load dependencies.
+ */
+export function useOverlayKey(): string {
+  return useSettingsStore((s) =>
+    s.syncEnabled && s.syncShownCalendarIds ? s.syncShownCalendarIds.join(',') : '',
+  );
 }
 
 // Exported so useDatesNotes (Phase 4.2-1) can reuse the same mapping
@@ -90,6 +115,7 @@ export function useNotes(date: Date | null) {
   const [notes, setNotes] = useState<CalendarNote[]>([]);
   const notesVersion = useCalendarStore((s) => s.notesVersion);
   const incrementNotesVersion = useCalendarStore((s) => s.incrementNotesVersion);
+  const overlayKey = useOverlayKey();
 
   useEffect(() => {
     if (!date) { setNotes([]); return; }
@@ -99,7 +125,9 @@ export function useNotes(date: Date | null) {
     async function load() {
       try {
         const hdate = new HDate(d);
-        const [gregEvents, hebEvents, recurringEvents, exceptionEvents] = await Promise.all([
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+        const [gregEvents, hebEvents, recurringEvents, exceptionEvents, overlay] = await Promise.all([
           StorageService.getEventsForGregorianDate(d),
           StorageService.getEventsForHebrewDate(hdate.getDate(), hdate.getMonth()),
           // Fetch all recurring notes so we can expand Gregorian recurring ones
@@ -109,6 +137,8 @@ export function useNotes(date: Date | null) {
           // Fetch exception/tombstone rows for the overlay.
           // Existing installs have zero such rows → no-op for current data.
           StorageService.getExceptions(),
+          // Live device-calendar overlay (empty while sync is off).
+          getOverlayEvents(dayStart, dayEnd),
         ]);
 
         if (cancelled) return;
@@ -147,6 +177,15 @@ export function useNotes(date: Date | null) {
         }
         for (const inst of instances) combinedById.set(inst.note.id, inst.note);
 
+        // Overlay events whose (inclusive) date range covers this day.
+        const dayKey = formatDateKey(d);
+        for (const o of overlay) {
+          const n = overlayToCalendarNote(o);
+          const from = n.gregorianDateStr ?? '';
+          const to = n.endDateStr ?? from;
+          if (from <= dayKey && dayKey <= to) combinedById.set(n.id, n);
+        }
+
         if (!cancelled) setNotes(Array.from(combinedById.values()));
       } catch (err) {
         console.error('useNotes load failed:', err);
@@ -157,7 +196,7 @@ export function useNotes(date: Date | null) {
     load();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date?.getTime(), notesVersion]);
+  }, [date?.getTime(), notesVersion, overlayKey]);
 
   const saveNote = useCallback(async (params: {
     id?: string;
@@ -343,6 +382,8 @@ export function useNotes(date: Date | null) {
       },
     };
     await StorageService.saveEvent(event);
+    // Device calendar write-through (no-op while sync is off).
+    void syncEvent(event.id);
 
     // Reminder scheduling:
     // - One-time events (recurrence_type 'none'): schedule immediately here.
@@ -408,6 +449,7 @@ export function useNotes(date: Date | null) {
   const deleteNote = useCallback(async (id: string) => {
     await NotificationService.cancelNotification(id);
     await StorageService.deleteEvent(id);
+    void syncEvent(id);
     incrementNotesVersion();
   }, []);
 
@@ -419,6 +461,7 @@ export function useNotes(date: Date | null) {
   /** "מחק לתאריך זה בלבד" — writes a tombstone so this one date is skipped; series continues. */
   const deleteOccurrence = useCallback(async (masterId: string, occurrenceDate: string) => {
     await StorageService.saveTombstoneForOccurrence(masterId, occurrenceDate);
+    void syncEvent(masterId);
     incrementNotesVersion();
   }, []);
 
@@ -438,6 +481,7 @@ export function useNotes(date: Date | null) {
     },
   ) => {
     await StorageService.saveExceptionForOccurrence(masterId, occurrenceDate, overrides);
+    void syncEvent(masterId);
     incrementNotesVersion();
   }, []);
 

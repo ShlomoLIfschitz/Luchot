@@ -54,6 +54,15 @@ interface SettingsState {
   candleLightingRemindersEnabled: boolean;
   candleLightingLeadMinutes: number;
 
+  // Device calendar sync (Phase 3). Off by default; the calendar permission is
+  // requested only when the user turns it on (settings.tsx). shown = device
+  // calendars shown as a live overlay (null = never chosen: settings.tsx
+  // preselects the Google calendars); write = the one Google calendar Luchot
+  // writes its personal events to (null = none).
+  syncEnabled: boolean;
+  syncShownCalendarIds: string[] | null;
+  syncWriteCalendarId: string | null;
+
   // Ready gate — false until loadFromStorage() completes
   settingsReady: boolean;
 
@@ -69,6 +78,9 @@ interface SettingsState {
   setOmerReminderTime: (t: string) => void;
   setCandleLightingRemindersEnabled: (v: boolean) => void;
   setCandleLightingLeadMinutes: (m: number) => void;
+  setSyncEnabled: (v: boolean) => void;
+  setSyncShownCalendarIds: (ids: string[]) => void;
+  setSyncWriteCalendarId: (id: string | null) => void;
   loadFromStorage: () => Promise<void>;
   save: (key: string, value: string) => Promise<void>;
 }
@@ -86,6 +98,17 @@ function buildCandleLoc(): { lat: number; lng: number; il: boolean; placeName?: 
   return { lat: latitude, lng: longitude, il: isIsraelCoords(latitude, longitude), placeName };
 }
 
+/** syncShownCalendarIds pref: a JSON string[]; anything else = never chosen. */
+function parseIdList(raw: string | undefined): string[] | null {
+  if (!raw) return null;
+  try {
+    const v: unknown = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   hebrewOnTop: true,
   darkMode: 'system',
@@ -99,6 +122,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   omerReminderTime: '21:00',
   candleLightingRemindersEnabled: false,
   candleLightingLeadMinutes: 15,
+  syncEnabled: false,
+  syncShownCalendarIds: null,
+  syncWriteCalendarId: null,
 
   toggleHebrewOnTop: () => { const v = !get().hebrewOnTop; set({ hebrewOnTop: v }); get().save('hebrewOnTop', String(v)); },
   setDarkMode:          (m) => { set({ darkMode: m });          get().save('darkMode', m); },
@@ -136,6 +162,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     );
   },
 
+  setSyncEnabled: (v) => { set({ syncEnabled: v }); get().save('syncEnabled', String(v)); },
+  setSyncShownCalendarIds: (ids) => {
+    set({ syncShownCalendarIds: ids });
+    get().save('syncShownCalendarIds', JSON.stringify(ids));
+  },
+  setSyncWriteCalendarId: (id) => {
+    set({ syncWriteCalendarId: id });
+    get().save('syncWriteCalendarId', id ?? '');
+  },
+
   loadFromStorage: async () => {
     try {
       // Single batched read (one transaction). Replaces the prior Promise.all
@@ -157,6 +193,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         omerReminderTime:    p.omerReminderTime ?? '21:00',
         candleLightingRemindersEnabled: (p.candleLightingRemindersEnabled ?? 'false') === 'true',
         candleLightingLeadMinutes: parseInt(p.candleLightingLeadMinutes ?? '15', 10) || 15,
+        syncEnabled:         (p.syncEnabled ?? 'false') === 'true',
+        syncShownCalendarIds: parseIdList(p.syncShownCalendarIds),
+        syncWriteCalendarId: p.syncWriteCalendarId ? p.syncWriteCalendarId : null,
         // candleLightingCity / candleLightingLat / candleLightingLng /
         // candleLightingPlaceName intentionally NOT read here anymore —
         // LocationProvider.loadFromStorage() adopts (migrates) any orphaned

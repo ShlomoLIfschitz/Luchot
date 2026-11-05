@@ -50,6 +50,8 @@ export interface DayCellTag {
   label: string; // displayed text, max ~12 chars practical
   /** Populated by tagMapper for multi-day span segments. Absent on single-day chips. */
   segment?: { isStart: boolean; isEnd: boolean };
+  /** A Google/device-calendar event (live overlay): outlined chip, Figma C1 `chip/google`. */
+  external?: boolean;
 }
 
 export interface DayCellProps {
@@ -212,9 +214,18 @@ function DayCellInner({
               }
             : null;
           return (
-            <View key={i} style={[styles.tagChip, { backgroundColor: bg }, segmentStyle]}>
+            <View
+              key={i}
+              style={[
+                styles.tagChip,
+                tag.external
+                  ? [styles.externalChip, { borderColor: colors.borderStrong }]
+                  : { backgroundColor: bg },
+                segmentStyle,
+              ]}
+            >
               <Text
-                style={[styles.tagText, { color: fg }]}
+                style={[styles.tagText, { color: tag.external ? colors.textSecondary : fg }]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
@@ -255,7 +266,8 @@ export const DayCell = memo(DayCellInner, (prev, next) => {
         t.category                 === next.tags[i].category &&
         t.label                    === next.tags[i].label    &&
         t.segment?.isStart         === next.tags[i].segment?.isStart &&
-        t.segment?.isEnd           === next.tags[i].segment?.isEnd
+        t.segment?.isEnd           === next.tags[i].segment?.isEnd &&
+        t.external                 === next.tags[i].external
     )
   );
 });
@@ -326,6 +338,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderRadius: radius.chip, // = 3, the Figma day-cell chip
+  },
+  // Figma C1 `chip/google`: no fill, 1 px borderStrong stroke, text
+  // textSecondary; the stroke takes 1 px of the 3 px inset (text at x=4).
+  externalChip: {
+    borderWidth: 1,
+    paddingHorizontal: 3,
   },
   tagText: {
     ...withFontFamily(typography.cellTag),

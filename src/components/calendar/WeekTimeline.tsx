@@ -406,15 +406,20 @@ const AllDayBar = React.memo(function AllDayBar({
           top,
           left: leftEdge,
           width: rightEdge - leftEdge,
-          backgroundColor: bg,
+          backgroundColor: item.external ? 'transparent' : bg,
           borderTopRightRadius: item.roundStart ? radius.xs : 0,
           borderBottomRightRadius: item.roundStart ? radius.xs : 0,
           borderTopLeftRadius: item.roundEnd ? radius.xs : 0,
           borderBottomLeftRadius: item.roundEnd ? radius.xs : 0,
         },
+        item.external && [styles.externalOutline, { borderColor: colors.borderStrong }],
       ]}
     >
-      <Text style={[styles.allDayLabel, { color: fg }]} numberOfLines={1} ellipsizeMode="tail">
+      <Text
+        style={[styles.allDayLabel, { color: item.external ? colors.textSecondary : fg }]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {item.label}
       </Text>
     </Pressable>
@@ -442,6 +447,7 @@ const TimedEventBlock = React.memo(function TimedEventBlock({
 }: TimedEventBlockProps) {
   const category = resolveEventColor(event.note.noteType, event.note.colorId);
   const { bg, fg } = categoryColors(colors, category);
+  const external = !!event.note.external;
   const laneWidth = colWidth / event.totalLanes;
   const left = colLeft + event.lane * laneWidth + EVENT_INSET;
   const width = Math.max(laneWidth - EVENT_INSET * 2, 4);
@@ -457,13 +463,14 @@ const TimedEventBlock = React.memo(function TimedEventBlock({
           height: event.geometry.height,
           left,
           width,
-          backgroundColor: bg,
+          backgroundColor: external ? colors.surface : bg,
         },
+        external && [styles.externalOutline, styles.timedExternal, { borderColor: colors.borderStrong }],
       ]}
     >
-      <View style={[styles.timedStripe, { backgroundColor: fg }]} />
+      {!external && <View style={[styles.timedStripe, { backgroundColor: fg }]} />}
       <Text
-        style={[styles.timedTitle, { color: fg }]}
+        style={[styles.timedTitle, { color: external ? colors.textPrimary : fg }]}
         numberOfLines={2}
         ellipsizeMode="tail"
       >
@@ -476,6 +483,7 @@ const TimedEventBlock = React.memo(function TimedEventBlock({
     prev.event.key === next.event.key &&
     prev.event.note.summary === next.event.note.summary &&
     prev.event.note.colorId === next.event.note.colorId &&
+    prev.event.note.external === next.event.note.external &&
     prev.event.lane === next.event.lane &&
     prev.event.totalLanes === next.event.totalLanes &&
     prev.event.geometry.top === next.event.geometry.top &&
@@ -638,6 +646,10 @@ const styles = StyleSheet.create({
     paddingRight: 5, // clears the 3 px stripe (Figma text box ends 5 from the edge)
     overflow: 'hidden',
   },
+  // Google/device events (live overlay): no fill, 1 px borderStrong stroke —
+  // the C1 chip / C2 block language (there is no week frame in Figma).
+  externalOutline: { borderWidth: 1 },
+  timedExternal: { paddingRight: 3 }, // no stripe to clear
   timedStripe: {
     position: 'absolute',
     top: 0,

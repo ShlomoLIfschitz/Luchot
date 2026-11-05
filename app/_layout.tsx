@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, useColorScheme, I18nManager } from 'react-native';
+import { Alert, AppState, useColorScheme, I18nManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -19,6 +19,7 @@ import { dateService } from '../src/services/DateService';
 import { Drawer } from '../src/components/drawer/Drawer';
 import { NotificationService } from '../src/services/NotificationService';
 import { isIsraelCoords } from '../src/utils/isIsraelCoords';
+import { resyncAll } from '../src/services/DeviceSyncService';
 import { useOtaUpdates } from '../src/hooks/useOtaUpdates';
 import * as Updates from 'expo-updates';
 
@@ -77,8 +78,23 @@ export default function RootLayout() {
           ? { lat: latitude, lng: longitude, il: isIsraelCoords(latitude, longitude), placeName }
           : null,
       );
+      // Device calendar sync: extend Hebrew-date series to 10 years ahead and
+      // catch up anything that changed. No-op (and no permission prompt) while
+      // sync is off.
+      void resyncAll();
     }
     init().catch(console.error);
+  }, []);
+
+  // Device calendar overlay: Google events may have changed while Luchot was
+  // in the background (the Google app syncs on its own) — re-read on return.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active' && useSettingsStore.getState().syncEnabled) {
+        useCalendarStore.getState().incrementNotesVersion();
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // Safety fallback: never block the UI forever. If loadFromStorage hangs

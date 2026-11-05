@@ -2,13 +2,14 @@
 
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
-import { Cake, Flame, Gem, FileText, type LucideIcon } from 'lucide-react-native';
+import { Cake, Flame, Gem, FileText, ExternalLink, type LucideIcon } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useSettingsStore } from '../../providers/SettingsProvider';
 import { useNotes, type CalendarNote, type NoteType } from '../../hooks/useNotes';
 import { NoteEditor } from './NoteEditor';
 import type { HebrewDateInfo } from '../../services/DateService';
 import { splitInstanceId } from '../../utils/recurringId';
+import { openInCalendarApp } from '../../services/DeviceCalendarService';
 import { radius } from '../../constants/radius';
 import { typography, withFontFamily } from '../../constants/typography';
 
@@ -134,6 +135,33 @@ export function NoteList({ date, hebrewDate, hideAddButton, onlyAllDay = false }
                 })()
               : null;
 
+          if (note.external) {
+            // Google/device event (live overlay): outlined like Figma C2's
+            // `event/google` block, external-link icon, "מגוגל · calendar";
+            // no delete — it is edited and deleted in the calendar app.
+            const ext = note.external;
+            return (
+              <Pressable
+                key={note.id}
+                onPress={() => void openInCalendarApp(ext.deviceEventId, ext.instanceStart)}
+                accessibilityRole="button"
+                accessibilityLabel={`${note.summary}, מגוגל, ${ext.calendarName}`}
+                accessibilityHint="פותח ביומן גוגל"
+                style={[s.noteRow, s.externalRow, { backgroundColor: colors.surface, borderColor: colors.borderStrong }]}
+              >
+                <View style={s.noteBody}>
+                  <View style={s.titleRow}>
+                    <Text style={[s.noteSummary, s.externalSummary, { color: colors.textPrimary }]}>{note.summary}</Text>
+                    <ExternalLink size={13} color={colors.textTertiary} />
+                  </View>
+                  <Text style={[s.noteTag, { color: colors.textSecondary }]}>
+                    {`מגוגל · ${ext.calendarName}`}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          }
+
           return (
             // row-reverse, JSX order [colorDot, title(flex:1,right), time, deleteButton]
             // so colorDot is rightmost and deleteButton is the last (leftmost) child.
@@ -216,6 +244,11 @@ const s = StyleSheet.create({
     borderRadius: radius.full,
   },
   noteBody: { flex: 1 },
+  // Overlay row: 1 px borderStrong stroke (Figma C2 `event/google`) instead of
+  // the hairline; vertical padding keeps the 48 dp touch target without the
+  // 44 dp delete button.
+  externalRow: { borderWidth: 1, minHeight: 48 },
+  externalSummary: { flex: 1 },
   titleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   noteSummary: { textAlign: 'right', ...withFontFamily(typography.bodyMedium) },
   noteTag: { textAlign: 'right', marginTop: 2, ...withFontFamily(typography.caption) },

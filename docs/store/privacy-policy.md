@@ -16,6 +16,7 @@
 - **מיקום** — רק אם תבחר "מיקום נוכחי", כדי לחשב זמני היום (זמנים) למקום שלך, או כדי לצרף מקום להערה. אפשר להשתמש באפליקציה בלי הרשאה זו, על ידי בחירת עיר מרשימה.
 - **התראות** — כדי להציג תזכורות שקבעת. התזכורות מתוזמנות במכשיר עצמו.
 - **התראות מדויקות (exact alarms)** — כדי שתזכורת תופיע בדיוק בשעה שקבעת.
+- **יומן (קריאה וכתיבה)** — רק אם תפעיל "סנכרון עם יומן גוגל" בהגדרות. לוחות קוראת את היומנים שבחרת במכשיר כדי להציג את האירועים שלהם (בלי לשמור אותם), וכותבת את האירועים האישיים שלך ליומן אחד שבחרת. אפליקציית יומן גוגל שבמכשיר היא שמסנכרנת אותם עם חשבון הגוגל שלך; לוחות עצמה לא שולחת דבר לגוגל או אלינו. כיבוי הסנכרון עוצר כל קריאה וכתיבה.
 
 ## מתי האפליקציה מתחברת לאינטרנט
 האפליקציה לא שולחת לנו שום מידע. יש שני מקרים שבהם היא פונה לשירות חיצוני:
@@ -57,6 +58,7 @@ Luchot is a Hebrew/Gregorian calendar app that runs on your device. It has no us
 - **Location**: only if you choose "current location", to calculate zmanim (halachic times) for where you are, or to tag a note with a place. You can use the app without it by picking a city from a list.
 - **Notifications**: to show the reminders you set. Reminders are scheduled on the device itself.
 - **Exact alarms**: so a reminder appears at the exact time you set.
+- **Calendar (read and write)**: only if you turn on "Sync with Google Calendar" in Settings. Luchot reads the device calendars you choose to show their events (without storing them) and writes your personal events to the one calendar you choose. The Google Calendar app on your device syncs them with your Google Account; Luchot itself sends nothing to Google or to us. Turning sync off stops all reading and writing.
 
 ## When the app connects to the internet
 The app sends no data to us. It contacts an outside service in two cases:
