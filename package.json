@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:ics": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ics-parser.ts",
+    "test:sync": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-device-sync.ts",
     "postinstall": "node scripts/patch-expo-sqlite-imports.cjs"
   },
   "dependencies": {
