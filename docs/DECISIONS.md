@@ -1049,3 +1049,25 @@
   build. Turning sync on writes every existing upcoming event (one-off events
   whose last day is today or later, and every series); past one-off events are
   not written.
+
+## Luchot is free software under GPL-3.0-or-later
+- Date: 2026-11-04
+- Context: `@hebcal/core` and `@hebcal/hdate`, the core of every calendar
+  calculation, are "GPL version 2 ... or (at your option) any later version".
+  Distributing an APK/AAB that bundles them (Play, the closed test, the preview
+  APKs) obliges us to offer the app's source under a compatible licence; the repo
+  was private. Shlomo chose to publish: "אני בעד לפרסם".
+- Choice: GPL-3.0-or-later (`LICENSE`, `package.json`, `README.md`), and the
+  repository becomes public. The About screen states the licence, links the
+  source, and lists each dependency's licence plus the OpenStreetMap (ODbL)
+  attribution that Nominatim results require.
+- Alternatives considered: GPL-2.0-only - rejected, incompatible with
+  `kosher-zmanim`'s LGPL-3.0; replacing hebcal with a permissive library -
+  rejected, hebcal is locked and a rewrite of every calculation.
+- Implications:
+  - The whole git history becomes public, including commit author emails and the
+    docs (handoffs, work logs, Figma links). A history scan on 2026-11-04 found no
+    secrets; keep it that way: secrets never enter the repo.
+  - Anyone may fork and redistribute; a fork must stay GPL. Tips via Play Billing
+    (above) remain possible.
+  - A new dependency must have a GPL-3.0-compatible licence.
