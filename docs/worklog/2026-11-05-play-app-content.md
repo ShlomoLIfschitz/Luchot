@@ -8,7 +8,7 @@
 ### Open issues / blocked
 - Data safety waits for PR #22 (calendar permission changes the answers).
 - Exact alarm declaration is not offered yet; expected after the first AAB upload.
-- App category and store contact details not filled yet.
+- App category (Productivity) and store contact details (email, website, no phone) saved later the same day.
 ### Next steps
 - Category and contact details; then PR #22, the production AAB and the closed test.
 - When tips ship: redo the content rating ("digital purchases" = Yes) and the financial features answer if Play asks.

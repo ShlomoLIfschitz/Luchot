@@ -39,7 +39,7 @@ Saved in Play Console on 2026-11-05 (draft, goes out with the first release):
 - [x] Content rating (IARC, Shlomo approved the IARC terms 2026-11-05): category "all other app types"; every question answered No (no rating-relevant content, no user-to-user sharing, no online content shown in-app, no age-restricted goods, no location sharing, no digital purchases, no rewards, not a browser, not primarily news/education). Result: ESRB Everyone, PEGI 3, USK 0, IARC 3+. Contact email `shlomo.apps.dev@gmail.com`. **Redo the questionnaire when tips (Play Billing) ship**: "digital purchases" becomes Yes.
 - [ ] **Exact alarm declaration:** `USE_EXACT_ALARM` is declared (DECISIONS.md 2026-11-03). Play restricts it to apps whose core function is alarms or **calendar** *(inference: Luchot qualifies as a calendar app)*. Not offered in App content yet; expected after the first AAB upload.
 - [ ] Data safety form: draft below. Waits for PR #22 (calendar permission).
-- [ ] App category and store contact details.
+- [x] Store settings (2026-11-05): app, category **Productivity**; store contact email `shlomo.apps.dev@gmail.com`, website `https://pricelog.fyi/en/`, no phone.
 
 ### Data safety draft *(inference, verify against the form's own definitions)*
 | Data | Leaves the device? | Declare |
