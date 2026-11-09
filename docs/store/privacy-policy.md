@@ -1,10 +1,10 @@
 # מדיניות פרטיות — לוחות (Luchot)
 
-**בתוקף מתאריך:** 3 בנובמבר 2026
+**בתוקף מתאריך:** 9 בנובמבר 2026
 **מפתח:** Shlomo Lifschitz · **יצירת קשר:** shlomo.apps.dev@gmail.com
 
 ## בקצרה
-לוחות היא אפליקציית לוח שנה עברי-לועזי שעובדת על המכשיר שלך. אין בה חשבון משתמש, אין שרת שלנו, אין פרסומות, אין אנליטיקה ואין מעקב. כל מה שאתה כותב באפליקציה (אירועים, הערות, תזכורות והגדרות) נשמר במכשיר שלך בלבד, ואנחנו לא מקבלים אותו לעולם.
+לוחות היא אפליקציית לוח שנה עברי-לועזי שעובדת על המכשיר שלך. אין בה חשבון משתמש, אין שרת שלנו, אין פרסומות, אין אנליטיקה ואין מעקב. כל מה שאתה כותב באפליקציה (אירועים, הערות, תזכורות והגדרות) נשמר במכשיר שלך, ואנחנו לא מקבלים אותו לעולם. אם תפעיל ״סנכרון עם יומן גוגל״, האירועים האישיים נכתבים גם ליומן שבחרת במכשיר, ויומן גוגל מסנכרן אותם עם חשבון הגוגל שלך (פרטים בהמשך).
 
 ## מה נשמר במכשיר
 - אירועים, הערות, תזכורות והגדרות נשמרים במסד נתונים מקומי בתוך האפליקציה.
@@ -42,11 +42,11 @@
 
 # Privacy Policy — Luchot
 
-**Effective date:** November 3, 2026
+**Effective date:** November 9, 2026
 **Developer:** Shlomo Lifschitz · **Contact:** shlomo.apps.dev@gmail.com
 
 ## Summary
-Luchot is a Hebrew/Gregorian calendar app that runs on your device. It has no user account, no server of ours, no ads, no analytics and no tracking. Everything you enter (events, notes, reminders and settings) is stored only on your device, and we never receive it.
+Luchot is a Hebrew/Gregorian calendar app that runs on your device. It has no user account, no server of ours, no ads, no analytics and no tracking. Everything you enter (events, notes, reminders and settings) is stored on your device, and we never receive it. If you turn on “Sync with Google Calendar”, your personal events are also written to the calendar you choose on the device, and Google Calendar syncs them with your Google Account (details below).
 
 ## Data stored on your device
 - Events, notes, reminders and settings are stored in a local database inside the app.
