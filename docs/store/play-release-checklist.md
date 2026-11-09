@@ -11,9 +11,10 @@ Facts marked *(verified)* were checked against Google's help pages on 2026-11-03
 - [ ] Add the personal Google account as a user with Admin rights (Users and permissions).
 
 ## 2. Closed test (the long pole)
-- [ ] (S) Collect 12+ testers: Gmail address + Android device each. *(verified: "At least 12 testers must be opted in", 14 consecutive days, opting out and back in restarts the count.)*
-- [ ] (C) Production AAB: `eas build --platform android --profile production` (`eas.json` already builds `app-bundle`, `autoIncrement` on).
-- [ ] (S) Create the app in Play Console, closed testing track, upload the AAB, add the testers list, send them the opt-in link.
+- [x] (S) Collect 12+ testers: Gmail address + Android device each. 12 collected 2026-11-09, Play Console email list "Luchot testers" (addresses live only in Play Console, not in the repo). *(verified: "At least 12 testers must be opted in", 14 consecutive days, opting out and back in restarts the count.)*
+- [x] (C) Production AAB (versionCode 18, built 2026-11-05): `eas build --platform android --profile production` (`eas.json` already builds `app-bundle`, `autoIncrement` on).
+- [x] (S) Create the app in Play Console, closed testing track (Alpha), upload the AAB, add the testers list, country Israel. Sent to Google for review 2026-11-09 (13 changes; Google says usually up to 7 days).
+- [ ] (S) After approval: send the testers the opt-in link (Alpha track → Testers tab). The 14 days count per tester from opt-in.
 - [ ] (S) After 14 days: apply for production access (Google asks questions about the test).
 
 ## 3. Permanent choices — decide once
