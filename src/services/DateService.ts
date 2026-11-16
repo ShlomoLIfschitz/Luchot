@@ -137,6 +137,55 @@ export function toHebrewYearFull(year: number, always: boolean): string {
   return year % 1000 === 0 ? prefix : prefix + toHebrewYear(year);
 }
 
+// ── Optional civil days ───────────────────────────────────
+// Israeli state days with no religious element. Shown by default; the
+// "ימים ממלכתיים" setting hides them. Shlomo (2026-11-16): the exceptions
+// that always show are the memorial days and Independence Day.
+const ALWAYS_SHOWN_MODERN = new Set([
+  'Yom HaShoah',
+  'Yom HaZikaron',
+  "Yom HaAtzma'ut",
+  'Yitzhak Rabin Memorial Day',
+  'Yom Yerushalayim', // has a religious element (Hallel)
+  'Sigd',             // a religious festival
+]);
+
+/** True for an event the "ימים ממלכתיים" setting may hide. */
+export function isOptionalCivilDay(ev: HebcalEvent): boolean {
+  const desc = ev.getDesc();
+  if (desc === 'Chag HaBanot') return true; // MINOR_HOLIDAY in hebcal, a folk custom
+  return (ev.getFlags() & flags.MODERN_HOLIDAY) !== 0 && !ALWAYS_SHOWN_MODERN.has(desc);
+}
+
+// ── Tanakh book names ─────────────────────────────────────
+// @hebcal/learning renders Nach Yomi / Tanakh Yomi / Psalms with the book
+// name in English even in 'he' ("Ezekiel כ׳"). Translate the leading name.
+const TANAKH_BOOKS_HE: Record<string, string> = {
+  'Genesis': 'בראשית', 'Exodus': 'שמות', 'Leviticus': 'ויקרא',
+  'Numbers': 'במדבר', 'Deuteronomy': 'דברים',
+  'Joshua': 'יהושע', 'Judges': 'שופטים',
+  'I Samuel': 'שמואל א׳', 'II Samuel': 'שמואל ב׳',
+  'I Kings': 'מלכים א׳', 'II Kings': 'מלכים ב׳',
+  'Isaiah': 'ישעיהו', 'Jeremiah': 'ירמיהו', 'Ezekiel': 'יחזקאל',
+  'Hosea': 'הושע', 'Joel': 'יואל', 'Amos': 'עמוס', 'Obadiah': 'עובדיה',
+  'Jonah': 'יונה', 'Micah': 'מיכה', 'Nachum': 'נחום', 'Nahum': 'נחום',
+  'Habakkuk': 'חבקוק', 'Zephaniah': 'צפניה', 'Haggai': 'חגי',
+  'Zechariah': 'זכריה', 'Malachi': 'מלאכי',
+  'Psalms': 'תהלים', 'Proverbs': 'משלי', 'Job': 'איוב',
+  'Song of Songs': 'שיר השירים', 'Ruth': 'רות', 'Lamentations': 'איכה',
+  'Ecclesiastes': 'קהלת', 'Esther': 'אסתר', 'Daniel': 'דניאל',
+  'Ezra': 'עזרא', 'Nehemiah': 'נחמיה',
+  'I Chronicles': 'דברי הימים א׳', 'II Chronicles': 'דברי הימים ב׳',
+};
+
+/** "Ezekiel כ׳" → "יחזקאל כ׳". Leaves anything else unchanged. */
+export function hebraizeBookName(text: string): string {
+  const m = text.match(/^([A-Za-z][A-Za-z ]*?)\s+(?=[^A-Za-z\s])/);
+  if (!m) return text;
+  const he = TANAKH_BOOKS_HE[m[1]];
+  return he ? he + ' ' + text.slice(m[0].length) : text;
+}
+
 // ── Daily Learning Helper ─────────────────────────────────
 // Looks up a named learning schedule for a given Hebrew date and returns
 // a LearningItem (display text + Sefaria URL), or undefined if no event
@@ -166,7 +215,7 @@ function renderLearning(scheduleName: string, hd: HDate, il: boolean): LearningI
   //      Pattern: 1+ whitespace + 1+ ASCII letters/spaces at end of string.
   // After both strips, reject if no Hebrew characters remain (U+0590–U+05FF)
   // to guard against schedules that produce fully-English output.
-  const display = rawDisplay
+  const display = hebraizeBookName(rawDisplay)
     .replace(/^[A-Za-z][A-Za-z\s]*:\s*/, '')        // leading "Daf Yomi: "
     .replace(/\s+[A-Za-z][A-Za-z\s]*$/, '')          // trailing "Psalms", "I Kings"
     .trim();
@@ -202,6 +251,7 @@ function lookupUpcomingParasha(hdate: HDate, il: boolean): string | undefined {
 
 export class DateService {
   private diaspora: boolean;
+  private showCivilDays = true;
 
   constructor(diaspora = false) {
     this.diaspora = diaspora;
@@ -210,6 +260,13 @@ export class DateService {
   setDiaspora(value: boolean) {
     this.diaspora = value;
     monthCache.clear(); // Invalidate cache on change
+  }
+
+  /** "ימים ממלכתיים" setting: false hides isOptionalCivilDay() events. */
+  setShowCivilDays(value: boolean) {
+    if (this.showCivilDays === value) return;
+    this.showCivilDays = value;
+    monthCache.clear();
   }
 
   /**
@@ -240,6 +297,7 @@ export class DateService {
 
     for (const ev of events) {
       const mask = ev.getFlags();
+      if (!this.showCivilDays && isOptionalCivilDay(ev)) continue;
       if (mask & flags.PARSHA_HASHAVUA) {
         parasha = stripNikud(ev.renderBrief('he'));
       } else if (mask & flags.OMER_COUNT) {

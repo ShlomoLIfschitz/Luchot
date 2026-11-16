@@ -61,8 +61,9 @@ export default function RootLayout() {
         useLocationStore.getState().loadFromStorage(),
         NotificationService.init(),
       ]);
-      const diaspora = useSettingsStore.getState().diaspora;
+      const { diaspora, showCivilDays } = useSettingsStore.getState();
       dateService.setDiaspora(diaspora);
+      dateService.setShowCivilDays(showCivilDays);
       useCalendarStore.getState().refreshMonth();
       await NotificationService.ensureAnnualReminders();
       await NotificationService.ensureRecurringReminders();
