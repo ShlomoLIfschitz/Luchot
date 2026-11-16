@@ -78,7 +78,9 @@
         }
       ],
       "expo-sharing",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-sqlite",
+      "expo-status-bar"
     ],
     "extra": {
       "router": {
