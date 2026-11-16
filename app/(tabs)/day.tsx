@@ -262,7 +262,6 @@ export default function DayScreen() {
   }, [timelineHourRange]);
 
   const isHoliday = dayData.isYomTov || dayData.holidays.length > 0;
-  const primaryHoliday = dayData.holidays[0];
 
   // Parasha card — shown every day: Shabbat itself uses `parasha` (the
   // current Shabbat's reading); every other day uses `upcomingParasha`
@@ -332,13 +331,16 @@ export default function DayScreen() {
               {hebrewOnTop ? gregFullDate(selectedDate) : hebrewFullDate(selectedDate)}
             </Text>
 
-            {isHoliday && primaryHoliday && (
-              <View style={[styles.infoBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
+            {/* Every holiday of the day, not just the first: 30 Shevat is both
+                Family Day and Rosh Chodesh Adar, and showing only holidays[0]
+                hid the Rosh Chodesh (device feedback, 2026-11-16). */}
+            {isHoliday && dayData.holidays.map((holiday) => (
+              <View key={holiday} style={[styles.infoBanner, { backgroundColor: colors.tagHolidayBg, borderColor: colors.tagHoliday }]}>
                 <Text style={[styles.infoBannerText, { color: colors.tagHoliday }]}>
-                  ✡ {primaryHoliday}
+                  ✡ {holiday}
                 </Text>
               </View>
-            )}
+            ))}
 
             {parashaCardName && (
               <ParashaCard colors={colors} label="פרשת השבוע" name={parashaCardName} />
