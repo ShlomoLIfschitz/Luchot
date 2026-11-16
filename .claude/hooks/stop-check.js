@@ -6,6 +6,9 @@
 // shows the user what is missing; stopMode "block" makes Claude keep going.
 // With workLogDir set, a new or changed file in that folder (one file per entry)
 // counts as the work log update; the single workLog file still counts too.
+// Files are grouped by the git checkout they live in (the project, or a worktree such as
+// <project>/.claude/worktrees/<name>/): each checkout needs its own work log update, and
+// git status runs there. The config is always read from the project.
 // Also suggests a new session when the transcript gets long (never blocks).
 //
 // Config (optional): .claude/workflow.json
@@ -14,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { readStdin, projectDir, workflowConfig, readChanged, isInside, samePath, logEvent } = require('./lib');
+const { readStdin, projectDir, workflowConfig, readChanged, isInside, worktreeRoot, samePath, logEvent } = require('./lib');
 
 function uncommitted(dir, files) {
   const r = spawnSync('git', ['status', '--porcelain', '--', ...files], { cwd: dir, encoding: 'utf8', timeout: 15000 });
@@ -43,20 +46,29 @@ readStdin().then(input => {
   const problems = [];
   const missing = []; // for the event log
   let left = [];
-  if (changed.length) {
-    const workLog = path.resolve(dir, cfg.workLog);
-    const logDir = cfg.workLogDir ? path.resolve(dir, cfg.workLogDir) : null;
-    if (!changed.some(f => samePath(f, workLog) || (logDir && isInside(f, logDir)))) {
-      problems.push(logDir
+  const groups = new Map(); // checkout root -> files changed in it
+  for (const f of changed) {
+    const root = worktreeRoot(f, dir);
+    const k = root.toLowerCase();
+    if (!groups.has(k)) groups.set(k, { root, files: [] });
+    groups.get(k).files.push(f);
+  }
+  for (const { root, files } of groups.values()) {
+    const where = samePath(root, dir) ? '' : `In ${path.relative(dir, root).split(path.sep).join('/')}: `;
+    const workLog = path.resolve(root, cfg.workLog);
+    const logDir = cfg.workLogDir ? path.resolve(root, cfg.workLogDir) : null;
+    if (!files.some(f => samePath(f, workLog) || (logDir && isInside(f, logDir)))) {
+      problems.push(where + (logDir
         ? `No work log entry this session: add ${cfg.workLogDir}/YYYY-MM-DD-<topic>.md.`
-        : `${cfg.workLog} was not updated this session.`);
-      missing.push('work-log');
+        : `${cfg.workLog} was not updated this session.`));
+      if (!missing.includes('work-log')) missing.push('work-log');
     }
     if (cfg.requireCommit) {
-      left = uncommitted(dir, changed.map(f => path.relative(dir, f))) || [];
-      if (left.length) {
-        problems.push(`Uncommitted changes: ${left.join(', ')}.`);
-        missing.push('commit');
+      const rel = uncommitted(root, files.map(f => path.relative(root, f))) || [];
+      if (rel.length) {
+        problems.push(`${where}Uncommitted changes: ${rel.join(', ')}.`);
+        if (!missing.includes('commit')) missing.push('commit');
+        left.push(...rel.map(r => path.relative(dir, path.resolve(root, r)).split(path.sep).join('/')));
       }
     }
   }

@@ -63,6 +63,18 @@ function isInside(file, dir) {
   return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
+// The git checkout a changed file belongs to: the nearest folder between the file and
+// dir (inclusive) that holds a `.git` file or folder, e.g. a worktree under
+// <project>\.claude\worktrees\<name>\. Falls back to dir.
+function worktreeRoot(file, dir) {
+  let cur = path.dirname(path.resolve(file));
+  while (isInside(cur, dir)) {
+    if (fs.existsSync(path.join(cur, '.git'))) return cur;
+    cur = path.dirname(cur);
+  }
+  return path.resolve(dir);
+}
+
 // workLogDir (e.g. "docs/worklog"): one file per entry, "YYYY-MM-DD-<topic>.md", so two
 // branches never edit the same log file. Returns the entry files oldest first: by
 // name (the date prefix), then by mtime for the same name prefix. Skips _TEMPLATE.md
@@ -139,4 +151,4 @@ function logEvent(input, hook, details) {
   } catch { /* logging is best effort */ }
 }
 
-module.exports = { readStdin, projectDir, workflowConfig, readChanged, addChanged, isInside, samePath, workLogEntryFiles, logEvent, redact };
+module.exports = { readStdin, projectDir, workflowConfig, readChanged, addChanged, isInside, worktreeRoot, samePath, workLogEntryFiles, logEvent, redact };
