@@ -138,14 +138,14 @@ export function toHebrewYearFull(year: number, always: boolean): string {
 }
 
 // ── Optional civil days ───────────────────────────────────
-// Israeli state days with no religious element. Shown by default; the
-// "ימים ממלכתיים" setting hides them. Shlomo (2026-11-16): the exceptions
-// that always show are the memorial days and Independence Day.
+// Israeli state days with no religious element. Hidden by default; the
+// "ימים ממלכתיים נוספים" setting shows them. Shlomo (2026-11-16): the
+// exceptions that always show are the memorial days and Independence Day;
+// Rabin Memorial Day is "יום ממלכתי לגמרי", so it is optional.
 const ALWAYS_SHOWN_MODERN = new Set([
   'Yom HaShoah',
   'Yom HaZikaron',
   "Yom HaAtzma'ut",
-  'Yitzhak Rabin Memorial Day',
   'Yom Yerushalayim', // has a religious element (Hallel)
   'Sigd',             // a religious festival
 ]);
@@ -251,7 +251,7 @@ function lookupUpcomingParasha(hdate: HDate, il: boolean): string | undefined {
 
 export class DateService {
   private diaspora: boolean;
-  private showCivilDays = true;
+  private showCivilDays = false;
 
   constructor(diaspora = false) {
     this.diaspora = diaspora;

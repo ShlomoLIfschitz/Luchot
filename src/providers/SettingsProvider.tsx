@@ -118,7 +118,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   firstDayOfWeek: 0,
   defaultCalendarType: 'hebrew',
   diaspora: false,
-  showCivilDays: true,
+  showCivilDays: false,
   zmanimMethod: 'GRA',
   use24hTime: true,
   omerRemindersEnabled: false,
@@ -188,7 +188,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         firstDayOfWeek:      Number(p.firstDayOfWeek ?? '0') as FirstDayOfWeek,
         defaultCalendarType: (p.defaultCalendarType ?? 'hebrew') as DefaultCalendarType,
         diaspora:            (p.diaspora ?? 'false') === 'true',
-        showCivilDays:       (p.showCivilDays ?? 'true') === 'true',
+        showCivilDays:       (p.showCivilDays ?? 'false') === 'true',
         // Migrate stored 'RABBANUT' (removed in Phase 4.1) to 'GRA'.
         // Also guards against any other unexpected stored value.
         zmanimMethod:
