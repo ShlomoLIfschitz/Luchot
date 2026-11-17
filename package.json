@@ -65,5 +65,16 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ShlomoLIfschitz/Luchot.git"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "expo",
+        "expo-calendar",
+        "expo-file-system",
+        "expo-router",
+        "expo-sqlite"
+      ]
+    }
   }
 }
