@@ -40,6 +40,7 @@ interface SettingsState {
   // Calendar
   defaultCalendarType: DefaultCalendarType;
   diaspora: boolean;
+  showCivilDays: boolean; // "ימים ממלכתיים נוספים" (DateService.isOptionalCivilDay)
 
   // Zmanim
   zmanimMethod: ZmanimMethod;
@@ -73,6 +74,7 @@ interface SettingsState {
   setFirstDayOfWeek: (d: FirstDayOfWeek) => void;
   setDefaultCalendarType: (t: DefaultCalendarType) => void;
   setDiaspora: (v: boolean) => void;
+  setShowCivilDays: (v: boolean) => void;
   setUse24hTime: (v: boolean) => void;
   setOmerRemindersEnabled: (v: boolean) => void;
   setOmerReminderTime: (t: string) => void;
@@ -116,6 +118,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   firstDayOfWeek: 0,
   defaultCalendarType: 'hebrew',
   diaspora: false,
+  showCivilDays: false,
   zmanimMethod: 'GRA',
   use24hTime: true,
   omerRemindersEnabled: false,
@@ -132,6 +135,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setFirstDayOfWeek:    (d) => { set({ firstDayOfWeek: d });    get().save('firstDayOfWeek', String(d)); },
   setDefaultCalendarType: (t) => { set({ defaultCalendarType: t }); get().save('defaultCalendarType', t); },
   setDiaspora:          (v) => { set({ diaspora: v });           get().save('diaspora', String(v)); },
+  setShowCivilDays:     (v) => { set({ showCivilDays: v });      get().save('showCivilDays', String(v)); },
   setUse24hTime:        (v) => { set({ use24hTime: v });         get().save('use24hTime', String(v)); },
   setOmerRemindersEnabled: (v) => {
     set({ omerRemindersEnabled: v });
@@ -184,6 +188,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         firstDayOfWeek:      Number(p.firstDayOfWeek ?? '0') as FirstDayOfWeek,
         defaultCalendarType: (p.defaultCalendarType ?? 'hebrew') as DefaultCalendarType,
         diaspora:            (p.diaspora ?? 'false') === 'true',
+        showCivilDays:       (p.showCivilDays ?? 'false') === 'true',
         // Migrate stored 'RABBANUT' (removed in Phase 4.1) to 'GRA'.
         // Also guards against any other unexpected stored value.
         zmanimMethod:

@@ -226,7 +226,10 @@ function DayCellInner({
             >
               <Text
                 style={[styles.tagText, { color: tag.external ? colors.textSecondary : fg }]}
-                numberOfLines={1}
+                // Up to two lines, so "ראש חודש שבט" / "שבת שובה" read in full
+                // instead of "ראש חוד…" (device feedback, 2026-11-16). Span
+                // bars stay one line so the bar keeps one height across days.
+                numberOfLines={tag.segment ? 1 : 2}
                 ellipsizeMode="tail"
               >
                 {tag.label}
@@ -330,11 +333,14 @@ const styles = StyleSheet.create({
     marginTop: 3,
     gap: 3,
     flex: 1,
+    overflow: 'hidden', // a wrapped chip must not spill below the cell
   },
   tagChip: {
     alignSelf: 'stretch',
-    height: 17, // was 15 — a couple more px so a typical two-word Hebrew
-                // holiday name (e.g. "ראש השנה") has room before truncating.
+    // One line = 17 (12 line + 2.5 + 2.5); a long name wraps to a second
+    // line (29) instead of truncating.
+    minHeight: 17,
+    paddingVertical: 2.5,
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderRadius: radius.chip, // = 3, the Figma day-cell chip

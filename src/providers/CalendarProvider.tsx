@@ -25,6 +25,7 @@ interface CalendarState {
   navigateMonth: (direction: 1 | -1) => void;
   navigateToMonth: (year: number, month: number) => void;
   setDiaspora: (value: boolean) => void;
+  setShowCivilDays: (value: boolean) => void;
   refreshMonth: () => void;
   incrementNotesVersion: () => void;
   navigateHebrewMonth: (direction: 1 | -1) => void;
@@ -71,6 +72,12 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   setDiaspora: (value) => {
     dateService.setDiaspora(value);
     get().refreshMonth();
+  },
+
+  setShowCivilDays: (value) => {
+    dateService.setShowCivilDays(value);
+    get().refreshMonth();
+    get().refreshHebrewMonth();
   },
 
   refreshMonth: () => {

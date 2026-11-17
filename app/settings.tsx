@@ -311,6 +311,7 @@ export default function SettingsScreen() {
     toggleHebrewOnTop, setDefaultCalendarType,
     setDarkMode, setZmanimMethod, setFirstDayOfWeek, setUse24hTime,
     setDiaspora: setSettingsDiaspora,
+    showCivilDays, setShowCivilDays: setSettingsShowCivilDays,
     omerRemindersEnabled, omerReminderTime,
     setOmerRemindersEnabled, setOmerReminderTime,
     candleLightingRemindersEnabled, candleLightingLeadMinutes,
@@ -319,6 +320,7 @@ export default function SettingsScreen() {
 
   const router = useRouter();
   const calendarSetDiaspora = useCalendarStore((s) => s.setDiaspora);
+  const calendarSetShowCivilDays = useCalendarStore((s) => s.setShowCivilDays);
   const { placeName, latitude, longitude } = useLocationStore();
 
   const permission = useNotificationPermission();
@@ -417,6 +419,16 @@ export default function SettingsScreen() {
             onValueChange={(v) => {
               setSettingsDiaspora(v);
               calendarSetDiaspora(v);
+            }}
+            colors={colors}
+          />
+          <ToggleRow
+            label="ימים ממלכתיים נוספים"
+            accessibilityLabel="ימים ממלכתיים נוספים, כמו יום בן־גוריון ויום המשפחה"
+            value={showCivilDays}
+            onValueChange={(v) => {
+              setSettingsShowCivilDays(v);
+              calendarSetShowCivilDays(v);
             }}
             colors={colors}
           />
