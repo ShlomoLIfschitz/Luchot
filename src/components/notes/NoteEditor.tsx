@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, type ComponentRef } from 'react';
 import {
   Modal, View, Text, TextInput, Pressable, StyleSheet, Switch, Alert,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, ActivityIndicator,
   ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
@@ -625,11 +625,17 @@ export function NoteEditor({
 
       <View style={s.overlay}>
           <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          {/* 'padding' on both platforms: SDK 58 is edge-to-edge, so an Android
+              Modal window is no longer resized for the keyboard and 'height'
+              did nothing. The view fills the overlay (box-none keeps backdrop
+              taps reaching the Pressable behind it) and the sheet shrinks to
+              the space above the keyboard. */}
+          <KeyboardAvoidingView behavior="padding" style={s.kav} pointerEvents="box-none">
               <View style={[s.sheet, { backgroundColor: colors.surface }]}>
                 <View style={[s.handle, { backgroundColor: colors.border }]} accessibilityElementsHidden importantForAccessibility="no" />
 
                 <ScrollView
+                  style={s.scroll}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
                 >
@@ -1159,28 +1165,33 @@ export function NoteEditor({
                       </>
                     )}
 
-                    {/* Footer — row-reverse, [Save, Cancel] so Save (primary) sits on the RIGHT */}
-                    <View style={[s.actions, { borderTopColor: colors.border }]}>
-                      <Pressable
-                        onPress={handleSave}
-                        style={[s.btn, { backgroundColor: colors.accent }]}
-                        accessibilityRole="button"
-                        accessibilityLabel="שמירה"
-                      >
-                        <Text style={[s.btnText, { color: colors.textInverse }]}>שמירה</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={onClose}
-                        style={[s.btn, { backgroundColor: colors.surfaceMuted }]}
-                        accessibilityRole="button"
-                        accessibilityLabel="ביטול"
-                      >
-                        <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
-                      </Pressable>
-                    </View>
                   </>
                 )}
                 </ScrollView>
+                {/* Footer — row-reverse, [Save, Cancel] so Save (primary) sits on the RIGHT.
+                    Outside the ScrollView so it stays above the keyboard: inside
+                    it, Save was below the fold while typing and the user had to
+                    close the keyboard to reach it (Android feedback, 2026-11-16). */}
+                {!isViewMode && (
+                <View style={[s.actions, { borderTopColor: colors.border }]}>
+                  <Pressable
+                    onPress={handleSave}
+                    style={[s.btn, { backgroundColor: colors.accent }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="שמירה"
+                  >
+                    <Text style={[s.btnText, { color: colors.textInverse }]}>שמירה</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onClose}
+                    style={[s.btn, { backgroundColor: colors.surfaceMuted }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="ביטול"
+                  >
+                    <Text style={[s.btnText, { color: colors.textSecondary }]}>ביטול</Text>
+                  </Pressable>
+                </View>
+                )}
               </View>
           </KeyboardAvoidingView>
       </View>
@@ -1192,7 +1203,10 @@ const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: overlay.modal, justifyContent: 'flex-end' },
   // Figma: top radius 20, 18 side padding, handle 10 from the top and 6
   // above the header, header padding 6 / 14, 13 between body items.
-  sheet: { borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, paddingHorizontal: 18, paddingTop: 10, maxHeight: '85%' },
+  sheet: { borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, paddingHorizontal: 18, paddingTop: 10, maxHeight: '85%', flexShrink: 1 },
+  kav: { flex: 1, justifyContent: 'flex-end' },
+  // Shrinks when the keyboard takes space, so the footer below it stays visible.
+  scroll: { flexGrow: 0, flexShrink: 1 },
   handle: { width: 38, height: 4, borderRadius: radius.full, alignSelf: 'center', marginBottom: 6 },
   headerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 14 },
   // Figma target: 18 Bold — exact match via typography.sheetTitle.
