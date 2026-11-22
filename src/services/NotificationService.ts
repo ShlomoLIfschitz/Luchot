@@ -547,7 +547,7 @@ export class NotificationService {
     const { lat, lng, il, placeName } = loc;
     const cityNameHe = placeName ?? '';
 
-    // City-specific candle-lighting offset (Jerusalem 40 min, Haifa 30, Safed 40, others 18)
+    // City-specific candle-lighting offset (see utils/candleLightingOffset.ts)
     const clOffsetMinutes = getCandleLightingOffset(lat, lng).minutes;
 
     // Sweep 91 days (13 weeks rolling window)
