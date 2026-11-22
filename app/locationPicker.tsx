@@ -33,7 +33,7 @@ import { Card } from '../src/components/ui/Card';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
 import { CITIES } from '../src/constants/cities';
 import { ISRAEL_LOCALITIES } from '../src/constants/israelLocalities';
-import { searchLocalities } from '../src/utils/localityLookup';
+import { ALL_LOCALITIES, searchLocalities } from '../src/utils/localityLookup';
 import { radius } from '../src/constants/radius';
 import { typography, withFontFamily } from '../src/constants/typography';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
@@ -175,7 +175,7 @@ export default function LocationPickerScreen() {
             </Card>
             {!q && (
               <Text style={[styles.hint, { color: colors.textTertiary }]}>
-                {`ועוד ${ISRAEL_LOCALITIES.length - TOP_LOCALITIES} יישובים — הקלידו שם כדי לחפש`}
+                {`ועוד ${ALL_LOCALITIES.length - TOP_LOCALITIES} יישובים — הקלידו שם כדי לחפש`}
               </Text>
             )}
           </>

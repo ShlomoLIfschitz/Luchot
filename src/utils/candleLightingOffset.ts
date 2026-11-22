@@ -25,6 +25,7 @@
 //      Jerusalem; the box keeps a GPS fix in Jerusalem at 40.
 
 import { ISRAEL_LOCALITIES } from '../constants/israelLocalities';
+import { OUTPOSTS } from '../constants/outposts';
 import { isIsraelCoords } from './isIsraelCoords';
 
 interface CityOffset {
@@ -62,7 +63,8 @@ const coordKey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(
 let localityByCoords: Map<string, number> | null = null;
 function localityCodeAt(lat: number, lng: number): number | undefined {
   if (!localityByCoords) {
-    localityByCoords = new Map(ISRAEL_LOCALITIES.map((l) => [coordKey(l.lat, l.lng), l.code]));
+    // CBS last, so a locality wins over an outpost placed at its coordinates.
+    localityByCoords = new Map([...OUTPOSTS, ...ISRAEL_LOCALITIES].map((l) => [coordKey(l.lat, l.lng), l.code]));
   }
   return localityByCoords.get(coordKey(lat, lng));
 }
