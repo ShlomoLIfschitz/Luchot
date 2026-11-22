@@ -31,6 +31,7 @@ export function useShabbatTable(date: Date): ShabbatRow[] {
   const longitude     = useLocationStore((s) => s.longitude);
   const source        = useLocationStore((s) => s.source);
   const cityHebcalKey = useLocationStore((s) => s.cityHebcalKey);
+  const placeName     = useLocationStore((s) => s.placeName);
 
   return useMemo(() => {
     // Only pass user coords when the user has actively set a location.
@@ -41,11 +42,12 @@ export function useShabbatTable(date: Date): ShabbatRow[] {
     }
 
     // Resolve a Hebrew label from the known city list; fall back gracefully.
+    // A picked locality has no curated key, only its name.
     const userLabel =
-      cityHebcalKey != null
-        ? (findCityByKey(cityHebcalKey)?.nameHe ?? 'המיקום שלי')
-        : 'המיקום שלי';
+      (cityHebcalKey != null ? findCityByKey(cityHebcalKey)?.nameHe : undefined)
+      ?? placeName
+      ?? 'המיקום שלי';
 
     return getShabbatTable(date, latitude, longitude, userLabel);
-  }, [date, latitude, longitude, source, cityHebcalKey]);
+  }, [date, latitude, longitude, source, cityHebcalKey, placeName]);
 }

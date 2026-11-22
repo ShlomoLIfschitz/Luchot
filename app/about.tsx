@@ -63,6 +63,12 @@ const CREDITS: CreditItem[] = [
     url: 'https://www.openstreetmap.org/copyright',
   },
   {
+    // Source of ISRAEL_LOCALITIES (scripts/build-israel-localities.py).
+    name: 'הלשכה המרכזית לסטטיסטיקה',
+    description: 'רשימת היישובים בישראל ומיקומם (קובץ יישובים 2024)',
+    url: 'https://www.cbs.gov.il',
+  },
+  {
     name: 'Sefaria',
     description: 'מקור מקושר ללימוד דף יומי, רמב״ם, וכל מקורות התורה',
     url: 'https://www.sefaria.org.il',

@@ -27,8 +27,8 @@ export interface ZmanimResult {
   havdalah: Date | null;        // tzeitHakochavim on Saturday only
 
   // Phase 4.3 — per-city minhag metadata (set only when isFriday)
-  candleLightingOffsetMinutes?: number; // e.g. 40 for Jerusalem, 18 elsewhere
-  candleLightingCityNameHe?: string;    // e.g. "ירושלים"; absent for default 18-min
+  candleLightingOffsetMinutes?: number; // 40 Jerusalem, 30 Haifa/Zikhron, 20 Israel, 18 abroad
+  candleLightingCityNameHe?: string;    // e.g. "ירושלים"; absent for the default offsets
 }
 
 const zmanimCache = new Map<string, ZmanimResult>();
@@ -83,8 +83,8 @@ export function getZmanim(
     const tzeitHakochavim = toJsDate(czc.getTzaisGeonim8Point5Degrees());
 
     // Candle lighting — Friday only (JS day 5).
-    // Offset is city-specific (Jerusalem 40 min, Haifa 30 min, Safed 40 min,
-    // everywhere else 18 min). getCandleLightingOffset is a pure function —
+    // Offset follows hebcal.com (Jerusalem 40, Haifa and Zikhron Ya'akov 30,
+    // rest of Israel 20, abroad 18). getCandleLightingOffset is a pure function —
     // safe to call on every invocation; cost is negligible.
     const isFriday = date.getDay() === 5;
     const clOffsetResult = getCandleLightingOffset(latitude, longitude);

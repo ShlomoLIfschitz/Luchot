@@ -1,59 +1,53 @@
 // src/utils/candleLightingOffset.ts
 //
-// Phase 4.3 — Determines candle-lighting offset (minutes before sunset)
-// based on geographic coordinates.
+// Candle-lighting offset (minutes before sunset) for given coordinates.
 //
-// Cities with non-default offsets (Israeli minhag):
-//   - Jerusalem: 40 minutes
-//   - Haifa: 30 minutes
-//   - Safed (Tzfat): 40 minutes
+// Matches hebcal.com (checked 2026-11-22 against its Shabbat API), plus
+// Petah Tikva:
+//   - Jerusalem 40, Haifa 30, Zikhron Ya'akov 30;
+//   - Petah Tikva 40 (Shlomo, 2026-11-22). hebcal.com gives it 20, but OU
+//     MyZmanim, Kipa and R. Ari Enkin give 40: the city was founded by
+//     Jerusalemites and kept the Jerusalem custom;
+//   - every other place in Israel 20 (hebcal.com's Israeli default; the
+//     pinned @hebcal/core v5 still says 18);
+//   - outside Israel 18.
+// Safed was 40 here until 2026-11-22; hebcal.com gives it 20, so it now
+// follows the Israeli default.
 //
-// All other locations default to 18 minutes (standard minhag).
-//
-// Detection uses a simple bounding-box per city rather than haversine
-// distance. For the city-vs-default decision at Israeli scale, a
-// degree-based proximity check is accurate enough and zero-dependency.
-// Radii are sized to capture each city proper without spilling into
-// adjacent settlements (which often follow their own minhag, deferred
-// to Phase 5+ when a broader city list is added).
+// Two ways to land on a city:
+//   1. A locality picked from the list (ISRAEL_LOCALITIES): the stored
+//      coordinates are that locality's own centroid, so an exact match
+//      identifies it, and only Jerusalem / Haifa / Zikhron Ya'akov get their
+//      offset. Neighbours inside the bounding boxes below (Motza Illit, Beit
+//      Zayit, Tirat Carmel, Ma'ayan Tzvi, ...) get 20, as on hebcal.com.
+//   2. Any other coordinates (GPS, the older curated city list): a bounding
+//      box per city. hebcal.com itself gives raw coordinates 20 even in
+//      Jerusalem; the box keeps a GPS fix in Jerusalem at 40.
+
+import { ISRAEL_LOCALITIES } from '../constants/israelLocalities';
+import { OUTPOSTS } from '../constants/outposts';
+import { isIsraelCoords } from './isIsraelCoords';
 
 interface CityOffset {
-  name:          string;   // English name (for logging / future use)
-  nameHe:        string;   // Hebrew name (shown in UI hint)
-  lat:           number;   // Centre latitude
-  lng:           number;   // Centre longitude
-  radiusDeg:     number;   // Detection radius in degrees ≈ km/111
+  name:          string;   // English city name
+  nameHe:        string;   // Hebrew city name (shown in the UI hint)
+  localityCode:  number;   // CBS locality code
+  lat:           number;   // Bounding-box centre latitude
+  lng:           number;   // Bounding-box centre longitude
+  radiusDeg:     number;   // Bounding-box half-size in degrees ≈ km/111
   offsetMinutes: number;   // Minutes before sunset
 }
 
 const SPECIAL_CITIES: CityOffset[] = [
-  {
-    name:          'Jerusalem',
-    nameHe:        'ירושלים',
-    lat:           31.7683,
-    lng:           35.2137,
-    radiusDeg:     0.06,   // ~7 km — covers the city proper
-    offsetMinutes: 40,
-  },
-  {
-    name:          'Haifa',
-    nameHe:        'חיפה',
-    lat:           32.7940,
-    lng:           34.9896,
-    radiusDeg:     0.05,   // ~6 km
-    offsetMinutes: 30,
-  },
-  {
-    name:          'Safed',
-    nameHe:        'צפת',
-    lat:           32.9650,
-    lng:           35.4951,
-    radiusDeg:     0.04,   // ~4 km
-    offsetMinutes: 40,
-  },
+  { name: 'Jerusalem',      nameHe: 'ירושלים',    localityCode: 3000, lat: 31.7683, lng: 35.2137, radiusDeg: 0.06, offsetMinutes: 40 },
+  { name: 'Haifa',          nameHe: 'חיפה',       localityCode: 4000, lat: 32.7940, lng: 34.9896, radiusDeg: 0.05, offsetMinutes: 30 },
+  { name: "Zikhron Ya'akov", nameHe: 'זכרון יעקב', localityCode: 9300, lat: 32.5701, lng: 34.9519, radiusDeg: 0.02, offsetMinutes: 30 },
+  // Box kept small so Ganei Tikva, Ma'as and Kiryat Ono (20) stay outside.
+  { name: 'Petah Tikva',    nameHe: 'פתח תקווה',  localityCode: 7900, lat: 32.0847, lng: 34.8856, radiusDeg: 0.02, offsetMinutes: 40 },
 ];
 
 export const DEFAULT_CANDLE_OFFSET_MINUTES = 18;
+export const ISRAEL_CANDLE_OFFSET_MINUTES = 20;
 
 export interface CandleLightingOffsetResult {
   /** Minutes before sunset to light candles. */
@@ -64,29 +58,41 @@ export interface CandleLightingOffsetResult {
   cityNameHe?: string;
 }
 
+const coordKey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+let localityByCoords: Map<string, number> | null = null;
+function localityCodeAt(lat: number, lng: number): number | undefined {
+  if (!localityByCoords) {
+    // CBS last, so a locality wins over an outpost placed at its coordinates.
+    localityByCoords = new Map([...OUTPOSTS, ...ISRAEL_LOCALITIES].map((l) => [coordKey(l.lat, l.lng), l.code]));
+  }
+  return localityByCoords.get(coordKey(lat, lng));
+}
+
+function special(city: CityOffset): CandleLightingOffsetResult {
+  return { minutes: city.offsetMinutes, cityName: city.name, cityNameHe: city.nameHe };
+}
+
 /**
- * Returns the appropriate candle-lighting offset (minutes before sunset)
- * for the given coordinates. If the location is within a special-city
- * radius, returns that city's minhag offset and name. Otherwise returns
- * the default 18-minute offset with no city name.
- *
- * Pure function — no I/O, no async. Safe to call on every zmanim
- * calculation without performance concern.
+ * Returns the candle-lighting offset for the given coordinates (see the
+ * header for the rules). Pure function, no I/O.
  */
 export function getCandleLightingOffset(
   latitude:  number,
   longitude: number,
 ): CandleLightingOffsetResult {
+  const code = localityCodeAt(latitude, longitude);
+  if (code !== undefined) {
+    const city = SPECIAL_CITIES.find((c) => c.localityCode === code);
+    return city ? special(city) : { minutes: ISRAEL_CANDLE_OFFSET_MINUTES };
+  }
+
   for (const city of SPECIAL_CITIES) {
-    const latDiff = Math.abs(latitude  - city.lat);
-    const lngDiff = Math.abs(longitude - city.lng);
-    if (latDiff < city.radiusDeg && lngDiff < city.radiusDeg) {
-      return {
-        minutes:    city.offsetMinutes,
-        cityName:   city.name,
-        cityNameHe: city.nameHe,
-      };
+    if (Math.abs(latitude - city.lat) < city.radiusDeg && Math.abs(longitude - city.lng) < city.radiusDeg) {
+      return special(city);
     }
   }
-  return { minutes: DEFAULT_CANDLE_OFFSET_MINUTES };
+  return {
+    minutes: isIsraelCoords(latitude, longitude) ? ISRAEL_CANDLE_OFFSET_MINUTES : DEFAULT_CANDLE_OFFSET_MINUTES,
+  };
 }
