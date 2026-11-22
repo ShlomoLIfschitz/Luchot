@@ -4,6 +4,8 @@
 - Location picker: Israel shows the 30 largest localities, then search (Hebrew/English, "קרית" ≈ "קריית") over all 1108; abroad keeps the curated hebcal cities. `setLocationFromLocality` stores the locality's centroid and its code (`location_locality` pref, read in `loadFromStorage`). A GPS fix within 3 km of a locality is named after it offline, before Nominatim.
 - Candle lighting (`utils/candleLightingOffset.ts`) now matches hebcal.com: Jerusalem 40, Haifa 30, Zikhron Ya'akov 30 (new), rest of Israel 20 (was 18), abroad 18. Safed was 40; hebcal.com gives it 20, so it now follows the default. A picked locality is identified by its exact centroid, so neighbours inside the city boxes (Motza Illit, Beit Zayit, Har Gilo, Ramat Rachel, Tirat Carmel, HaHotrim, Kfar Galim, Ma'ayan Tzvi) get 20 as on hebcal.com; GPS and older saved cities still use the boxes.
 - About screen credits the CBS as the source of the list.
+- Petah Tikva 40 (Shlomo, 2026-11-22: "אני חושב שגם פתח תקווה מכניסים 40 דק"): hebcal.com gives 20, but OU MyZmanim, Kipa and R. Ari Enkin give 40 (founded by Jerusalemites). GPS box 0.02° so Ganei Tikva / Ma'as / Kiryat Ono stay at 20.
+- Safed left at 20 (hebcal.com) pending Shlomo: Kipa says 30 (single source); Hidabroot's Safed page (27/11/2026, 16:13) is 18 before sea-level sunset, i.e. a generic offset; no other Safed-specific source found.
 ### Findings (hebcal.com, checked 2026-11-22)
 - hebcal.com computes each place from its own coordinates (GeoNames), not from a nearby city; sunset without elevation, same as ours.
 - Its Israeli default is 20 min (`b=18` and no `b` both give sunset − 20); 40/30 only when the named city (Jerusalem / Haifa / Zikhron) is selected; raw coordinates in Jerusalem get 20.

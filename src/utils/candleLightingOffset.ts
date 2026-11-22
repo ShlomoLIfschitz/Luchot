@@ -2,8 +2,12 @@
 //
 // Candle-lighting offset (minutes before sunset) for given coordinates.
 //
-// Matches hebcal.com (checked 2026-11-22 against its Shabbat API):
+// Matches hebcal.com (checked 2026-11-22 against its Shabbat API), plus
+// Petah Tikva:
 //   - Jerusalem 40, Haifa 30, Zikhron Ya'akov 30;
+//   - Petah Tikva 40 (Shlomo, 2026-11-22). hebcal.com gives it 20, but OU
+//     MyZmanim, Kipa and R. Ari Enkin give 40: the city was founded by
+//     Jerusalemites and kept the Jerusalem custom;
 //   - every other place in Israel 20 (hebcal.com's Israeli default; the
 //     pinned @hebcal/core v5 still says 18);
 //   - outside Israel 18.
@@ -37,6 +41,8 @@ const SPECIAL_CITIES: CityOffset[] = [
   { name: 'Jerusalem',      nameHe: 'ירושלים',    localityCode: 3000, lat: 31.7683, lng: 35.2137, radiusDeg: 0.06, offsetMinutes: 40 },
   { name: 'Haifa',          nameHe: 'חיפה',       localityCode: 4000, lat: 32.7940, lng: 34.9896, radiusDeg: 0.05, offsetMinutes: 30 },
   { name: "Zikhron Ya'akov", nameHe: 'זכרון יעקב', localityCode: 9300, lat: 32.5701, lng: 34.9519, radiusDeg: 0.02, offsetMinutes: 30 },
+  // Box kept small so Ganei Tikva, Ma'as and Kiryat Ono (20) stay outside.
+  { name: 'Petah Tikva',    nameHe: 'פתח תקווה',  localityCode: 7900, lat: 32.0847, lng: 34.8856, radiusDeg: 0.02, offsetMinutes: 40 },
 ];
 
 export const DEFAULT_CANDLE_OFFSET_MINUTES = 18;
