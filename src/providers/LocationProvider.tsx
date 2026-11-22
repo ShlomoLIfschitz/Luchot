@@ -53,6 +53,7 @@ import {
   getCityCoordinates,
 } from '../utils/locationLookup';
 import { reverseGeocodeCityName } from '../utils/reverseGeocode';
+import { findLocalityByCode, findNearbyLocality } from '../utils/localityLookup';
 
 export type LocationSource = 'gps' | 'manual' | 'default';
 
@@ -84,11 +85,13 @@ interface LocationState {
   latitude: number;
   longitude: number;
   cityHebcalKey?: string;      // @hebcal/core city key — undefined means "unknown"
+  localityCode?: number;       // CBS code when picked from ISRAEL_LOCALITIES
   placeName?: string;          // human-readable display name (curated city or Nominatim)
   source: LocationSource;       // how we got these coords
 
   setLocationFromGps:   (lat: number, lng: number) => void;
   setLocationFromCity:  (hebcalKey: string) => boolean;  // false if key unknown
+  setLocationFromLocality: (code: number) => boolean;    // false if code unknown
   acquireFromDeviceGps: () => Promise<GpsResult>;
   loadFromStorage:      () => Promise<void>;
 }
@@ -100,12 +103,14 @@ function persistLocation(
   cityKey: string | undefined,
   source: LocationSource,
   placeName: string | undefined,
+  localityCode?: number,
 ): void {
   StorageService.setPref('location_lat',        String(lat));
   StorageService.setPref('location_lng',        String(lng));
   StorageService.setPref('location_city',       cityKey ?? '');
   StorageService.setPref('location_source',     source);
   StorageService.setPref('location_place_name', placeName ?? '');
+  StorageService.setPref('location_locality',   localityCode ? String(localityCode) : '');
 }
 
 const DEFAULT_CITY = findCityByKey('Jerusalem');
@@ -121,9 +126,9 @@ export const useLocationStore = create<LocationState>((set) => ({
   setLocationFromGps: (lat, lng) => {
     const matched = lookupCityByCoords(lat, lng);
     const cityKey = matched?.hebcalKey;
-    const placeName = matched?.nameHe;
+    const placeName = findNearbyLocality(lat, lng)?.he ?? matched?.nameHe;
 
-    set({ latitude: lat, longitude: lng, cityHebcalKey: cityKey, placeName, source: 'gps' });
+    set({ latitude: lat, longitude: lng, cityHebcalKey: cityKey, localityCode: undefined, placeName, source: 'gps' });
     persistLocation(lat, lng, cityKey, 'gps', placeName);
   },
 
@@ -139,11 +144,29 @@ export const useLocationStore = create<LocationState>((set) => ({
       latitude:      coords.lat,
       longitude:     coords.lng,
       cityHebcalKey: hebcalKey,
+      localityCode:  undefined,
       placeName:     city.nameHe,
       source:        'manual',
     });
     persistLocation(coords.lat, coords.lng, hebcalKey, 'manual', city.nameHe);
 
+    return true;
+  },
+
+  // An Israeli locality from the CBS list: its own centroid, which also
+  // tells getCandleLightingOffset which locality it is.
+  setLocationFromLocality: (code) => {
+    const loc = findLocalityByCode(code);
+    if (!loc) return false;
+    set({
+      latitude:      loc.lat,
+      longitude:     loc.lng,
+      cityHebcalKey: undefined,
+      localityCode:  loc.code,
+      placeName:     loc.he,
+      source:        'manual',
+    });
+    persistLocation(loc.lat, loc.lng, undefined, 'manual', loc.he, loc.code);
     return true;
   },
 
@@ -180,7 +203,9 @@ export const useLocationStore = create<LocationState>((set) => ({
 
       const matched = lookupCityByCoords(lat, lng);
       const cityHebcalKey = matched?.hebcalKey;
-      let placeName = matched?.nameHe;
+      // A locality within a few km names the place offline, before the
+      // curated-city match and the network fallback.
+      let placeName = findNearbyLocality(lat, lng)?.he ?? matched?.nameHe;
 
       if (!placeName) {
         // No curated city nearby — fall back to the one permitted network
@@ -192,7 +217,7 @@ export const useLocationStore = create<LocationState>((set) => ({
         if (resolved) placeName = resolved;
       }
 
-      set({ latitude: lat, longitude: lng, cityHebcalKey, placeName, source: 'gps' });
+      set({ latitude: lat, longitude: lng, cityHebcalKey, localityCode: undefined, placeName, source: 'gps' });
       persistLocation(lat, lng, cityHebcalKey, 'gps', placeName);
 
       return { ok: true, lat, lng, cityHebcalKey, placeName };
@@ -210,6 +235,7 @@ export const useLocationStore = create<LocationState>((set) => ({
     const cityKey       = p.location_city       ?? '';
     const sourceStr      = p.location_source     ?? 'default';
     const placeNameStr  = p.location_place_name ?? '';
+    const localityCode  = Number(p.location_locality ?? '') || undefined;
 
     const hasOwnLocation = Boolean(latStr && lngStr);
 
@@ -283,6 +309,12 @@ export const useLocationStore = create<LocationState>((set) => ({
     const source = (sourceStr === 'gps' || sourceStr === 'manual')
       ? (sourceStr as LocationSource)
       : 'default';
+
+    // A picked locality has no curated-city key on purpose; don't backfill one.
+    if (localityCode && findLocalityByCode(localityCode)) {
+      set({ latitude: lat, longitude: lng, cityHebcalKey: undefined, localityCode, placeName: placeNameStr || undefined, source });
+      return;
+    }
 
     // Migration: existing users may have lat/lng but no cityKey.
     // Run lookupCityByCoords to backfill; if still not found, use nearest.

@@ -1,7 +1,8 @@
 // app/locationPicker.tsx
-// Phase 4.5 — Location picker screen. Lists curated cities grouped
-// by country (Israel / International). User can also press a GPS
-// button to use device location.
+// Phase 4.5 — Location picker screen. Israel: the CBS list of Jewish and
+// mixed localities (ISRAEL_LOCALITIES, 2026-11-22) — the largest ones until
+// the user types, then search results. Abroad: the curated hebcal cities.
+// User can also press a GPS button to use device location.
 //
 // Selecting a city or confirming GPS updates LocationProvider and
 // pops back to the previous screen.
@@ -30,13 +31,18 @@ import { useLocationStore, type GpsResult } from '../src/providers/LocationProvi
 import { ScreenHeader } from '../src/components/common/ScreenHeader';
 import { Card } from '../src/components/ui/Card';
 import { SectionLabel } from '../src/components/ui/SectionLabel';
-import { CITIES, type CityEntry } from '../src/constants/cities';
+import { CITIES } from '../src/constants/cities';
+import { ISRAEL_LOCALITIES } from '../src/constants/israelLocalities';
+import { searchLocalities } from '../src/utils/localityLookup';
 import { radius } from '../src/constants/radius';
 import { typography, withFontFamily } from '../src/constants/typography';
 import type { ThemeColors } from '../src/hooks/useThemeColors';
 
 // ─── GPS acquisition UI state ──────────────────────────────────────────────────
 // Nothing renders until the first attempt (`idle`).
+
+/** Israeli localities shown before the user types (largest population first). */
+const TOP_LOCALITIES = 30;
 
 type GpsUiState =
   | { phase: 'idle' }
@@ -47,7 +53,9 @@ export default function LocationPickerScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const currentKey       = useLocationStore((s) => s.cityHebcalKey);
+  const currentLocality  = useLocationStore((s) => s.localityCode);
   const setFromCity      = useLocationStore((s) => s.setLocationFromCity);
+  const setFromLocality  = useLocationStore((s) => s.setLocationFromLocality);
 
   const [query, setQuery]     = useState('');
   const [gpsState, setGpsState] = useState<GpsUiState>({ phase: 'idle' });
@@ -57,20 +65,21 @@ export default function LocationPickerScreen() {
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Filter city list by Hebrew name or English key
-  const filteredCities = useMemo(() => {
-    const q = query.trim();
-    if (!q) return CITIES;
-    const lower = q.toLowerCase();
-    return CITIES.filter(
-      (c) =>
-        c.nameHe.includes(q) ||
-        c.hebcalKey.toLowerCase().includes(lower),
-    );
-  }, [query]);
+  const q = query.trim();
 
-  const israeli       = filteredCities.filter((c) => c.country === 'IL');
-  const international = filteredCities.filter((c) => c.country === 'INTL');
+  // Israel: the largest localities until the user types, then matches.
+  const israeli = useMemo(
+    () => (q ? searchLocalities(q) : ISRAEL_LOCALITIES.slice(0, TOP_LOCALITIES)),
+    [q],
+  );
+
+  // Abroad: the curated hebcal cities, by Hebrew name or English key.
+  const international = useMemo(() => {
+    const abroad = CITIES.filter((c) => c.country === 'INTL');
+    if (!q) return abroad;
+    const lower = q.toLowerCase();
+    return abroad.filter((c) => c.nameHe.includes(q) || c.hebcalKey.toLowerCase().includes(lower));
+  }, [q]);
 
   const handleUseGps = async () => {
     setGpsState({ phase: 'acquiring' });
@@ -79,6 +88,14 @@ export default function LocationPickerScreen() {
     setGpsState({ phase: 'done', result });
     if (result.ok) {
       router.back();
+    }
+  };
+
+  const handlePickLocality = (code: number) => {
+    if (setFromLocality(code)) {
+      router.back();
+    } else {
+      Alert.alert('שגיאה', 'לא הצלחנו לטעון את היישוב הזה. נסה אחר.');
     }
   };
 
@@ -132,7 +149,7 @@ export default function LocationPickerScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="חפש עיר…"
+            placeholder="חפש עיר או יישוב…"
             placeholderTextColor={colors.textTertiary}
             style={[styles.searchInput, { color: colors.textPrimary }]}
             textAlign="right"
@@ -146,16 +163,21 @@ export default function LocationPickerScreen() {
           <>
             <SectionLabel title="ישראל" colors={colors} inset={0} gapAbove={0} gapBelow={12} />
             <Card colors={colors} inset={0} radius={radius.lg}>
-              {israeli.map((city) => (
+              {israeli.map((loc) => (
                 <CityRow
-                  key={city.hebcalKey}
-                  city={city}
-                  isSelected={city.hebcalKey === currentKey}
+                  key={loc.code}
+                  name={loc.he}
+                  isSelected={loc.code === currentLocality}
                   colors={colors}
-                  onPress={() => handlePickCity(city.hebcalKey)}
+                  onPress={() => handlePickLocality(loc.code)}
                 />
               ))}
             </Card>
+            {!q && (
+              <Text style={[styles.hint, { color: colors.textTertiary }]}>
+                {`ועוד ${ISRAEL_LOCALITIES.length - TOP_LOCALITIES} יישובים — הקלידו שם כדי לחפש`}
+              </Text>
+            )}
           </>
         )}
 
@@ -167,7 +189,7 @@ export default function LocationPickerScreen() {
               {international.map((city) => (
                 <CityRow
                   key={city.hebcalKey}
-                  city={city}
+                  name={city.nameHe}
                   isSelected={city.hebcalKey === currentKey}
                   colors={colors}
                   onPress={() => handlePickCity(city.hebcalKey)}
@@ -177,7 +199,7 @@ export default function LocationPickerScreen() {
           </>
         )}
 
-        {filteredCities.length === 0 && (
+        {israeli.length === 0 && international.length === 0 && (
           <Text style={[styles.emptyState, { color: colors.textTertiary }]}>
             {`לא נמצאו תוצאות עבור "${query}"`}
           </Text>
@@ -319,13 +341,13 @@ function StatusGlyph({ glyph, color }: { glyph: string; color: string }) {
 // ─── CityRow ───────────────────────────────────────────────────────────────────
 
 function CityRow({
-  city,
+  name,
   isSelected,
   isLast = false,
   colors,
   onPress,
 }: {
-  city: CityEntry;
+  name: string;
   isSelected: boolean;
   isLast?: boolean;
   colors: ThemeColors;
@@ -344,7 +366,7 @@ function CityRow({
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={city.nameHe}
+      accessibilityLabel={name}
       accessibilityState={{ selected: isSelected }}
     >
       <PinIcon
@@ -358,7 +380,7 @@ function CityRow({
           isSelected && styles.cityNameSelected,
         ]}
       >
-        {city.nameHe}
+        {name}
       </Text>
       {isSelected && (
         <Text style={[styles.checkmark, { color: colors.accent }]}>✓</Text>
@@ -426,6 +448,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // Below the Israel card when nothing is typed: how to reach the rest.
+  hint: {
+    ...withFontFamily(typography.bodySmall),
+    textAlign: 'center',
+    marginTop: 10,
+  },
   emptyState: {
     ...withFontFamily(typography.bodySmall),
     textAlign: 'center',
