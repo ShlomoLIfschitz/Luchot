@@ -14,3 +14,5 @@
 - Not verified on a device.
 ### Next steps
 - Merge PR #33 (stop-check hooks) once `main` is green.
+
+- Correction (2026-11-23): the revert above did not last. Commit `65a0421` added the `expo-sqlite` and `expo-status-bar` config plugins back, and they are in `app.json` on `main`. `2026-11-16-holiday-feedback.md` is right: the next release is a full build.

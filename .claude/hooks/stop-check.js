@@ -17,7 +17,20 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { readStdin, projectDir, workflowConfig, readChanged, isInside, worktreeRoot, samePath, logEvent } = require('./lib');
+const { readStdin, projectDir, workflowConfig, readChanged, changedSince, isInside, worktreeRoot, samePath, logEvent } = require('./lib');
+
+// A work log entry the change list didn't see (written by a shell command, retro 2026-11-22 P1):
+// it counts if git shows it new or changed in this checkout, or committed since the session began.
+function logInGit(root, rels, since) {
+  const st = spawnSync('git', ['status', '--porcelain', '--', ...rels], { cwd: root, encoding: 'utf8', timeout: 15000 });
+  if (st.status !== 0) return false;
+  if (st.stdout.trim()) return true;
+  if (!since) return false;
+  const lg = spawnSync('git', ['log', '-20', '--format=%ct', '--', ...rels], { cwd: root, encoding: 'utf8', timeout: 15000 });
+  if (lg.status !== 0) return false;
+  const start = Math.floor(since / 1000);
+  return lg.stdout.split(/\r?\n/).filter(Boolean).some(t => Number(t) >= start);
+}
 
 function uncommitted(dir, files) {
   const r = spawnSync('git', ['status', '--porcelain', '--', ...files], { cwd: dir, encoding: 'utf8', timeout: 15000 });
@@ -42,6 +55,7 @@ readStdin().then(input => {
   const cfg = workflowConfig(dir);
   const changed = readChanged(input.session_id).filter(f => isInside(f, dir));
   const note = longSessionNote(input, cfg);
+  const since = changedSince(input.session_id);
 
   const problems = [];
   const missing = []; // for the event log
@@ -57,7 +71,8 @@ readStdin().then(input => {
     const where = samePath(root, dir) ? '' : `In ${path.relative(dir, root).split(path.sep).join('/')}: `;
     const workLog = path.resolve(root, cfg.workLog);
     const logDir = cfg.workLogDir ? path.resolve(root, cfg.workLogDir) : null;
-    if (!files.some(f => samePath(f, workLog) || (logDir && isInside(f, logDir)))) {
+    const logRels = [workLog, logDir].filter(Boolean).map(p => path.relative(root, p) || '.');
+    if (!files.some(f => samePath(f, workLog) || (logDir && isInside(f, logDir))) && !logInGit(root, logRels, since)) {
       problems.push(where + (logDir
         ? `No work log entry this session: add ${cfg.workLogDir}/YYYY-MM-DD-<topic>.md.`
         : `${cfg.workLog} was not updated this session.`));
