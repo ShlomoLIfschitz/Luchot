@@ -34,9 +34,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Pure node:test scripts (no device): .ics parser, device-sync plan, reminder config.
+      # Pure node:test scripts (no device): .ics parser, device-sync plan, reminder config, holiday display.
       - name: Script tests
-        run: npm run test:ics && npm run test:sync && npm run test:reminders
+        run: npm run test:ics && npm run test:sync && npm run test:reminders && npm run test:holidays
 
       - name: Expo doctor
         run: npx expo-doctor
