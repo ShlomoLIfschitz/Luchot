@@ -42,6 +42,12 @@ function readChanged(sessionId) {
   try { return JSON.parse(fs.readFileSync(stateFile(sessionId), 'utf8')); } catch { return []; }
 }
 
+// When the session first changed a file (the change list's creation time), in ms; null if unknown.
+// Falls back to mtime where the file system has no birth time (later, so it errs toward a reminder).
+function changedSince(sessionId) {
+  try { const st = fs.statSync(stateFile(sessionId)); return st.birthtimeMs || st.mtimeMs || null; } catch { return null; }
+}
+
 // Windows paths compare case-insensitively (c: vs C:).
 const key = p => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
 
@@ -151,4 +157,4 @@ function logEvent(input, hook, details) {
   } catch { /* logging is best effort */ }
 }
 
-module.exports = { readStdin, projectDir, workflowConfig, readChanged, addChanged, isInside, worktreeRoot, samePath, workLogEntryFiles, logEvent, redact };
+module.exports = { readStdin, projectDir, workflowConfig, readChanged, changedSince, addChanged, isInside, worktreeRoot, samePath, workLogEntryFiles, logEvent, redact };
