@@ -1,6 +1,16 @@
 # Luchot — Roadmap
 
-> **Status snapshot — UI redesign + location unification complete (2026-08-30).**
+> **Status snapshot — closed testing on Google Play (2026-11-25).**
+> Build 24 (1.0.0, versionCode 24) is live on the Alpha (closed testing) track since
+> 2026-11-23. It carries the full Israeli localities list with outposts (PR #41),
+> hebcal.com candle-lighting offsets (Jerusalem and Petah Tikva 40, Haifa and Zikhron
+> Ya'akov 30, rest of Israel 20), the keyboard fix in the note editor, and the portrait
+> hardware feature declared not required (PR #42, which Play had blocked on build 22).
+>
+> **The long pole is Play production access, not code** — see "Play Store production
+> track" under Phase 5. Target date to request it: **2026-12-01**.
+>
+> **Status snapshot (earlier) — UI redesign + location unification complete (2026-08-30).**
 > Commits `0b26677` (data layer) and `5f02771` (UI redesign). Design was built and
 > approved in Figma before any UI code was written.
 >
@@ -195,6 +205,32 @@ updates LocationProvider.
 
 ### Bug fixes (active) — A: theme persistence · B: event indicators in day cells
 
+### Play Store production track *(ACTIVE — 2026-11-25)*
+Personal Play Console accounts must run a closed test with at least 12 opted-in testers
+for 14 consecutive days before they may request production access. Dashboard on
+2026-11-23: release published to closed testing ✅, 12 testers joined ✅, "12 testers
+opted in for 6 consecutive days" ⏳.
+
+- **2026-12-01** — earliest date to request production access, if no tester opts out
+  (an opt-out may reset the 14-day count, so ask testers to stay in).
+- Until then: no new full build to testers without a strong reason; JS-only changes go
+  by OTA (`production` OTA is Shlomo's step).
+- Before the request: privacy policy URL and Data safety form (status not verified —
+  check in Play Console), plus Google's questions about the closed test.
+- After access is granted: production release (Shlomo's step, closed-list stop 1).
+  Release order and store checklist: `docs/agentic/deploy.md`.
+
+### Tester feedback round 1 ✅ (2026-11-16 → 2026-11-23)
+Full holiday text in month cells; Nach Yomi book names in Hebrew; state-only civil days
+optional and off by default (memorial days, Independence Day, Jerusalem Day, Sigd always
+shown); Rosh Chodesh alongside Family Day; keyboard no longer hides Save in the note
+editor (PRs #34, #36).
+
+### Locations and candle-lighting ✅ (PR #41, 2026-11-22)
+CBS localities list (Jewish and mixed, 1108) plus 112 outposts and farms (1220 places),
+offline search; candle-lighting offsets match hebcal.com, with Petah Tikva 40 by
+Shlomo's decision. Detail: `docs/worklog/2026-11-22-israel-localities.md`.
+
 ### Wave 4 — .ics export/import + device calendar sync
 Export ✅ (`IcsExportService.ts`). Import: not built yet. **Reopened 2026-11-01:**
 opt-in Google Calendar sync through the device calendar provider (`expo-calendar`),
@@ -209,7 +245,8 @@ release: Expo SDK upgrade to target API 36.
 - **Yerushalmi Yomi** — available in @hebcal/learning; add to DayData + Details screen.
 - **Per-hour notes** — time-anchored note entries in the Day screen's hourly schedule. EventSchema `start.dateTime` field exists (Google Calendar compat); just needs NoteEditor time picker + Day screen rendering.
 - **Rabbanut shita (proper implementation)** — Phase 4.1 removed RABBANUT because the old code silently computed GRA. Implement correctly: Rabbanut = GRA-based with Jerusalem-specific adjustments + per-city candle times. Now unblocked (location picker is complete).
-- **Expanded city candle-lighting list** — `candleLightingOffset.ts` currently hardcodes Jerusalem/Haifa/Safed. Now that the 36-city picker exists, replace the bounding-box approach with the curated city list for the ~15 cities that have non-default offsets.
+- ~~**Expanded city candle-lighting list**~~ ✅ done in PR #41 (2026-11-22): offsets follow hebcal.com plus Petah Tikva 40; a picked locality is matched by its exact centroid.
+- **.ics import** — the remaining half of Wave 4 (export exists). JS only, ships by OTA.
 - **Havdalah custom selection** — currently `tzeitHakochavim` (8.5° twilight). Add per-user preference for Rabbeinu Tam (72 min) or 50-minute convention.
 - **Week view expansion** — swipe between weeks; Week screen currently shows only the week containing `selectedDate`.
 - **Accessibility** — dynamic type, screen reader labels (`accessibilityRole`, `accessibilityLabel`), RTL-aware focus order.
@@ -242,6 +279,8 @@ Phase 3 completion gets us roughly 90% there. Phase 4 closes the remaining 10%.
 
 > **תמונת מצב — MVP הושלם (2026-05-27). תויג `mvp-1.0.0`.**
 > Phases 4.5–4.7 הושלמו. הפצת APK בתהליך (EAS Build, פרופיל preview — מכסה מתאפסת 2026-06-01). Phase 5 הוא הבא — ממתין למשוב משתמשים.
+>
+> **עדכון 2026-11-25:** החלק הזה הוא עותק היסטורי. המצב העדכני נמצא בחלק האנגלי למעלה: build 24 בבדיקה סגורה ב-Play, והבקשה לגישה ל-production מוקדם ביותר ב-1 בדצמבר 2026.
 
 המסמך הזה הוא מפת התלויות וסדר העבודה של לוחות. כל שלב מציין את מה שהוא מכיל, במה הוא תלוי, ומה הוא משחרר אחריו. הפירוט המלא של כל משימה חי ב-prompts שה-Architect כותב ל-Claude Code בזמן ביצוע — לא כאן.
 
